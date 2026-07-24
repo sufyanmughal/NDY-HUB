@@ -1,0 +1,17 @@
+{
+  "name": "ndy-hub",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev --workspace apps/api",
+    "dev:web": "npm run dev --workspace apps/web",
+    "build:api": "npm run build --workspace apps/api",
+    "build:web": "npm run build --workspace apps/web",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "prisma:generate": "npm run --workspace apps/api exec -- prisma generate",
+    "prisma:migrate": "npm run --workspace apps/api exec -- prisma migrate dev"
+  }
+}

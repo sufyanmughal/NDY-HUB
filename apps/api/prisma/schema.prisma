@@ -1,0 +1,109 @@
+// NDY HUB — Core API database schema
+// Milestone 1 (Identity core): User, NDY ID, Passport verification, login-request tokens.
+// Everything else (membership, CRYNDY, webhooks, documents) gets added in later milestones
+// on top of this — this file is the system of record, nothing else writes identity data.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum VerificationLevel {
+  LEVEL_0 // registered, nothing confirmed yet
+  LEVEL_1 // email confirmed
+  LEVEL_2 // + phone confirmed
+  LEVEL_3 // + identity document confirmed
+}
+
+enum LoginRequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+  EXPIRED
+}
+
+enum LoginRequestMethod {
+  QR
+  DEEP_LINK
+}
+
+model User {
+  id                String            @id @default(uuid())
+  ndyId             String            @unique // e.g. NDY-4F82XK — generated once, never reused, never editable
+  email             String            @unique
+  passwordHash      String?           // null for users who only ever sign in via Google/Apple/NDYAPPS
+  fullName          String?
+  profilePhotoUrl   String?
+  verificationLevel VerificationLevel @default(LEVEL_0)
+  emailVerifiedAt   DateTime?
+  phoneVerifiedAt   DateTime?
+  identityVerifiedAt DateTime?
+
+  ndyappsConnected  Boolean           @default(false)
+  ndyappsConnectedAt DateTime?
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  loginRequests      LoginRequest[]
+  authIdentities      AuthIdentity[]
+  sessions            Session[]
+
+  @@index([ndyId])
+}
+
+// One row per external login method (Google, Apple, NDYAPPS) linked to a single User,
+// so the same person never ends up with two accounts because they signed in a different way.
+model AuthIdentity {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider   String   // "password" | "google" | "apple" | "ndyapps"
+  providerId String   // subject/id from that provider; unused for "password"
+  createdAt  DateTime @default(now())
+
+  @@unique([provider, providerId])
+  @@index([userId])
+}
+
+// The QR / deep-link login handshake described in the proposal: short-lived, single-use.
+model LoginRequest {
+  id            String              @id @default(uuid())
+  token         String              @unique
+  method        LoginRequestMethod
+  status        LoginRequestStatus  @default(PENDING)
+
+  requestingIp       String?
+  requestingDevice   String?
+  requestingBrowser  String?
+  requestingLocation String?
+
+  userId        String?             // set once approved
+  user          User?               @relation(fields: [userId], references: [id])
+
+  expiresAt     DateTime
+  approvedAt    DateTime?
+  deniedAt      DateTime?
+  createdAt     DateTime            @default(now())
+
+  @@index([token])
+  @@index([status])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken String   @unique
+  userAgent    String?
+  ip           String?
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+
+  @@index([userId])
+}

@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+/*
+  NDY HUB runs one committed look — the dark, premium console from the
+  reference mockup — rather than following the OS light/dark preference.
+  That's a deliberate call for an internal ecosystem dashboard, not an
+  oversight.
+*/
+:root {
+  --background: #0a0d16;
+  --surface: #10141f;
+  --surface-2: #171c2b;
+  --border: #232a3d;
+  --foreground: #eef1f8;
+  --foreground-muted: #8891a8;
+  --accent: #4f7cff;
+  --accent-2: #8b5cf6;
+  --good: #22c58b;
+  --warn: #e0a83c;
+  --critical: #f0605a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-critical: var(--critical);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
