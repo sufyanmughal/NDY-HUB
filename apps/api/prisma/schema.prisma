@@ -88,6 +88,9 @@ model LoginRequest {
   expiresAt     DateTime
   approvedAt    DateTime?
   deniedAt      DateTime?
+  // Set the moment the desktop side redeems an APPROVED request for a real
+  // session, via /exchange. Guards against exchanging the same approval twice.
+  sessionIssuedAt DateTime?
   createdAt     DateTime            @default(now())
 
   @@index([token])
@@ -95,15 +98,17 @@ model LoginRequest {
 }
 
 model Session {
-  id           String   @id @default(uuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  refreshToken String   @unique
-  userAgent    String?
-  ip           String?
-  createdAt    DateTime @default(now())
-  expiresAt    DateTime
-  revokedAt    DateTime?
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // SHA-256 of the refresh token, never the raw value — a leaked database
+  // row shouldn't be a usable credential.
+  refreshTokenHash String    @unique
+  userAgent        String?
+  ip               String?
+  createdAt        DateTime  @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
 
   @@index([userId])
 }

@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateNdyId } from '../common/ndy-id.util';
 
@@ -13,8 +17,14 @@ export class IdentityService {
    * Collisions are astronomically rare at this alphabet/length, but we still
    * retry on the unique-constraint error rather than trusting probability.
    */
-  async createUser(params: { email: string; passwordHash?: string; fullName?: string }) {
-    const existing = await this.prisma.user.findUnique({ where: { email: params.email } });
+  async createUser(params: {
+    email: string;
+    passwordHash?: string;
+    fullName?: string;
+  }) {
+    const existing = await this.prisma.user.findUnique({
+      where: { email: params.email },
+    });
     if (existing) {
       throw new ConflictException('An account with this email already exists.');
     }
@@ -31,14 +41,19 @@ export class IdentityService {
           },
         });
       } catch (err: unknown) {
-        if (isUniqueConstraintError(err, 'ndyId') && attempt < MAX_NDY_ID_ATTEMPTS - 1) {
+        if (
+          isUniqueConstraintError(err, 'ndyId') &&
+          attempt < MAX_NDY_ID_ATTEMPTS - 1
+        ) {
           continue;
         }
         throw err;
       }
     }
 
-    throw new ConflictException('Could not allocate a unique NDY ID, please retry.');
+    throw new ConflictException(
+      'Could not allocate a unique NDY ID, please retry.',
+    );
   }
 
   async findByNdyId(ndyId: string) {
