@@ -121,6 +121,15 @@ export class AuthService {
       throw new ConflictException('This login request was already handled.');
     }
 
+    // Approving a login request is proof the person has NDYAPPS and is
+    // using it — that's exactly the signal ndyappsConnected exists to
+    // record. Only flips false -> true, never touches an already-connected
+    // user's timestamp.
+    await this.prisma.user.updateMany({
+      where: { id: userId, ndyappsConnected: false },
+      data: { ndyappsConnected: true, ndyappsConnectedAt: new Date() },
+    });
+
     this.gateway.publishStatus(token, LoginRequestStatus.APPROVED);
     return this.prisma.loginRequest.findUniqueOrThrow({ where: { token } });
   }
