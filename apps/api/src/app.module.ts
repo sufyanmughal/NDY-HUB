@@ -5,6 +5,8 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { IdentityModule } from './identity/identity.module';
 import { AuthModule } from './auth/auth.module';
+import { CryndyModule } from './cryndy/cryndy.module';
+import { NdybitsModule } from './ndybits/ndybits.module';
 
 @Module({
   imports: [
@@ -12,6 +14,8 @@ import { AuthModule } from './auth/auth.module';
     PrismaModule,
     IdentityModule,
     AuthModule,
+    CryndyModule,
+    NdybitsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

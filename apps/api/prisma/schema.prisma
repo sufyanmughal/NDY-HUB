@@ -52,6 +52,8 @@ model User {
   loginRequests      LoginRequest[]
   authIdentities      AuthIdentity[]
   sessions            Session[]
+  cryndyPurchases     CryndyPurchase[]
+  ndybitsLedgerEntries NdybitsLedgerEntry[]
 
   @@index([ndyId])
 }
@@ -95,6 +97,74 @@ model LoginRequest {
 
   @@index([token])
   @@index([status])
+}
+
+// Milestone 5 (CRYNDY + NDYBITS): a purchase moving through the presale
+// pipeline, from payment intake through compliance review to on-chain
+// distribution. The status itself is the source of truth for what a user is
+// allowed to see as "available" — ALLOCATED/LOCKED CRYNDY is owned but not
+// yet spendable, and only AVAILABLE/DISTRIBUTED_ON_CHAIN should ever be
+// summed into a balance a user can act on.
+enum CryndyPurchaseStatus {
+  PAYMENT_PENDING
+  PAYMENT_CONFIRMED
+  UNDER_REVIEW
+  VERIFIED
+  ALLOCATED
+  LOCKED
+  AVAILABLE
+  DISTRIBUTED_ON_CHAIN
+  CANCELLED
+  REFUNDED
+}
+
+model CryndyPurchase {
+  id        String @id @default(uuid())
+  // Human-facing receipt number, e.g. CRY-2026-07-000184. Distinct from `id`
+  // (uuid) so support/finance can reference something readable; not relied
+  // on for uniqueness enforcement anywhere else in the system.
+  reference String @unique
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amountPaid Decimal @db.Decimal(18, 2)
+  currency   String // ISO 4217, e.g. "USD"
+
+  cryndyAmount Decimal @db.Decimal(28, 8)
+  bonusAmount  Decimal @default(0) @db.Decimal(28, 8)
+  packageName  String?
+
+  paymentMethod String // e.g. "card", "bank_transfer", "crypto"
+  status        CryndyPurchaseStatus @default(PAYMENT_PENDING)
+
+  // The presale site's own transaction id. Unique so the same webhook
+  // delivery, replayed any number of times, only ever produces one row.
+  providerTransactionId String @unique
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  verifiedAt  DateTime?
+  allocatedAt DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Append-only NDYBITS movement log. Balance is derived by summing this
+// table rather than kept as a cached counter on User — see NdybitsService
+// for why (correctness over micro-optimizing a read that isn't hot yet).
+model NdybitsLedgerEntry {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amount Int // positive = credit, negative = debit
+  reason String // e.g. "daily_login", "referral_bonus", "purchase_reward"
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Session {
