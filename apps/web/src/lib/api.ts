@@ -47,6 +47,33 @@ export function exchangeLoginRequest(token: string): Promise<IssuedSession> {
   });
 }
 
+export function refreshSession(refreshToken: string): Promise<IssuedSession> {
+  return apiFetch<IssuedSession>("/auth/refresh", {
+    method: "POST",
+    body: JSON.stringify({ refreshToken }),
+  });
+}
+
+export function logoutSession(refreshToken: string): Promise<void> {
+  return apiFetch<void>("/auth/logout", {
+    method: "POST",
+    body: JSON.stringify({ refreshToken }),
+  });
+}
+
+export interface PublicPassport {
+  ndyId: string;
+  fullName: string | null;
+  profilePhotoUrl: string | null;
+  verificationLevel: string;
+  ndyappsConnected: boolean;
+  memberSince: string;
+}
+
+export function getPublicPassport(ndyId: string): Promise<PublicPassport> {
+  return apiFetch<PublicPassport>(`/passport/${ndyId}`);
+}
+
 /**
  * What the QR code actually encodes — a deep link NDYAPPS registers itself
  * to open. The web-only fallback query param lets a browser that scans this

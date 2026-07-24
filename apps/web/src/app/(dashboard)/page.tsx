@@ -1,33 +1,44 @@
+"use client";
+
+import Link from "next/link";
 import { StatTile } from "@/components/stat-tile";
+import { useAuth } from "@/lib/auth-context";
+import { usePassport } from "@/lib/use-passport";
 import { mockUser, mockTransactions, mockPlatforms } from "@/lib/mock-data";
 
 export default function DashboardPage() {
+  const { auth } = useAuth();
+  const passport = usePassport();
+  if (auth.status !== "authenticated") return null;
+
   const connectedCount = mockPlatforms.filter((p) => p.status === "Connected").length;
+  const firstName = (passport?.fullName ?? auth.ndyId).split(" ")[0];
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">
-        Welcome back, {mockUser.firstName}
-      </h1>
+      <h1 className="text-2xl font-semibold">Welcome back, {firstName}</h1>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="NDY ID" value={mockUser.ndyId} />
+        <StatTile label="NDY ID" value={auth.ndyId} />
         <StatTile
           label="Passport"
-          value={mockUser.passportVerified ? "Verified" : "Unverified"}
-          badge={{ text: `Level ${mockUser.verificationLevel}`, tone: "good" }}
+          value={passport ? "Verified" : "…"}
+          badge={passport ? { text: `Level ${passport.verificationLevel.replace("LEVEL_", "")}`, tone: "good" } : undefined}
         />
+        {/* Membership is still mock data — the billing module (M4) hasn't landed yet. */}
         <StatTile label="Membership" value={mockUser.membership} />
         <StatTile
           label="NDYAPPS"
-          value={mockUser.ndyappsConnected ? "Connected" : "Not connected"}
+          value={passport?.ndyappsConnected ? "Connected" : "Not connected"}
           badge={{
-            text: mockUser.ndyappsConnected ? "Active" : "Action needed",
-            tone: mockUser.ndyappsConnected ? "good" : "warn",
+            text: passport?.ndyappsConnected ? "Active" : "Action needed",
+            tone: passport?.ndyappsConnected ? "good" : "warn",
           }}
         />
       </div>
 
+      {/* CRYNDY, NDYBITS, and Connected Platforms are still mock data — the
+          CRYNDY/NDYBITS pipeline (M5) hasn't been merged into this branch yet. */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label="CRYNDY Balance" value={mockUser.cryndyBalance.toLocaleString()} />
         <StatTile label="NDYBITS Balance" value={mockUser.ndybitsBalance.toLocaleString()} />
@@ -65,16 +76,16 @@ export default function DashboardPage() {
             <div>
               <div className="text-sm font-medium">All systems secure</div>
               <div className="text-xs text-foreground-muted">
-                Last login: {mockUser.lastLogin.when} · {mockUser.lastLogin.where}
+                Signed in as {auth.ndyId}
               </div>
             </div>
           </div>
-          <a
+          <Link
             href="/security"
             className="mt-4 inline-block rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
           >
             View Security
-          </a>
+          </Link>
         </div>
       </div>
     </div>

@@ -5,9 +5,18 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import { buildLoginDeepLink } from "@/lib/api";
 import { useLoginRequest } from "@/lib/use-login-request";
+import { useAuth } from "@/lib/auth-context";
 
 export function QrLoginCard() {
   const { state, restart } = useLoginRequest();
+  const { login } = useAuth();
+
+  // Hands the issued session to AuthProvider the moment the exchange
+  // succeeds, so DashboardGate sees an authenticated user the instant
+  // someone clicks through instead of re-deriving it from scratch.
+  useEffect(() => {
+    if (state.phase === "success") login(state.session);
+  }, [state, login]);
 
   return (
     <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 text-center">

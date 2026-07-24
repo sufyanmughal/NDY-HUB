@@ -1,6 +1,16 @@
+"use client";
+
+import { useAuth } from "@/lib/auth-context";
+import { usePassport } from "@/lib/use-passport";
 import { mockUser } from "@/lib/mock-data";
 
 export default function PassportPage() {
+  const { auth } = useAuth();
+  const passport = usePassport();
+  if (auth.status !== "authenticated") return null;
+
+  const displayName = passport?.fullName ?? "Name not set yet";
+
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-semibold">NDY Passport</h1>
@@ -11,23 +21,28 @@ export default function PassportPage() {
       <div className="mt-6 overflow-hidden rounded-xl border border-border bg-surface">
         <div className="flex items-center gap-4 border-b border-border bg-surface-2 p-5">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-2 text-xl font-semibold text-white">
-            {mockUser.fullName.charAt(0)}
+            {displayName.charAt(0)}
           </div>
           <div>
-            <div className="text-lg font-semibold">{mockUser.fullName}</div>
-            <div className="font-mono text-sm text-foreground-muted">{mockUser.ndyId}</div>
+            <div className="text-lg font-semibold">{displayName}</div>
+            <div className="font-mono text-sm text-foreground-muted">{auth.ndyId}</div>
           </div>
           <span className="ml-auto rounded-full bg-good/15 px-3 py-1 text-xs font-medium text-good">
-            Verified
+            {passport ? "Verified" : "Loading…"}
           </span>
         </div>
 
         <dl className="divide-y divide-border text-sm">
+          {/* Membership, CRYNDY, and NDYBITS rows are still mock data until
+              the billing (M4) and CRYNDY/NDYBITS (M5) modules land. */}
           <Row label="Membership" value={mockUser.membership} />
           <Row label="CRYNDY Holdings" value={`${mockUser.cryndyBalance.toLocaleString()} CRYNDY`} />
           <Row label="NDYBITS" value={`${mockUser.ndybitsBalance.toLocaleString()} NDYBITS`} />
           <Row label="Connected Platforms" value={`${mockUser.connectedPlatformsCount} Platforms`} />
-          <Row label="Verification Level" value={`Level ${mockUser.verificationLevel}`} />
+          <Row
+            label="Verification Level"
+            value={passport ? `Level ${passport.verificationLevel.replace("LEVEL_", "")}` : "…"}
+          />
         </dl>
       </div>
 

@@ -1,6 +1,22 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { QrLoginCard } from "@/components/qr-login-card";
+import { useAuth } from "@/lib/auth-context";
 
 export default function LoginPage() {
+  const { auth } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (auth.status === "authenticated") router.replace("/");
+  }, [auth.status, router]);
+
+  if (auth.status !== "unauthenticated") {
+    return null;
+  }
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 p-6">
       <div className="text-center">

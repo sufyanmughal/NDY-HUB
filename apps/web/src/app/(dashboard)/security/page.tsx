@@ -10,11 +10,12 @@ export default function SecurityPage() {
         description="Active sessions, login history, NDYAPPS connection controls, and 2FA — the QR/deep-link login work in M3 is what this page is built on top of."
       />
       <p className="text-sm text-foreground-muted">
-        The QR login flow itself is already wired up end to end —{" "}
+        You&apos;re seeing this page because the QR login flow at{" "}
         <Link href="/login" className="text-accent hover:underline">
-          see it working here
-        </Link>
-        . It talks to the real API; this dashboard just doesn&apos;t consume the session yet.
+          /login
+        </Link>{" "}
+        already gates the whole dashboard — the session it issues is real, this page listing
+        it and letting you revoke it isn&apos;t built yet.
       </p>
     </div>
   );

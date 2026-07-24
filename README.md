@@ -46,19 +46,24 @@ ndy-hub/
 - Dashboard shell with the full nav from the mockup: Dashboard, NDY Passport,
   Memberships, CRYNDY, NDYBITS, Connected Platforms, Transactions, Documents,
   Security, Settings, Support.
-- Dashboard overview and NDY Passport pages built against mock data, matching the
-  layout in the client's reference mockup. Everything else still unbuilt is a
-  labeled placeholder stating which milestone fills it in — not a broken link.
 - **`/login`** — a real, working QR login page. Generates the login request against
   the API, renders the QR code, subscribes to the WebSocket for live status, falls
   back to polling if the socket doesn't connect, and exchanges an approval for a
-  session the moment it lands. Nothing about it is mocked; it just doesn't have
-  NDYAPPS on the other end yet, so approving it means calling the API directly
-  (see "Testing the login flow" below).
-
-**Not built yet, on purpose:** the dashboard doesn't consume the session `/login`
-produces — there's no cookie, no auth-gated routing, no "logged in as" state yet.
-That's the next slice: wiring the session into the dashboard shell itself.
+  session the moment it lands.
+- **The session is real end to end now.** `AuthProvider` (`src/lib/auth-context.tsx`)
+  holds it, `DashboardGate` (`src/app/(dashboard)/layout.tsx`) redirects to `/login`
+  if there isn't one and bounces already-logged-in visitors away from `/login`
+  itself, and the access token auto-refreshes on load if it's gone stale. The
+  Dashboard overview, Passport page, and Topbar all show your real NDY ID and
+  Passport (fetched from `GET /passport/:ndyId`) instead of mock data — Membership,
+  CRYNDY, and NDYBITS numbers on those same pages are still mock, clearly commented
+  as such, because M4/M5 haven't landed in this branch yet.
+- Everything not yet built is a labeled placeholder stating which milestone fills
+  it in — not a broken link.
+- **Known gap, on purpose:** sessions live in `localStorage`, not an httpOnly
+  cookie (see the comment in `src/lib/auth-client.ts`). Fine for local dev, not
+  the final security posture the proposal commits to — swap this before any real
+  traffic touches it.
 
 ## Running it locally
 
@@ -103,12 +108,13 @@ curl -s -X POST http://localhost:3000/auth/login-request/<token>/approve \
 ```
 
 The browser tab should flip to "You're logged in" within a second or two over the
-WebSocket, without any manual refresh.
+WebSocket, without any manual refresh, and land you on a real dashboard showing
+that account's actual NDY ID and Passport.
 
 ## Next up (per the build sequence)
 
-1. Wire the session `/login` issues into the dashboard shell — cookie storage,
-   auth-gated routing, a real "logged in as" state instead of mock data.
+1. Move sessions from `localStorage` to an httpOnly cookie set by the API —
+   the real security posture, not the dev placeholder.
 2. Freeze the login API contract so the NDYAPPS developer can start building
    against it (milestone 3) — the endpoints above are already stable enough to
    hand off.
