@@ -1,0 +1,39 @@
+import { Module } from '@nestjs/common';
+import { OAuthClientService } from './oauth-client.service';
+import { OAuthClientAdminController } from './oauth-client-admin.controller';
+import { AuthorizationCodeService } from './authorization-code.service';
+import { GrantService } from './grant.service';
+import { OAuthTokenService } from './oauth-token.service';
+import { OAuthAccessTokenGuard } from './guards/oauth-access-token.guard';
+import { AuthorizeController } from './authorize.controller';
+import { TokenController } from './token.controller';
+import { UserInfoController } from './userinfo.controller';
+import { DiscoveryController } from './discovery.controller';
+import { GrantsController } from './grants.controller';
+import { AuthModule } from '../auth/auth.module';
+import { IdentityModule } from '../identity/identity.module';
+
+@Module({
+  // AuthModule: JwtAuthGuard (consent/status/grants endpoints), AdminGuard,
+  // and the shared JwtModule (OAuthTokenService signs with the same
+  // JwtService). IdentityModule: user lookups the token/userinfo endpoints
+  // both need.
+  imports: [AuthModule, IdentityModule],
+  controllers: [
+    OAuthClientAdminController,
+    AuthorizeController,
+    TokenController,
+    UserInfoController,
+    DiscoveryController,
+    GrantsController,
+  ],
+  providers: [
+    OAuthClientService,
+    AuthorizationCodeService,
+    GrantService,
+    OAuthTokenService,
+    OAuthAccessTokenGuard,
+  ],
+  exports: [GrantService],
+})
+export class OAuthModule {}

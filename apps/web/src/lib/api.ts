@@ -428,6 +428,65 @@ export function getAdminAuditLog(accessToken: string): Promise<{ entries: AuditL
   return authedFetch("/admin/audit-log?take=25", accessToken);
 }
 
+// --- OAuth / OIDC consent (SSO for third-party NDJOYIT sites) ---
+
+export interface OAuthClientPublicInfo {
+  clientId: string;
+  name: string;
+  allowedScopes: string[];
+}
+
+export interface OAuthScopeDescription {
+  scope: string;
+  description: string;
+}
+
+export interface OAuthAuthorizeStatus {
+  client: OAuthClientPublicInfo;
+  scopeDescriptions: OAuthScopeDescription[];
+  alreadyGranted: boolean;
+}
+
+export function getOAuthAuthorizeStatus(
+  accessToken: string,
+  clientId: string,
+  scope: string,
+): Promise<OAuthAuthorizeStatus> {
+  const params = new URLSearchParams({ client_id: clientId, scope });
+  return authedFetch<OAuthAuthorizeStatus>(`/oauth/authorize/status?${params.toString()}`, accessToken);
+}
+
+export interface OAuthConsentResult {
+  redirectUrl: string;
+}
+
+export function submitOAuthConsent(
+  accessToken: string,
+  params: { clientId: string; redirectUri: string; scope: string; state?: string; approve: boolean },
+): Promise<OAuthConsentResult> {
+  return authedFetch<OAuthConsentResult>("/oauth/authorize/consent", accessToken, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export interface ConnectedSite {
+  id: string;
+  clientName: string;
+  clientId: string;
+  scope: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function getConnectedSites(accessToken: string): Promise<ConnectedSite[]> {
+  return authedFetch<ConnectedSite[]>("/oauth/grants", accessToken);
+}
+
+export function revokeConnectedSite(accessToken: string, grantId: string): Promise<void> {
+  return authedFetch<void>(`/oauth/grants/${grantId}`, accessToken, { method: "DELETE" });
+}
+
 /**
  * What the QR code actually encodes — a deep link NDYAPPS registers itself
  * to open. The web-only fallback query param lets a browser that scans this

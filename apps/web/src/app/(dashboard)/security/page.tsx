@@ -2,13 +2,23 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { getMySessions, revokeSessionById, revokeAllSessions, type SecuritySession } from "@/lib/api";
+import {
+  getMySessions,
+  revokeSessionById,
+  revokeAllSessions,
+  getConnectedSites,
+  revokeConnectedSite,
+  type SecuritySession,
+  type ConnectedSite,
+} from "@/lib/api";
 
 export default function SecurityPage() {
   const { auth, logout } = useAuth();
   const [sessions, setSessions] = useState<SecuritySession[] | null>(null);
+  const [sites, setSites] = useState<ConnectedSite[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [siteBusyId, setSiteBusyId] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     if (auth.status !== "authenticated") return;
@@ -17,9 +27,17 @@ export default function SecurityPage() {
       .catch((err) => setError((err as Error).message));
   }, [auth]);
 
+  const refreshSites = useCallback(() => {
+    if (auth.status !== "authenticated") return;
+    getConnectedSites(auth.accessToken)
+      .then(setSites)
+      .catch((err) => setError((err as Error).message));
+  }, [auth]);
+
   useEffect(() => {
     refresh();
-  }, [refresh]);
+    refreshSites();
+  }, [refresh, refreshSites]);
 
   if (auth.status !== "authenticated") return null;
   const accessToken = auth.accessToken;
@@ -34,6 +52,19 @@ export default function SecurityPage() {
       setError((err as Error).message);
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function handleRevokeSite(grantId: string) {
+    setSiteBusyId(grantId);
+    setError(null);
+    try {
+      await revokeConnectedSite(accessToken, grantId);
+      refreshSites();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSiteBusyId(null);
     }
   }
 
@@ -111,10 +142,42 @@ export default function SecurityPage() {
         )}
       </div>
 
+      <div className="rounded-lg border border-border bg-surface p-5">
+        <h2 className="text-sm font-medium text-foreground-muted">Connected Websites</h2>
+        {sites && sites.length === 0 ? (
+          <p className="mt-3 text-sm text-foreground-muted">
+            No third-party sites are connected to your NDY HUB account yet.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-border">
+            {sites?.map((site) => (
+              <li key={site.id} className="flex items-center justify-between py-3 text-sm">
+                <div>
+                  <div className="font-medium">{site.clientName}</div>
+                  <div className="text-xs text-foreground-muted">
+                    Access: {site.scope.split(" ").join(", ")} · Connected{" "}
+                    {new Date(site.createdAt).toLocaleString()}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleRevokeSite(site.id)}
+                  disabled={siteBusyId === site.id}
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-2 disabled:opacity-50"
+                >
+                  {siteBusyId === site.id ? "…" : "Revoke"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <p className="text-xs text-foreground-muted">
         Revoking a session stops it from staying signed in past its current 15-minute access
-        token — it can no longer refresh into a new one. NDYAPPS connection controls and login
-        history land in a later milestone.
+        token — it can no longer refresh into a new one. Revoking a connected website also kills
+        every refresh token it holds for your account, so it can&apos;t silently mint new access
+        tokens after the fact. NDYAPPS connection controls and login history land in a later
+        milestone.
       </p>
     </div>
   );

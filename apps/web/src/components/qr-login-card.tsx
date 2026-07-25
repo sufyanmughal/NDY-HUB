@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth-context";
 const DEV_EMAIL = "dev-test@ndyhub.local";
 const DEV_PASSWORD = "dev-test-password-123";
 
-export function QrLoginCard() {
+export function QrLoginCard({ redirectTo = "/" }: { redirectTo?: string }) {
   const { state, restart } = useLoginRequest();
   const { login } = useAuth();
 
@@ -37,7 +37,7 @@ export function QrLoginCard() {
           </div>
           <p className="mt-3 text-sm font-medium">You&apos;re logged in.</p>
           <Link
-            href="/"
+            href={redirectTo}
             className="mt-4 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
           >
             Go to dashboard

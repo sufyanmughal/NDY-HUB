@@ -14,6 +14,7 @@ import { SecurityModule } from './security/security.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { DocumentsModule } from './documents/documents.module';
 import { AdminModule } from './admin/admin.module';
+import { OAuthModule } from './oauth/oauth.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { AdminModule } from './admin/admin.module';
     TransactionsModule,
     DocumentsModule,
     AdminModule,
+    OAuthModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
