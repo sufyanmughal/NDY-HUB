@@ -41,11 +41,33 @@ ndy-hub/
 - A WebSocket gateway (`login-request:subscribe` / `login-request:status`) pushes
   approval/denial live instead of making the desktop poll.
 - `GET /passport/:ndyId` — the public-safe Passport view (no email, no password hash).
+- Approving a login request now actually sets `User.ndyappsConnected` — it didn't
+  before, despite being in the schema and the Passport response.
 
-**Web (`apps/web`) — milestone 2 (dashboard shell) + a working slice of milestone 3**
+**API (`apps/api`) — milestone 5 (CRYNDY + NDYBITS pipeline), complete**
+- Prisma schema: `CryndyPurchase` (full lifecycle — `PAYMENT_PENDING` through
+  `DISTRIBUTED_ON_CHAIN`/`CANCELLED`/`REFUNDED`) and `NdybitsLedgerEntry`.
+- `GET /cryndy/me` (guarded) — purchase history plus a full per-status breakdown,
+  so pending/locked/allocated CRYNDY can never be mistaken for spendable. Only
+  `AVAILABLE` and `DISTRIBUTED_ON_CHAIN` count toward the balance.
+- `POST /webhooks/cryndy/purchase` — the presale site's intake endpoint.
+  HMAC-SHA256 signed over the raw request body (`CRYNDY_WEBHOOK_SECRET`,
+  timing-safe comparison), idempotent on `providerTransactionId` (a replay
+  returns `200 { duplicate: true }`, not an error).
+- `GET /ndybits/me` (guarded) — balance (summed from the ledger on read, not a
+  cached counter — see the comment in `ndybits.service.ts` for why) plus recent
+  entries.
+
+**Web (`apps/web`) — milestone 2 (dashboard shell) + working slices of 3 and 5**
 - Dashboard shell with the full nav from the mockup: Dashboard, NDY Passport,
   Memberships, CRYNDY, NDYBITS, Connected Platforms, Transactions, Documents,
   Security, Settings, Support.
+- **`/cryndy`** and **`/ndybits`** — full pages (status breakdown, purchase
+  history, ledger) built against mock data shaped exactly like `GET /cryndy/me`
+  and `GET /ndybits/me`'s real response bodies, so wiring in a live fetch later
+  is a small, mechanical change. The Dashboard overview and Passport page pull
+  the same mock exports — one source of numbers, not three independently
+  hardcoded ones.
 - **`/login`** — a real, working QR login page. Generates the login request against
   the API, renders the QR code, subscribes to the WebSocket for live status, falls
   back to polling if the socket doesn't connect, and exchanges an approval for a
@@ -55,9 +77,8 @@ ndy-hub/
   if there isn't one and bounces already-logged-in visitors away from `/login`
   itself, and the access token auto-refreshes on load if it's gone stale. The
   Dashboard overview, Passport page, and Topbar all show your real NDY ID and
-  Passport (fetched from `GET /passport/:ndyId`) instead of mock data — Membership,
-  CRYNDY, and NDYBITS numbers on those same pages are still mock, clearly commented
-  as such, because M4/M5 haven't landed in this branch yet.
+  Passport (fetched from `GET /passport/:ndyId`) instead of mock data — only
+  Membership is still mock (M4 hasn't landed), and it's commented as such.
 - Everything not yet built is a labeled placeholder stating which milestone fills
   it in — not a broken link.
 - **Known gap, on purpose:** sessions live in `localStorage`, not an httpOnly
@@ -111,12 +132,16 @@ The browser tab should flip to "You're logged in" within a second or two over th
 WebSocket, without any manual refresh, and land you on a real dashboard showing
 that account's actual NDY ID and Passport.
 
+The login API contract for the NDYAPPS developer is frozen and documented in
+[`NDYAPPS-INTEGRATION.md`](./NDYAPPS-INTEGRATION.md) — everything they need to
+build the approve/deny screen against, independent of anything else in this repo.
+
 ## Next up (per the build sequence)
 
 1. Move sessions from `localStorage` to an httpOnly cookie set by the API —
    the real security posture, not the dev placeholder.
-2. Freeze the login API contract so the NDYAPPS developer can start building
-   against it (milestone 3) — the endpoints above are already stable enough to
-   hand off.
-3. Membership + Stripe billing (milestone 4).
+2. Membership + Stripe billing (milestone 4) — the one piece of the dashboard
+   still on hardcoded mock data.
+3. Wire `/cryndy` and `/ndybits` to their real endpoints instead of mock data
+   now that a session exists to authenticate the fetch with.
 4. CRYNDY + NDYBITS pipeline (milestone 5).

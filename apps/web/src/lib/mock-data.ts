@@ -2,6 +2,12 @@
 // wired to the Core API yet — that happens once milestone 1's auth/session
 // endpoints are in place and this becomes a real authenticated fetch.
 
+// Membership is the only field left here that's genuinely still mock —
+// CRYNDY and NDYBITS balances, and the connected-platforms count, are
+// derived below from the same mock purchase/ledger/platform data the
+// /cryndy, /ndybits, and /platforms pages use, so the dashboard overview
+// and Passport page can't silently drift out of sync with them the way
+// hardcoded duplicates would.
 export const mockUser = {
   firstName: "Teun",
   fullName: "Teun Rietdijk",
@@ -10,9 +16,6 @@ export const mockUser = {
   verificationLevel: 2,
   ndyappsConnected: true,
   membership: "NDY Flow",
-  cryndyBalance: 2450,
-  ndybitsBalance: 18750,
-  connectedPlatformsCount: 6,
   recentActivityCount: 12,
   lastLogin: { when: "Today, 14:32", where: "Amsterdam, Netherlands" },
 };
@@ -200,3 +203,7 @@ export const mockPlatforms = [
   { name: "NDYCOLLECT", status: "Coming Soon" as const },
   { name: "NDYNEX", status: "Coming Soon" as const },
 ];
+
+export const mockConnectedPlatformsCount = mockPlatforms.filter(
+  (p) => p.status === "Connected",
+).length;

@@ -2,7 +2,12 @@
 
 import { useAuth } from "@/lib/auth-context";
 import { usePassport } from "@/lib/use-passport";
-import { mockUser } from "@/lib/mock-data";
+import {
+  mockUser,
+  mockCryndyAvailableBalance,
+  mockNdybitsBalance,
+  mockConnectedPlatformsCount,
+} from "@/lib/mock-data";
 
 export default function PassportPage() {
   const { auth } = useAuth();
@@ -33,12 +38,14 @@ export default function PassportPage() {
         </div>
 
         <dl className="divide-y divide-border text-sm">
-          {/* Membership, CRYNDY, and NDYBITS rows are still mock data until
-              the billing (M4) and CRYNDY/NDYBITS (M5) modules land. */}
+          {/* Membership is still mock data until the billing module (M4)
+              lands. CRYNDY/NDYBITS/Connected Platforms are the same mock
+              data the /cryndy, /ndybits, and /platforms pages use — not a
+              live fetch yet, but a single source instead of a duplicate. */}
           <Row label="Membership" value={mockUser.membership} />
-          <Row label="CRYNDY Holdings" value={`${mockUser.cryndyBalance.toLocaleString()} CRYNDY`} />
-          <Row label="NDYBITS" value={`${mockUser.ndybitsBalance.toLocaleString()} NDYBITS`} />
-          <Row label="Connected Platforms" value={`${mockUser.connectedPlatformsCount} Platforms`} />
+          <Row label="CRYNDY Holdings" value={`${mockCryndyAvailableBalance.toLocaleString()} CRYNDY`} />
+          <Row label="NDYBITS" value={`${mockNdybitsBalance.toLocaleString()} NDYBITS`} />
+          <Row label="Connected Platforms" value={`${mockConnectedPlatformsCount} Platforms`} />
           <Row
             label="Verification Level"
             value={passport ? `Level ${passport.verificationLevel.replace("LEVEL_", "")}` : "…"}

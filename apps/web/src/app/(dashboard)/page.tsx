@@ -4,14 +4,19 @@ import Link from "next/link";
 import { StatTile } from "@/components/stat-tile";
 import { useAuth } from "@/lib/auth-context";
 import { usePassport } from "@/lib/use-passport";
-import { mockUser, mockTransactions, mockPlatforms } from "@/lib/mock-data";
+import {
+  mockUser,
+  mockTransactions,
+  mockCryndyAvailableBalance,
+  mockNdybitsBalance,
+  mockConnectedPlatformsCount,
+} from "@/lib/mock-data";
 
 export default function DashboardPage() {
   const { auth } = useAuth();
   const passport = usePassport();
   if (auth.status !== "authenticated") return null;
 
-  const connectedCount = mockPlatforms.filter((p) => p.status === "Connected").length;
   const firstName = (passport?.fullName ?? auth.ndyId).split(" ")[0];
 
   return (
@@ -37,12 +42,13 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* CRYNDY, NDYBITS, and Connected Platforms are still mock data — the
-          CRYNDY/NDYBITS pipeline (M5) hasn't been merged into this branch yet. */}
+      {/* CRYNDY and NDYBITS here are the same mock data the /cryndy and
+          /ndybits pages show — not yet a live fetch, but no longer a second,
+          independently-hardcoded number either. */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="CRYNDY Balance" value={mockUser.cryndyBalance.toLocaleString()} />
-        <StatTile label="NDYBITS Balance" value={mockUser.ndybitsBalance.toLocaleString()} />
-        <StatTile label="Connected Platforms" value={String(connectedCount)} />
+        <StatTile label="CRYNDY Balance" value={mockCryndyAvailableBalance.toLocaleString()} />
+        <StatTile label="NDYBITS Balance" value={mockNdybitsBalance.toLocaleString()} />
+        <StatTile label="Connected Platforms" value={String(mockConnectedPlatformsCount)} />
         <StatTile label="Recent Activity" value={`${mockUser.recentActivityCount} new`} />
       </div>
 
