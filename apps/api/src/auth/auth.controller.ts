@@ -92,7 +92,6 @@ export class AuthController {
 
   @Post('login-request')
   createLoginRequest(@Body() dto: CreateLoginRequestDto, @Req() req: Request) {
-    // TODO: resolve requestingLocation from IP via a geo-IP lookup once one is wired in.
     return this.auth.createLoginRequest(dto, { ip: req.ip });
   }
 

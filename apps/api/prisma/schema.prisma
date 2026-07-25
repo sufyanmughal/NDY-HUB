@@ -120,6 +120,7 @@ model User {
   authIdentities          AuthIdentity[]
   oauthLoginExchanges     OAuthLoginExchange[]
   externalAuthLinkStates  ExternalAuthState[]
+  supportTickets          SupportTicket[]
 
   @@index([ndyId])
 }
@@ -544,4 +545,27 @@ model Session {
   revokedAt        DateTime?
 
   @@index([userId])
+}
+
+// A user's own request; a single admin reply resolves it. Deliberately not
+// a full threaded-conversation ticketing system — one message in, one
+// message back, marked resolved. Real back-and-forth can graduate this
+// into something richer once there's actual support volume to justify it.
+model SupportTicket {
+  id         String              @id @default(uuid())
+  userId     String
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject    String
+  message    String
+  status     SupportTicketStatus @default(OPEN)
+  adminReply String?
+  repliedAt  DateTime?
+  createdAt  DateTime            @default(now())
+
+  @@index([userId])
+}
+
+enum SupportTicketStatus {
+  OPEN
+  RESOLVED
 }

@@ -577,6 +577,57 @@ export async function downloadDocument(accessToken: string, documentId: string, 
   URL.revokeObjectURL(url);
 }
 
+// --- Support ---
+
+export type SupportTicketStatus = "OPEN" | "RESOLVED";
+
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  message: string;
+  status: SupportTicketStatus;
+  adminReply: string | null;
+  repliedAt: string | null;
+  createdAt: string;
+}
+
+export function getMySupportTickets(accessToken: string): Promise<SupportTicket[]> {
+  return authedFetch<SupportTicket[]>("/support/tickets", accessToken);
+}
+
+export function createSupportTicket(
+  accessToken: string,
+  subject: string,
+  message: string,
+): Promise<SupportTicket> {
+  return authedFetch<SupportTicket>("/support/tickets", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ subject, message }),
+  });
+}
+
+// --- Admin: support tickets ---
+
+export interface AdminSupportTicket extends SupportTicket {
+  userId: string;
+  user: { ndyId: string; email: string };
+}
+
+export function adminListSupportTickets(accessToken: string): Promise<AdminSupportTicket[]> {
+  return authedFetch<AdminSupportTicket[]>("/admin/support-tickets", accessToken);
+}
+
+export function adminReplySupportTicket(
+  accessToken: string,
+  ticketId: string,
+  reply: string,
+): Promise<AdminSupportTicket> {
+  return authedFetch<AdminSupportTicket>(`/admin/support-tickets/${ticketId}/reply`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ reply }),
+  });
+}
+
 // --- Admin (M6) ---
 // Every function here hits an endpoint guarded by JwtAuthGuard + AdminGuard
 // on the server — a non-admin gets a real 403 from Nest, not just a hidden
@@ -654,6 +705,49 @@ export interface AuditLogEntry {
 
 export function getAdminAuditLog(accessToken: string): Promise<{ entries: AuditLogEntry[]; total: number }> {
   return authedFetch("/admin/audit-log?take=25", accessToken);
+}
+
+// --- Admin: OAuth client management (registering NDJOYIT sites as SSO
+// relying parties) ---
+
+export interface AdminOAuthClient {
+  id: string;
+  clientId: string;
+  name: string;
+  redirectUris: string[];
+  allowedScopes: string[];
+  isActive: boolean;
+  createdAt: string;
+}
+
+export function getOAuthScopeCatalog(accessToken: string): Promise<{ scopes: Record<string, string>; all: string[] }> {
+  return authedFetch("/admin/oauth-clients/scopes", accessToken);
+}
+
+export function listAdminOAuthClients(accessToken: string): Promise<AdminOAuthClient[]> {
+  return authedFetch("/admin/oauth-clients", accessToken);
+}
+
+/** The response includes clientSecret in plaintext — the one and only time
+ * it's ever visible. The caller must show it once and never fetch it again. */
+export function createAdminOAuthClient(
+  accessToken: string,
+  params: { name: string; redirectUris: string[]; allowedScopes: string[] },
+): Promise<AdminOAuthClient & { clientSecret: string }> {
+  return authedFetch("/admin/oauth-clients", accessToken, {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export function setAdminOAuthClientActive(
+  accessToken: string,
+  id: string,
+  active: boolean,
+): Promise<AdminOAuthClient> {
+  return authedFetch(`/admin/oauth-clients/${id}/${active ? "activate" : "deactivate"}`, accessToken, {
+    method: "PATCH",
+  });
 }
 
 // --- OAuth / OIDC consent (SSO for third-party NDJOYIT sites) ---

@@ -19,6 +19,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { PROFILE_PHOTOS_DIR } from '../common/upload-dir.util';
+import { GeoIpService } from '../common/geo-ip.service';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
 import { TotpService } from './totp.service';
 import { LoginRequestGateway } from './login-request.gateway';
@@ -51,6 +52,7 @@ export class AuthService {
     private readonly totp: TotpService,
     private readonly gateway: LoginRequestGateway,
     private readonly config: ConfigService,
+    private readonly geoIp: GeoIpService,
   ) {}
 
   async register(dto: RegisterDto, meta: SessionMeta): Promise<IssuedSession> {
@@ -358,11 +360,9 @@ export class AuthService {
    * or the universal-link URL (mobile) — NDYAPPS calls back with it once the
    * person approves or denies inside the app.
    */
-  async createLoginRequest(
-    dto: CreateLoginRequestDto,
-    meta: { ip?: string; location?: string },
-  ) {
+  async createLoginRequest(dto: CreateLoginRequestDto, meta: { ip?: string }) {
     const token = generateToken();
+    const location = await this.geoIp.lookupLocation(meta.ip);
     return this.prisma.loginRequest.create({
       data: {
         token,
@@ -370,7 +370,7 @@ export class AuthService {
         requestingIp: meta.ip,
         requestingDevice: dto.device,
         requestingBrowser: dto.browser,
-        requestingLocation: meta.location,
+        requestingLocation: location,
         expiresAt: new Date(Date.now() + LOGIN_REQUEST_TTL_MS),
       },
     });
