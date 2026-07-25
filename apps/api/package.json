@@ -29,6 +29,7 @@
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.1.28",
     "@prisma/client": "^6.19.3",
+    "@simplewebauthn/server": "^13.3.2",
     "@types/multer": "^2.2.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",

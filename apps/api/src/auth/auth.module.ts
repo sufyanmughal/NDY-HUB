@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { SessionService } from './session.service';
 import { TotpService } from './totp.service';
+import { PasskeyService } from './passkey.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LoginRequestGateway } from './login-request.gateway';
 import { IdentityModule } from '../identity/identity.module';
@@ -25,6 +26,7 @@ import { IdentityModule } from '../identity/identity.module';
     AuthService,
     SessionService,
     TotpService,
+    PasskeyService,
     JwtAuthGuard,
     LoginRequestGateway,
   ],

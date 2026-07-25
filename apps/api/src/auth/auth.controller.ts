@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -20,6 +21,7 @@ import { extname } from 'path';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { TotpService } from './totp.service';
+import { PasskeyService } from './passkey.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { CreateLoginRequestDto } from './dto/create-login-request.dto';
@@ -32,6 +34,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ConfirmTotpDto } from './dto/confirm-totp.dto';
 import { DisableTotpDto } from './dto/disable-totp.dto';
 import { Verify2faDto } from './dto/verify-2fa.dto';
+import { PasskeyRegisterVerifyDto } from './dto/passkey-register-verify.dto';
+import { PasskeyLoginVerifyDto } from './dto/passkey-login-verify.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthenticatedRequestUser } from './guards/jwt-auth.guard';
@@ -55,6 +59,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly totp: TotpService,
+    private readonly passkeys: PasskeyService,
   ) {}
 
   @Throttle(BRUTE_FORCE_GUARD)
@@ -244,6 +249,50 @@ export class AuthController {
   @Post('2fa/verify')
   verify2fa(@Body() dto: Verify2faDto, @Req() req: Request) {
     return this.totp.verifyChallenge(dto, sessionMeta(req));
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('passkeys')
+  listPasskeys(@CurrentUser() user: AuthenticatedRequestUser) {
+    return this.passkeys.listPasskeys(user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('passkeys/:id')
+  removePasskey(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.passkeys.removePasskey(user.sub, id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('passkeys/register/options')
+  beginPasskeyRegistration(@CurrentUser() user: AuthenticatedRequestUser) {
+    return this.passkeys.beginRegistration(user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('passkeys/register/verify')
+  verifyPasskeyRegistration(
+    @Body() dto: PasskeyRegisterVerifyDto,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.passkeys.verifyRegistration(user.sub, dto);
+  }
+
+  // Public: usernameless sign-in — there's no account context yet until
+  // the credential response itself resolves one, same reasoning as every
+  // other pre-session endpoint in this controller.
+  @Post('passkeys/login/options')
+  beginPasskeyLogin() {
+    return this.passkeys.beginAuthentication();
+  }
+
+  @Throttle(BRUTE_FORCE_GUARD)
+  @Post('passkeys/login/verify')
+  verifyPasskeyLogin(@Body() dto: PasskeyLoginVerifyDto, @Req() req: Request) {
+    return this.passkeys.verifyAuthentication(dto, sessionMeta(req));
   }
 }
 

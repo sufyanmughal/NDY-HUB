@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { loginWithPassword, registerWithPassword, verify2fa } from "@/lib/api";
+import { loginWithPasskey, browserSupportsWebAuthn } from "@/lib/passkey";
 import { useAuth } from "@/lib/auth-context";
 
 /**
@@ -20,6 +21,20 @@ export function PasswordAuthForm() {
   const [error, setError] = useState<string | null>(null);
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [code, setCode] = useState("");
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+
+  async function handlePasskeyLogin() {
+    setPasskeyBusy(true);
+    setError(null);
+    try {
+      const session = await loginWithPasskey();
+      login(session);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setPasskeyBusy(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -174,6 +189,24 @@ export function PasswordAuthForm() {
           {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
         </button>
       </form>
+
+      {mode === "signin" && typeof window !== "undefined" && browserSupportsWebAuthn() && (
+        <>
+          <div className="my-3 flex items-center gap-3 text-xs text-foreground-muted">
+            <span className="h-px flex-1 bg-border" />
+            or
+            <span className="h-px flex-1 bg-border" />
+          </div>
+          <button
+            type="button"
+            onClick={handlePasskeyLogin}
+            disabled={passkeyBusy}
+            className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {passkeyBusy ? "Waiting for passkey…" : "Sign in with a passkey"}
+          </button>
+        </>
+      )}
     </div>
   );
 }

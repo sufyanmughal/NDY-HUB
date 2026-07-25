@@ -15,8 +15,12 @@ import {
   begin2faSetup,
   confirm2faSetup,
   disable2fa,
+  getMyPasskeys,
+  removeMyPasskey,
   type MeProfile,
+  type PasskeySummary,
 } from "@/lib/api";
+import { registerPasskey, browserSupportsWebAuthn } from "@/lib/passkey";
 
 const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -58,6 +62,7 @@ export default function SettingsPage() {
       {profile && <ProfileForm accessToken={auth.accessToken} profile={profile} onSaved={setProfile} />}
       <PasswordForm accessToken={auth.accessToken} />
       {profile && <TwoFactorSection accessToken={auth.accessToken} profile={profile} onChanged={setProfile} />}
+      <PasskeysSection accessToken={auth.accessToken} />
       {profile && (
         <DataPrivacySection
           accessToken={auth.accessToken}
@@ -524,6 +529,137 @@ function TwoFactorSection({
       )}
     </div>
   );
+}
+
+function PasskeysSection({ accessToken }: { accessToken: string }) {
+  const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const supported = typeof window !== "undefined" && browserSupportsWebAuthn();
+
+  useEffect(() => {
+    // Guards against React Strict Mode's double effect-invoke in dev (and
+    // any other double-fire): without this, a stale first fetch resolving
+    // after a later add/remove would clobber the up-to-date list — same
+    // "cancelled" pattern QrLoginCard uses for its QR data URL fetch.
+    let cancelled = false;
+    getMyPasskeys(accessToken)
+      .then((result) => {
+        if (!cancelled) setPasskeys(result);
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError((err as Error).message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
+  async function handleAdd() {
+    setBusy(true);
+    setError(null);
+    try {
+      // A reasonable default label beats an empty one — the user can't
+      // rename it later without deleting and re-adding, but most people
+      // never touch this beyond "does this list make sense to me."
+      const label =
+        typeof navigator !== "undefined" ? guessDeviceLabel(navigator.userAgent) : undefined;
+      const created = await registerPasskey(accessToken, label);
+      setPasskeys((prev) => [...(prev ?? []), created]);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemove(id: string) {
+    setRemovingId(id);
+    setError(null);
+    try {
+      await removeMyPasskey(accessToken, id);
+      setPasskeys((prev) => (prev ?? []).filter((p) => p.id !== id));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-surface p-5">
+      <h2 className="text-sm font-medium text-foreground-muted">Passkeys</h2>
+      <p className="mt-2 text-sm text-foreground-muted">
+        Sign in with your fingerprint, face, or device PIN instead of a password — phishing
+        resistant, and nothing to remember.
+      </p>
+
+      {!supported && (
+        <p className="mt-3 text-sm text-critical">This browser doesn&apos;t support passkeys.</p>
+      )}
+      {loadError && <p className="mt-3 text-sm text-critical">{loadError}</p>}
+
+      {passkeys && passkeys.length > 0 && (
+        <ul className="mt-4 space-y-2">
+          {passkeys.map((p) => (
+            <li
+              key={p.id}
+              className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
+            >
+              <div>
+                <p className="font-medium">{p.deviceLabel ?? "Unnamed passkey"}</p>
+                <p className="text-xs text-foreground-muted">
+                  Added {new Date(p.createdAt).toLocaleDateString()}
+                  {p.lastUsedAt ? ` · last used ${new Date(p.lastUsedAt).toLocaleDateString()}` : ""}
+                </p>
+              </div>
+              <button
+                onClick={() => handleRemove(p.id)}
+                disabled={removingId === p.id}
+                className="rounded-md border border-critical/40 px-3 py-1.5 text-xs font-medium text-critical hover:bg-critical/10 disabled:opacity-50"
+              >
+                {removingId === p.id ? "Removing…" : "Remove"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {error && <p className="mt-3 text-sm text-critical">{error}</p>}
+
+      <button
+        onClick={handleAdd}
+        disabled={busy || !supported}
+        className="mt-4 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {busy ? "Adding…" : "Add a passkey"}
+      </button>
+    </div>
+  );
+}
+
+function guessDeviceLabel(userAgent: string): string {
+  const os = /Windows/.test(userAgent)
+    ? "Windows"
+    : /Mac OS/.test(userAgent)
+      ? "Mac"
+      : /Android/.test(userAgent)
+        ? "Android"
+        : /iPhone|iPad/.test(userAgent)
+          ? "iOS"
+          : "device";
+  const browser = /Edg\//.test(userAgent)
+    ? "Edge"
+    : /Chrome\//.test(userAgent)
+      ? "Chrome"
+      : /Firefox\//.test(userAgent)
+        ? "Firefox"
+        : /Safari\//.test(userAgent)
+          ? "Safari"
+          : "browser";
+  return `${browser} on ${os}`;
 }
 
 function DataPrivacySection({

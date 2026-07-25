@@ -115,6 +115,8 @@ model User {
   oauthAuthorizationCodes OAuthAuthorizationCode[]
   oauthGrants             OAuthGrant[]
   oauthRefreshTokens      OAuthRefreshToken[]
+  passkeys                Passkey[]
+  webauthnChallenges      WebauthnChallenge[]
 
   @@index([ndyId])
 }
@@ -142,7 +144,54 @@ model TotpBackupCode {
 // NDYAPPS approval requires an *existing* password-based account rather
 // than creating one. A dormant table implies protection that wasn't
 // actually happening. Bring this back — for real, wired into a working
-// OAuth flow — when Google/Apple/passkey login gets built.
+// OAuth flow — when Google/Apple login gets built (passkeys, below, are
+// already real).
+
+// One row per registered authenticator (a phone, a security key, a
+// platform credential like Windows Hello/Touch ID). publicKey/counter are
+// exactly what @simplewebauthn/server's verifyRegistrationResponse hands
+// back — counter must be persisted and checked on every subsequent login
+// to detect a cloned authenticator (a real device's counter only ever
+// increases; a clone replaying an old assertion reports a stale one).
+model Passkey {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      Int       @default(0)
+  transports   String[]
+  deviceLabel  String?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([userId])
+}
+
+// The WebAuthn ceremony is two round trips (options, then a signed
+// response) and the server has to remember the exact challenge it issued
+// in between. Registration always has an authenticated user (userId set);
+// login is intentionally usernameless/discoverable — the browser prompts
+// with whatever passkeys it has for this site before the server knows who
+// it is — so userId is null there and the credential response itself
+// (its credentialId) is what resolves to an account. `id` doubles as the
+// opaque handle the client hands back at the second step (a challengeId),
+// same "random single-use value, no separate secret needed" reasoning as
+// LoginRequest.token.
+model WebauthnChallenge {
+  id        String   @id @default(uuid())
+  challenge String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      WebauthnChallengeType
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+enum WebauthnChallengeType {
+  REGISTRATION
+  AUTHENTICATION
+}
 
 // The QR / deep-link login handshake described in the proposal: short-lived, single-use.
 model LoginRequest {

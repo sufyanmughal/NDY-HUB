@@ -37,7 +37,12 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => ({}));
     throw new ApiError(body.message ?? `Request failed with status ${res.status}`, res.status);
   }
-  return res.json() as Promise<T>;
+  // A `void`-returning endpoint (logout, disable-2fa, remove-passkey...)
+  // sends a 200/201 with an empty body — res.json() throws on that ("Unexpected
+  // end of JSON input"), so callers typed Promise<void> need this to resolve
+  // cleanly instead of rejecting on their own success path.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 /** Same as apiFetch, but for the guarded endpoints — every real dashboard
@@ -368,6 +373,61 @@ export function disable2fa(accessToken: string, currentPassword: string, code: s
   return authedFetch<void>("/auth/2fa/disable", accessToken, {
     method: "POST",
     body: JSON.stringify({ currentPassword, code }),
+  });
+}
+
+// --- Passkeys (WebAuthn) ---
+// Two round trips each, mirroring @simplewebauthn/server's own two-step
+// shape: an "options" call that also stashes a server-side challenge (
+// returned here as challengeId, since the actual challenge value never
+// needs to leave the server), then a "verify" call carrying whatever
+// navigator.credentials produced plus that challengeId. The passkey.ts
+// helper functions below wrap the @simplewebauthn/browser calls in
+// between so callers don't touch the WebAuthn types directly.
+
+export interface PasskeySummary {
+  id: string;
+  deviceLabel: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+export function getMyPasskeys(accessToken: string): Promise<PasskeySummary[]> {
+  return authedFetch<PasskeySummary[]>("/auth/passkeys", accessToken);
+}
+
+export function removeMyPasskey(accessToken: string, id: string): Promise<void> {
+  return authedFetch<void>(`/auth/passkeys/${id}`, accessToken, { method: "DELETE" });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebAuthn options/response JSON, typed precisely in passkey.ts
+export function beginPasskeyRegistration(accessToken: string): Promise<{ options: any; challengeId: string }> {
+  return authedFetch("/auth/passkeys/register/options", accessToken, { method: "POST" });
+}
+
+export function verifyPasskeyRegistration(
+  accessToken: string,
+  challengeId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  response: any,
+  deviceLabel?: string,
+): Promise<PasskeySummary> {
+  return authedFetch("/auth/passkeys/register/verify", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ challengeId, response, deviceLabel }),
+  });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function beginPasskeyLogin(): Promise<{ options: any; challengeId: string }> {
+  return apiFetch("/auth/passkeys/login/options", { method: "POST" });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function verifyPasskeyLogin(challengeId: string, response: any): Promise<IssuedSession> {
+  return apiFetch<IssuedSession>("/auth/passkeys/login/verify", {
+    method: "POST",
+    body: JSON.stringify({ challengeId, response }),
   });
 }
 
