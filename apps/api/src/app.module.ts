@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { CryndyModule } from './cryndy/cryndy.module';
 import { NdybitsModule } from './ndybits/ndybits.module';
 import { MembershipModule } from './membership/membership.module';
+import { SecurityModule } from './security/security.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { MembershipModule } from './membership/membership.module';
     CryndyModule,
     NdybitsModule,
     MembershipModule,
+    SecurityModule,
   ],
   controllers: [AppController],
   providers: [AppService],

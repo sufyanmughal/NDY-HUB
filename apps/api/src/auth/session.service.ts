@@ -35,13 +35,12 @@ export class SessionService {
     ndyId: string,
     meta: SessionMeta,
   ): Promise<IssuedSession> {
-    const accessToken = await this.jwt.signAsync(
-      { sub: userId, ndyId },
-      { expiresIn: ACCESS_TOKEN_TTL },
-    );
-
     const refreshToken = randomBytes(48).toString('base64url');
-    await this.prisma.session.create({
+    // Created before the JWT is signed so the access token can carry the
+    // session's own id (sid) — that's what lets the Security page say
+    // "this is the device you're looking at right now" instead of just
+    // listing sessions with no way to tell yours apart.
+    const session = await this.prisma.session.create({
       data: {
         userId,
         refreshTokenHash: hashToken(refreshToken),
@@ -50,6 +49,11 @@ export class SessionService {
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
       },
     });
+
+    const accessToken = await this.jwt.signAsync(
+      { sub: userId, ndyId, sid: session.id },
+      { expiresIn: ACCESS_TOKEN_TTL },
+    );
 
     return { accessToken, refreshToken, expiresIn: ACCESS_TOKEN_TTL };
   }

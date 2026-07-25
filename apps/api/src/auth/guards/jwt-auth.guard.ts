@@ -10,6 +10,7 @@ import type { Request } from 'express';
 export interface AuthenticatedRequestUser {
   sub: string; // User.id
   ndyId: string;
+  sid: string; // Session.id this access token was issued alongside
 }
 
 /**

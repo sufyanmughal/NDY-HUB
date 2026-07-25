@@ -228,6 +228,31 @@ export function getMyNdybits(accessToken: string): Promise<NdybitsSummary> {
   return authedFetch<NdybitsSummary>("/ndybits/me", accessToken);
 }
 
+// --- Security ---
+
+export interface SecuritySession {
+  id: string;
+  userAgent: string | null;
+  ip: string | null;
+  createdAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+}
+
+export function getMySessions(accessToken: string): Promise<SecuritySession[]> {
+  return authedFetch<SecuritySession[]>("/security/sessions", accessToken);
+}
+
+export function revokeSessionById(accessToken: string, sessionId: string): Promise<void> {
+  return authedFetch<void>(`/security/sessions/${sessionId}`, accessToken, { method: "DELETE" });
+}
+
+export function revokeAllSessions(accessToken: string): Promise<{ revokedCount: number }> {
+  return authedFetch<{ revokedCount: number }>("/security/sessions/revoke-all", accessToken, {
+    method: "POST",
+  });
+}
+
 /**
  * What the QR code actually encodes — a deep link NDYAPPS registers itself
  * to open. The web-only fallback query param lets a browser that scans this
