@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
+import { Check, X } from "lucide-react";
 import { buildLoginDeepLink, devLogin, devRegister, approveLoginRequestAs } from "@/lib/api";
 import { useLoginRequest } from "@/lib/use-login-request";
 import { useAuth } from "@/lib/auth-context";
@@ -32,7 +33,7 @@ export function QrLoginCard() {
       {state.phase === "success" && (
         <div>
           <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-good/15 text-good">
-            ✓
+            <Check size={20} strokeWidth={2.5} />
           </div>
           <p className="mt-3 text-sm font-medium">You&apos;re logged in.</p>
           <Link
@@ -122,7 +123,7 @@ function TerminalView({ message, onRetry }: { message: string; onRetry: () => vo
   return (
     <div>
       <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-critical/15 text-critical">
-        ✕
+        <X size={20} strokeWidth={2.5} />
       </div>
       <p className="mt-3 text-sm">{message}</p>
       <button

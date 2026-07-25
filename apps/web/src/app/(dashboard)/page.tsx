@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { IdCard, ShieldCheck, Users, Smartphone, Coins, Boxes, Link2, Activity } from "lucide-react";
 import { StatTile } from "@/components/stat-tile";
 import { useAuth } from "@/lib/auth-context";
 import { usePassport } from "@/lib/use-passport";
@@ -26,11 +27,12 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-semibold">Welcome back, {firstName}</h1>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="NDY ID" value={auth.ndyId} />
+        <StatTile label="NDY ID" value={auth.ndyId} icon={IdCard} />
         <StatTile
           label="Passport"
           value={passport ? "Verified" : "…"}
           badge={passport ? { text: `Level ${passport.verificationLevel.replace("LEVEL_", "")}`, tone: "good" } : undefined}
+          icon={ShieldCheck}
         />
         <StatTile
           label="Membership"
@@ -40,6 +42,7 @@ export default function DashboardPage() {
               ? { text: membership.current.status, tone: "good" }
               : { text: "Not subscribed", tone: "neutral" }
           }
+          icon={Users}
         />
         <StatTile
           label="NDYAPPS"
@@ -48,16 +51,17 @@ export default function DashboardPage() {
             text: passport?.ndyappsConnected ? "Active" : "Action needed",
             tone: passport?.ndyappsConnected ? "good" : "warn",
           }}
+          icon={Smartphone}
         />
       </div>
 
       {/* Connected Platforms and Recent Activity are still mock data — no
           platforms or activity-log backend exists yet. */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="CRYNDY Balance" value={(cryndy?.availableBalance ?? 0).toLocaleString()} />
-        <StatTile label="NDYBITS Balance" value={(ndybits?.balance ?? 0).toLocaleString()} />
-        <StatTile label="Connected Platforms" value={String(mockConnectedPlatformsCount)} />
-        <StatTile label="Recent Activity" value={`${mockUser.recentActivityCount} new`} />
+        <StatTile label="CRYNDY Balance" value={(cryndy?.availableBalance ?? 0).toLocaleString()} icon={Coins} />
+        <StatTile label="NDYBITS Balance" value={(ndybits?.balance ?? 0).toLocaleString()} icon={Boxes} />
+        <StatTile label="Connected Platforms" value={String(mockConnectedPlatformsCount)} icon={Link2} />
+        <StatTile label="Recent Activity" value={`${mockUser.recentActivityCount} new`} icon={Activity} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -91,7 +95,7 @@ export default function DashboardPage() {
           <h2 className="text-sm font-medium text-foreground-muted">Security Status</h2>
           <div className="mt-3 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-good/15 text-good">
-              ✓
+              <ShieldCheck size={20} strokeWidth={2} />
             </div>
             <div>
               <div className="text-sm font-medium">All systems secure</div>
