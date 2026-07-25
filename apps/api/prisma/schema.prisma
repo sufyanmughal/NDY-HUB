@@ -31,6 +31,15 @@ enum LoginRequestMethod {
   DEEP_LINK
 }
 
+// Milestone 6 (admin): a single role rather than the full multi-role matrix
+// the proposal eventually wants (Verified User + Member + CRYNDY Holder +
+// Business Verified, worn simultaneously) — that needs a join table and
+// isn't needed yet to gate "can this person see the admin dashboard."
+enum Role {
+  USER
+  ADMIN
+}
+
 model User {
   id                String            @id @default(uuid())
   ndyId             String            @unique // e.g. NDY-4F82XK — generated once, never reused, never editable
@@ -42,6 +51,10 @@ model User {
   emailVerifiedAt   DateTime?
   phoneVerifiedAt   DateTime?
   identityVerifiedAt DateTime?
+
+  role              Role              @default(USER)
+  suspended         Boolean           @default(false)
+  suspendedAt       DateTime?
 
   ndyappsConnected  Boolean           @default(false)
   ndyappsConnectedAt DateTime?
@@ -219,6 +232,28 @@ model Membership {
 
   @@index([userId])
   @@index([status])
+}
+
+// Deliberately not a foreign-key relation to User — an audit trail needs to
+// survive the record it describes (e.g. an admin account that's later
+// demoted, or eventually a deleted user), so both sides are denormalized
+// snapshots of who/what at the time the action happened, not live links.
+model AuditLogEntry {
+  id            String   @id @default(uuid())
+  adminUserId   String
+  adminNdyId    String
+  action        String   // e.g. "user.suspend", "user.role.update"
+  targetUserId  String?
+  targetNdyId   String?
+  previousValue Json?
+  newValue      Json?
+  reason        String?
+  ip            String?
+  createdAt     DateTime @default(now())
+
+  @@index([adminUserId])
+  @@index([targetUserId])
+  @@index([createdAt])
 }
 
 model Session {

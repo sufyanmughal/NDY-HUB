@@ -52,6 +52,9 @@ export class AuthService {
     if (!valid) {
       throw new UnauthorizedException('Incorrect email or password.');
     }
+    if (user.suspended) {
+      throw new UnauthorizedException('This account has been suspended.');
+    }
     return this.sessions.issueSession(user.id, user.ndyId, meta);
   }
 

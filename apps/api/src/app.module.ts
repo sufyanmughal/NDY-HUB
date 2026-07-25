@@ -11,6 +11,7 @@ import { MembershipModule } from './membership/membership.module';
 import { SecurityModule } from './security/security.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { DocumentsModule } from './documents/documents.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { DocumentsModule } from './documents/documents.module';
     SecurityModule,
     TransactionsModule,
     DocumentsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

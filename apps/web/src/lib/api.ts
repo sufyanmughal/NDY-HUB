@@ -15,6 +15,19 @@ export interface IssuedSession {
   expiresIn: string;
 }
 
+/** Carries the real HTTP status alongside the server's message — callers
+ * that need to branch on "was this specifically a 403" (AdminGate) shouldn't
+ * have to string-match error messages to do it. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -22,7 +35,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? `Request failed with status ${res.status}`);
+    throw new ApiError(body.message ?? `Request failed with status ${res.status}`, res.status);
   }
   return res.json() as Promise<T>;
 }
@@ -334,6 +347,85 @@ export async function downloadDocument(accessToken: string, documentId: string, 
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+// --- Admin (M6) ---
+// Every function here hits an endpoint guarded by JwtAuthGuard + AdminGuard
+// on the server — a non-admin gets a real 403 from Nest, not just a hidden
+// UI element. The frontend has no separate "am I admin" check; it just
+// calls these and handles the 403 (see AdminGate).
+
+export type UserRole = "USER" | "ADMIN";
+
+export interface AdminUserSummary {
+  id: string;
+  ndyId: string;
+  email: string;
+  fullName: string | null;
+  role: UserRole;
+  suspended: boolean;
+  verificationLevel: string;
+  ndyappsConnected: boolean;
+  createdAt: string;
+}
+
+export interface AdminUserDetail extends AdminUserSummary {
+  membership: { tierLabel: string; status: string } | null;
+  cryndyAvailableBalance: number;
+  cryndyPurchaseCount: number;
+  ndybitsBalance: number;
+  activeSessionCount: number;
+}
+
+export function searchAdminUsers(
+  accessToken: string,
+  q?: string,
+): Promise<{ users: AdminUserSummary[]; total: number }> {
+  const query = q ? `?q=${encodeURIComponent(q)}` : "";
+  return authedFetch(`/admin/users${query}`, accessToken);
+}
+
+export function getAdminUserDetail(accessToken: string, userId: string): Promise<AdminUserDetail> {
+  return authedFetch(`/admin/users/${userId}`, accessToken);
+}
+
+export function adminUpdateRole(
+  accessToken: string,
+  userId: string,
+  role: UserRole,
+  reason?: string,
+): Promise<{ id: string; ndyId: string; role: UserRole }> {
+  return authedFetch(`/admin/users/${userId}/role`, accessToken, {
+    method: "PATCH",
+    body: JSON.stringify({ role, reason }),
+  });
+}
+
+export function adminSetSuspended(
+  accessToken: string,
+  userId: string,
+  suspended: boolean,
+  reason?: string,
+): Promise<{ id: string; ndyId: string; suspended: boolean }> {
+  return authedFetch(`/admin/users/${userId}/${suspended ? "suspend" : "unsuspend"}`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export interface AuditLogEntry {
+  id: string;
+  adminNdyId: string;
+  action: string;
+  targetNdyId: string | null;
+  previousValue: unknown;
+  newValue: unknown;
+  reason: string | null;
+  createdAt: string;
+}
+
+export function getAdminAuditLog(accessToken: string): Promise<{ entries: AuditLogEntry[]; total: number }> {
+  return authedFetch("/admin/audit-log?take=25", accessToken);
 }
 
 /**
