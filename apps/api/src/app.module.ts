@@ -9,6 +9,7 @@ import { CryndyModule } from './cryndy/cryndy.module';
 import { NdybitsModule } from './ndybits/ndybits.module';
 import { MembershipModule } from './membership/membership.module';
 import { SecurityModule } from './security/security.module';
+import { TransactionsModule } from './transactions/transactions.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { SecurityModule } from './security/security.module';
     NdybitsModule,
     MembershipModule,
     SecurityModule,
+    TransactionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

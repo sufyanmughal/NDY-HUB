@@ -287,6 +287,23 @@ export function changePassword(
   });
 }
 
+// --- Transactions ---
+
+export interface Transaction {
+  id: string;
+  type: "membership" | "cryndy";
+  label: string;
+  detail: string;
+  amount: number;
+  currency: string;
+  status: string;
+  date: string;
+}
+
+export function getMyTransactions(accessToken: string): Promise<Transaction[]> {
+  return authedFetch<Transaction[]>("/transactions/me", accessToken);
+}
+
 /**
  * What the QR code actually encodes — a deep link NDYAPPS registers itself
  * to open. The web-only fallback query param lets a browser that scans this

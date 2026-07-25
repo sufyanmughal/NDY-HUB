@@ -7,7 +7,8 @@ import { usePassport } from "@/lib/use-passport";
 import { useCryndySummary } from "@/lib/use-cryndy";
 import { useNdybitsSummary } from "@/lib/use-ndybits";
 import { useMembershipSummary } from "@/lib/use-membership";
-import { mockUser, mockTransactions, mockConnectedPlatformsCount } from "@/lib/mock-data";
+import { useTransactions } from "@/lib/use-transactions";
+import { mockUser, mockConnectedPlatformsCount } from "@/lib/mock-data";
 
 export default function DashboardPage() {
   const { auth } = useAuth();
@@ -15,6 +16,7 @@ export default function DashboardPage() {
   const cryndy = useCryndySummary();
   const ndybits = useNdybitsSummary();
   const membership = useMembershipSummary();
+  const transactions = useTransactions();
   if (auth.status !== "authenticated") return null;
 
   const firstName = (passport?.fullName ?? auth.ndyId).split(" ")[0];
@@ -61,22 +63,28 @@ export default function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-border bg-surface p-5">
           <h2 className="text-sm font-medium text-foreground-muted">Recent Transactions</h2>
-          <ul className="mt-3 divide-y divide-border">
-            {mockTransactions.map((tx) => (
-              <li key={`${tx.label}-${tx.when}`} className="flex items-center justify-between py-3 text-sm">
-                <div>
-                  <div className="font-medium">{tx.label}</div>
-                  <div className="text-foreground-muted">{tx.detail}</div>
-                </div>
-                <div className="text-right">
-                  <div className="rounded-full bg-good/15 px-2 py-0.5 text-[11px] font-medium text-good">
-                    {tx.status}
+          {transactions && transactions.length === 0 ? (
+            <p className="mt-3 text-sm text-foreground-muted">No transactions yet.</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-border">
+              {transactions?.slice(0, 4).map((tx) => (
+                <li key={tx.id} className="flex items-center justify-between py-3 text-sm">
+                  <div>
+                    <div className="font-medium">{tx.label}</div>
+                    <div className="text-foreground-muted">{tx.detail}</div>
                   </div>
-                  <div className="mt-1 text-xs text-foreground-muted">{tx.when}</div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                  <div className="text-right">
+                    <div className="rounded-full bg-good/15 px-2 py-0.5 text-[11px] font-medium text-good">
+                      {tx.status}
+                    </div>
+                    <div className="mt-1 text-xs text-foreground-muted">
+                      {new Date(tx.date).toLocaleDateString()}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="rounded-lg border border-border bg-surface p-5">
