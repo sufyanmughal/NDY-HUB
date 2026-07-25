@@ -10,6 +10,7 @@ import { NdybitsModule } from './ndybits/ndybits.module';
 import { MembershipModule } from './membership/membership.module';
 import { SecurityModule } from './security/security.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { DocumentsModule } from './documents/documents.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { TransactionsModule } from './transactions/transactions.module';
     MembershipModule,
     SecurityModule,
     TransactionsModule,
+    DocumentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

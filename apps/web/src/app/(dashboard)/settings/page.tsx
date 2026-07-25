@@ -7,10 +7,13 @@ import { getMe, updateProfile, changePassword, type MeProfile } from "@/lib/api"
 export default function SettingsPage() {
   const { auth } = useAuth();
   const [profile, setProfile] = useState<MeProfile | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (auth.status !== "authenticated") return;
-    getMe(auth.accessToken).then(setProfile);
+    getMe(auth.accessToken)
+      .then(setProfile)
+      .catch((err) => setLoadError((err as Error).message));
   }, [auth]);
 
   if (auth.status !== "authenticated") return null;
@@ -24,6 +27,12 @@ export default function SettingsPage() {
           land in a later milestone.
         </p>
       </div>
+
+      {loadError && (
+        <p className="rounded-md border border-critical/30 bg-critical/10 px-3 py-2 text-sm text-critical">
+          {loadError}
+        </p>
+      )}
 
       {profile && <ProfileForm accessToken={auth.accessToken} profile={profile} onSaved={setProfile} />}
       <PasswordForm accessToken={auth.accessToken} />

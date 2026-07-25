@@ -14,9 +14,13 @@ export function useCryndySummary(): CryndySummary | null {
   useEffect(() => {
     if (auth.status !== "authenticated") return;
     let cancelled = false;
-    getMyCryndy(auth.accessToken).then((result) => {
-      if (!cancelled) setSummary(result);
-    });
+    getMyCryndy(auth.accessToken)
+      .then((result) => {
+        if (!cancelled) setSummary(result);
+      })
+      .catch(() => {
+        /* consuming pages fall back to "…"/0 while summary stays null */
+      });
     return () => {
       cancelled = true;
     };

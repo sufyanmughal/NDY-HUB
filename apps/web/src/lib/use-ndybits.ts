@@ -11,9 +11,13 @@ export function useNdybitsSummary(): NdybitsSummary | null {
   useEffect(() => {
     if (auth.status !== "authenticated") return;
     let cancelled = false;
-    getMyNdybits(auth.accessToken).then((result) => {
-      if (!cancelled) setSummary(result);
-    });
+    getMyNdybits(auth.accessToken)
+      .then((result) => {
+        if (!cancelled) setSummary(result);
+      })
+      .catch(() => {
+        /* consuming pages fall back to "…"/0 while summary stays null */
+      });
     return () => {
       cancelled = true;
     };

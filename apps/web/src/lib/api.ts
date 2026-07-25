@@ -304,6 +304,38 @@ export function getMyTransactions(accessToken: string): Promise<Transaction[]> {
   return authedFetch<Transaction[]>("/transactions/me", accessToken);
 }
 
+// --- Documents ---
+
+export interface DocumentStub {
+  id: string;
+  type: "MEMBERSHIP_CONFIRMATION" | "CRYNDY_CERTIFICATE";
+  title: string;
+  date: string;
+}
+
+export function getMyDocuments(accessToken: string): Promise<DocumentStub[]> {
+  return authedFetch<DocumentStub[]>("/documents/me", accessToken);
+}
+
+/** A plain <a href> can't send an Authorization header, and the guard
+ * shouldn't be weakened to accept tokens via query string just for this —
+ * so fetch it as an authenticated request, then hand the browser a
+ * blob: URL to actually save. Once real object storage exists, this
+ * becomes a signed short-lived S3 URL instead and this function goes away. */
+export async function downloadDocument(accessToken: string, documentId: string, filename: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/documents/${documentId}/download`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Download failed with status ${res.status}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 /**
  * What the QR code actually encodes — a deep link NDYAPPS registers itself
  * to open. The web-only fallback query param lets a browser that scans this

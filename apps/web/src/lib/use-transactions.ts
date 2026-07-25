@@ -11,9 +11,13 @@ export function useTransactions(): Transaction[] | null {
   useEffect(() => {
     if (auth.status !== "authenticated") return;
     let cancelled = false;
-    getMyTransactions(auth.accessToken).then((result) => {
-      if (!cancelled) setTransactions(result);
-    });
+    getMyTransactions(auth.accessToken)
+      .then((result) => {
+        if (!cancelled) setTransactions(result);
+      })
+      .catch(() => {
+        /* consuming pages fall back to their own empty state */
+      });
     return () => {
       cancelled = true;
     };
