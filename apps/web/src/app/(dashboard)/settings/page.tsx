@@ -8,6 +8,7 @@ import {
   changePassword,
   downloadDataExport,
   deleteAccount,
+  resendEmailVerification,
   type MeProfile,
 } from "@/lib/api";
 
@@ -39,6 +40,10 @@ export default function SettingsPage() {
         <p className="rounded-md border border-critical/30 bg-critical/10 px-3 py-2 text-sm text-critical">
           {loadError}
         </p>
+      )}
+
+      {profile && profile.verificationLevel === "LEVEL_0" && (
+        <EmailVerificationBanner accessToken={auth.accessToken} />
       )}
 
       {profile && <ProfileForm accessToken={auth.accessToken} profile={profile} onSaved={setProfile} />}
@@ -114,6 +119,44 @@ function ProfileForm({
         {busy ? "Saving…" : "Save changes"}
       </button>
     </form>
+  );
+}
+
+function EmailVerificationBanner({ accessToken }: { accessToken: string }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ kind: "good" | "critical"; text: string } | null>(null);
+
+  async function handleResend() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await resendEmailVerification(accessToken);
+      setMessage({ kind: "good", text: "Verification email sent — check your inbox." });
+    } catch (err) {
+      setMessage({ kind: "critical", text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-accent/30 bg-accent/10 p-4">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-foreground">Your email address isn&apos;t verified yet.</p>
+        <button
+          onClick={handleResend}
+          disabled={busy}
+          className="shrink-0 rounded-md border border-accent/40 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10 disabled:opacity-50"
+        >
+          {busy ? "Sending…" : "Resend verification email"}
+        </button>
+      </div>
+      {message && (
+        <p className={`mt-2 text-xs ${message.kind === "good" ? "text-good" : "text-critical"}`}>
+          {message.text}
+        </p>
+      )}
+    </div>
   );
 }
 

@@ -2,11 +2,18 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { customAlphabet } from 'nanoid';
-import { LoginRequestMethod, LoginRequestStatus } from '@prisma/client';
+import { createHash } from 'crypto';
+import {
+  LoginRequestMethod,
+  LoginRequestStatus,
+  VerificationLevel,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
@@ -16,9 +23,11 @@ import { LoginDto } from './dto/login.dto';
 import { CreateLoginRequestDto } from './dto/create-login-request.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { ConfirmEmailDto } from './dto/confirm-email.dto';
 
 const SALT_ROUNDS = 12;
 const LOGIN_REQUEST_TTL_MS = 90_000; // 90 seconds, per the desktop-QR / deep-link spec
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const generateToken = customAlphabet(
   'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789',
   32,
@@ -26,11 +35,14 @@ const generateToken = customAlphabet(
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly identity: IdentityService,
     private readonly sessions: SessionService,
     private readonly gateway: LoginRequestGateway,
+    private readonly config: ConfigService,
   ) {}
 
   async register(dto: RegisterDto, meta: SessionMeta): Promise<IssuedSession> {
@@ -40,6 +52,7 @@ export class AuthService {
       passwordHash,
       fullName: dto.fullName,
     });
+    await this.issueAndSendVerificationEmail(user.id, user.email);
     return this.sessions.issueSession(user.id, user.ndyId, meta);
   }
 
@@ -108,6 +121,98 @@ export class AuthService {
       where: { id: userId },
       data: { passwordHash: newHash },
     });
+  }
+
+  /** Resend, called from Settings — register() already sends the first one. */
+  async requestEmailVerification(userId: string): Promise<void> {
+    const user = await this.identity.findById(userId);
+    if (user.emailVerifiedAt) {
+      throw new BadRequestException('This email address is already verified.');
+    }
+    await this.issueAndSendVerificationEmail(user.id, user.email);
+  }
+
+  /**
+   * The click-through from the verification link. Public (no auth) by
+   * design — the token itself, not a session, is the credential here, the
+   * same way a password-reset link works. Single-use, enforced the same
+   * atomic way as every other one-time token in this schema: the update's
+   * WHERE clause only matches while the hash is still present, so a
+   * double-click or a replayed request updates zero rows the second time.
+   */
+  async confirmEmailVerification(
+    dto: ConfirmEmailDto,
+  ): Promise<{ verificationLevel: VerificationLevel }> {
+    const tokenHash = hashVerificationToken(dto.token);
+    const user = await this.prisma.user.findUnique({
+      where: { emailVerificationTokenHash: tokenHash },
+    });
+    if (
+      !user ||
+      !user.emailVerificationExpiresAt ||
+      user.emailVerificationExpiresAt < new Date()
+    ) {
+      throw new BadRequestException(
+        'This verification link is invalid or has expired.',
+      );
+    }
+
+    const result = await this.prisma.user.updateMany({
+      where: { id: user.id, emailVerificationTokenHash: tokenHash },
+      data: {
+        emailVerifiedAt: new Date(),
+        emailVerificationTokenHash: null,
+        emailVerificationExpiresAt: null,
+        // Only ever moves LEVEL_0 -> LEVEL_1 — phone/identity verification
+        // (LEVEL_2/LEVEL_3) don't exist yet, but if they ever land first for
+        // some user, confirming email afterward shouldn't downgrade them.
+        verificationLevel:
+          user.verificationLevel === VerificationLevel.LEVEL_0
+            ? VerificationLevel.LEVEL_1
+            : undefined,
+      },
+    });
+    if (result.count === 0) {
+      throw new ConflictException('This verification link was already used.');
+    }
+
+    return {
+      verificationLevel:
+        user.verificationLevel === VerificationLevel.LEVEL_0
+          ? VerificationLevel.LEVEL_1
+          : user.verificationLevel,
+    };
+  }
+
+  private async issueAndSendVerificationEmail(
+    userId: string,
+    email: string,
+  ): Promise<void> {
+    const token = generateToken();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        emailVerificationTokenHash: hashVerificationToken(token),
+        emailVerificationExpiresAt: new Date(
+          Date.now() + EMAIL_VERIFICATION_TTL_MS,
+        ),
+      },
+    });
+    this.sendVerificationEmail(email, token);
+  }
+
+  /** No email provider is configured (no SMTP/SendGrid key exists in this
+   * environment) — same dev-mode-fallback pattern as MembershipService's
+   * Stripe warning. Logs the link a real email would contain instead of
+   * silently doing nothing, so the flow is still testable end-to-end
+   * locally. Swap this for a real provider call before this goes anywhere
+   * near production traffic. */
+  private sendVerificationEmail(email: string, token: string): void {
+    const webAppUrl = this.config.getOrThrow<string>('WEB_APP_URL');
+    const link = `${webAppUrl}/verify-email?token=${token}`;
+    this.logger.warn(
+      `No email provider configured — verification link for ${email}: ${link}`,
+    );
   }
 
   /**
@@ -262,6 +367,10 @@ export class AuthService {
     }
     return loginRequest;
   }
+}
+
+function hashVerificationToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
 }
 
 export { LoginRequestMethod };

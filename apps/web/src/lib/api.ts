@@ -300,6 +300,19 @@ export function changePassword(
   });
 }
 
+// --- Email verification ---
+
+export function confirmEmailVerification(token: string): Promise<{ verificationLevel: string }> {
+  return apiFetch<{ verificationLevel: string }>("/auth/verify-email/confirm", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export function resendEmailVerification(accessToken: string): Promise<void> {
+  return authedFetch<void>("/auth/verify-email/resend", accessToken, { method: "POST" });
+}
+
 // --- GDPR: data export + account deletion ---
 
 /** Fetches the export as an authenticated request (same reasoning as

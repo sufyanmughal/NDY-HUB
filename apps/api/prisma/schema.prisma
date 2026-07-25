@@ -51,6 +51,13 @@ model User {
   emailVerifiedAt   DateTime?
   phoneVerifiedAt   DateTime?
   identityVerifiedAt DateTime?
+  // Single-use, TTL'd — same shape as every other one-time token in this
+  // schema (LoginRequest.token, OAuthAuthorizationCode.code). Cleared back
+  // to null the moment it's redeemed, so a unique index on the hash is safe
+  // (no two *pending* tokens ever collide; used-up ones don't occupy the
+  // index at all).
+  emailVerificationTokenHash String?   @unique
+  emailVerificationExpiresAt DateTime?
 
   role              Role              @default(USER)
   suspended         Boolean           @default(false)

@@ -17,6 +17,7 @@ import { CreateLoginRequestDto } from './dto/create-login-request.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { ConfirmEmailDto } from './dto/confirm-email.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthenticatedRequestUser } from './guards/jwt-auth.guard';
@@ -114,6 +115,20 @@ export class AuthController {
     @CurrentUser() user: AuthenticatedRequestUser,
   ) {
     return this.auth.changePassword(user.sub, dto);
+  }
+
+  // Public: the token itself is the credential, same as a password-reset
+  // link — there's no session to require yet if this is opened in a fresh
+  // browser tab from the verification email.
+  @Post('verify-email/confirm')
+  confirmEmailVerification(@Body() dto: ConfirmEmailDto) {
+    return this.auth.confirmEmailVerification(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('verify-email/resend')
+  resendEmailVerification(@CurrentUser() user: AuthenticatedRequestUser) {
+    return this.auth.requestEmailVerification(user.sub);
   }
 }
 
