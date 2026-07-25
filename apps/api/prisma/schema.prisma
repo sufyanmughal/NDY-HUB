@@ -55,6 +55,14 @@ model User {
   role              Role              @default(USER)
   suspended         Boolean           @default(false)
   suspendedAt       DateTime?
+  // Set by GdprService.deleteAccount — a self-service deletion, distinct
+  // from an admin suspension. The row itself survives (financial records
+  // like CryndyPurchase/Membership have a userId FK that must keep
+  // resolving for legal/tax retention — see the schema note above
+  // AuditLogEntry for the same reasoning), but every PII field on it gets
+  // wiped and `suspended` flips true so login is blocked the same way an
+  // admin suspension already blocks it.
+  deletedAt         DateTime?
 
   ndyappsConnected  Boolean           @default(false)
   ndyappsConnectedAt DateTime?

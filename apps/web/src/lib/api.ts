@@ -300,6 +300,32 @@ export function changePassword(
   });
 }
 
+// --- GDPR: data export + account deletion ---
+
+/** Fetches the export as an authenticated request (same reasoning as
+ * downloadDocument — a plain <a href> can't send a bearer token), then
+ * hands the browser a blob: URL so it saves like a normal download. */
+export async function downloadDataExport(accessToken: string, ndyId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/gdpr/export`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Export failed with status ${res.status}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `ndyhub-data-export-${ndyId}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export function deleteAccount(accessToken: string, currentPassword: string): Promise<void> {
+  return authedFetch<void>("/gdpr/delete-account", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, confirm: "DELETE" }),
+  });
+}
+
 // --- Transactions ---
 
 export interface Transaction {

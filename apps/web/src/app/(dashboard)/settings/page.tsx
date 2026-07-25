@@ -2,10 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { getMe, updateProfile, changePassword, type MeProfile } from "@/lib/api";
+import {
+  getMe,
+  updateProfile,
+  changePassword,
+  downloadDataExport,
+  deleteAccount,
+  type MeProfile,
+} from "@/lib/api";
 
 export default function SettingsPage() {
-  const { auth } = useAuth();
+  const { auth, logout } = useAuth();
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -36,6 +43,13 @@ export default function SettingsPage() {
 
       {profile && <ProfileForm accessToken={auth.accessToken} profile={profile} onSaved={setProfile} />}
       <PasswordForm accessToken={auth.accessToken} />
+      {profile && (
+        <DataPrivacySection
+          accessToken={auth.accessToken}
+          ndyId={profile.ndyId}
+          onAccountDeleted={logout}
+        />
+      )}
     </div>
   );
 }
@@ -164,5 +178,130 @@ function PasswordForm({ accessToken }: { accessToken: string }) {
         {busy ? "Changing…" : "Change password"}
       </button>
     </form>
+  );
+}
+
+function DataPrivacySection({
+  accessToken,
+  ndyId,
+  onAccountDeleted,
+}: {
+  accessToken: string;
+  ndyId: string;
+  onAccountDeleted: () => void;
+}) {
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmText, setConfirmText] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleExport() {
+    setExportBusy(true);
+    setExportError(null);
+    try {
+      await downloadDataExport(accessToken, ndyId);
+    } catch (err) {
+      setExportError((err as Error).message);
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  async function handleDelete(e: React.FormEvent) {
+    e.preventDefault();
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount(accessToken, password);
+      // The account is anonymized and every session/connection revoked
+      // server-side the moment this resolves — clear the local session too
+      // so DashboardGate sends this tab back to /login immediately.
+      onAccountDeleted();
+    } catch (err) {
+      setDeleteError((err as Error).message);
+      setDeleteBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-surface p-5">
+      <h2 className="text-sm font-medium text-foreground-muted">Data &amp; Privacy</h2>
+      <p className="mt-2 text-sm text-foreground-muted">
+        Download a copy of everything tied to your account, or permanently delete it.
+      </p>
+
+      <button
+        onClick={handleExport}
+        disabled={exportBusy}
+        className="mt-4 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50"
+      >
+        {exportBusy ? "Preparing…" : "Export my data"}
+      </button>
+      {exportError && <p className="mt-2 text-sm text-critical">{exportError}</p>}
+
+      <div className="mt-6 border-t border-critical/20 pt-5">
+        <h3 className="text-sm font-medium text-critical">Delete account</h3>
+        <p className="mt-1 text-xs text-foreground-muted">
+          Your profile, email, and password are permanently wiped, and every device and
+          connected website is signed out. Purchase and membership history is retained for
+          legal/financial record-keeping, no longer linked to identifying information.
+        </p>
+
+        {!confirmOpen ? (
+          <button
+            onClick={() => setConfirmOpen(true)}
+            className="mt-3 rounded-md border border-critical/40 px-4 py-2 text-sm font-medium text-critical hover:bg-critical/10"
+          >
+            Delete my account
+          </button>
+        ) : (
+          <form onSubmit={handleDelete} className="mt-3 space-y-3">
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                Current password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                Type DELETE to confirm
+              </label>
+              <input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+
+            {deleteError && <p className="text-sm text-critical">{deleteError}</p>}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(false)}
+                className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={deleteBusy || !password || confirmText !== "DELETE"}
+                className="rounded-md bg-critical px-4 py-2 text-sm font-medium text-white hover:bg-critical/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleteBusy ? "Deleting…" : "Permanently delete"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
   );
 }
