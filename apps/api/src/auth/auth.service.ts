@@ -27,10 +27,13 @@ import { CreateLoginRequestDto } from './dto/create-login-request.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ConfirmEmailDto } from './dto/confirm-email.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const SALT_ROUNDS = 12;
 const LOGIN_REQUEST_TTL_MS = 90_000; // 90 seconds, per the desktop-QR / deep-link spec
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour — tighter than email verification on purpose
 const generateToken = customAlphabet(
   'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789',
   32,
@@ -163,6 +166,83 @@ export class AuthService {
     });
   }
 
+  /**
+   * Always resolves the same way whether or not the email is registered —
+   * the controller returns one generic message either way. Letting a
+   * caller tell "unregistered email" apart from "check your inbox" turns
+   * this endpoint into an account-enumeration oracle, so there's no early
+   * return with a different shape for that case, just silently doing
+   * nothing further.
+   */
+  async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
+    const user = await this.identity.findByEmail(dto.email);
+    // No account, a Google/Apple/NDYAPPS-only account with no password to
+    // reset, or a deleted/anonymized account — nothing to email, and the
+    // caller can't distinguish this from a real send either way.
+    if (!user || !user.passwordHash || user.deletedAt) return;
+
+    const token = generateToken();
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetTokenHash: hashToken(token),
+        passwordResetExpiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+      },
+    });
+    this.sendPasswordResetEmail(user.email, token);
+  }
+
+  /**
+   * The click-through from the reset link. Public by design — the token
+   * itself is the credential, same reasoning as confirmEmailVerification.
+   * Redeeming it also revokes every existing session on the account: a
+   * password reset is exactly the moment something might be compromised,
+   * so whoever had the old password gets signed out everywhere, not just
+   * here — the same "kick everyone out" behavior SecurityService's
+   * revoke-all already gives a user who does this deliberately.
+   */
+  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+    const tokenHash = hashToken(dto.token);
+    const user = await this.prisma.user.findUnique({
+      where: { passwordResetTokenHash: tokenHash },
+    });
+    if (
+      !user ||
+      !user.passwordResetExpiresAt ||
+      user.passwordResetExpiresAt < new Date()
+    ) {
+      throw new BadRequestException(
+        'This password reset link is invalid or has expired.',
+      );
+    }
+
+    const newHash = await bcrypt.hash(dto.newPassword, SALT_ROUNDS);
+    const result = await this.prisma.user.updateMany({
+      where: { id: user.id, passwordResetTokenHash: tokenHash },
+      data: {
+        passwordHash: newHash,
+        passwordResetTokenHash: null,
+        passwordResetExpiresAt: null,
+      },
+    });
+    if (result.count === 0) {
+      throw new ConflictException('This password reset link was already used.');
+    }
+
+    await this.prisma.session.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  private sendPasswordResetEmail(email: string, token: string): void {
+    const webAppUrl = this.config.getOrThrow<string>('WEB_APP_URL');
+    const link = `${webAppUrl}/reset-password?token=${token}`;
+    this.logger.warn(
+      `No email provider configured — password reset link for ${email}: ${link}`,
+    );
+  }
+
   /** Resend, called from Settings — register() already sends the first one. */
   async requestEmailVerification(userId: string): Promise<void> {
     const user = await this.identity.findById(userId);
@@ -183,7 +263,7 @@ export class AuthService {
   async confirmEmailVerification(
     dto: ConfirmEmailDto,
   ): Promise<{ verificationLevel: VerificationLevel }> {
-    const tokenHash = hashVerificationToken(dto.token);
+    const tokenHash = hashToken(dto.token);
     const user = await this.prisma.user.findUnique({
       where: { emailVerificationTokenHash: tokenHash },
     });
@@ -232,7 +312,7 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        emailVerificationTokenHash: hashVerificationToken(token),
+        emailVerificationTokenHash: hashToken(token),
         emailVerificationExpiresAt: new Date(
           Date.now() + EMAIL_VERIFICATION_TTL_MS,
         ),
@@ -409,7 +489,7 @@ export class AuthService {
   }
 }
 
-function hashVerificationToken(token: string): string {
+function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 

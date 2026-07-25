@@ -26,6 +26,8 @@ import { RefreshDto } from './dto/refresh.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ConfirmEmailDto } from './dto/confirm-email.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthenticatedRequestUser } from './guards/jwt-auth.guard';
@@ -186,6 +188,22 @@ export class AuthController {
   @Post('verify-email/resend')
   resendEmailVerification(@CurrentUser() user: AuthenticatedRequestUser) {
     return this.auth.requestEmailVerification(user.sub);
+  }
+
+  // Same brute-force tier as login/register — this is public and takes an
+  // arbitrary email, exactly the kind of endpoint that gets hammered for
+  // account enumeration or spam if left unthrottled.
+  @Throttle(BRUTE_FORCE_GUARD)
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.auth.forgotPassword(dto);
+  }
+
+  // Public: the token itself is the credential, same as email verification.
+  @Throttle(BRUTE_FORCE_GUARD)
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.auth.resetPassword(dto);
   }
 }
 

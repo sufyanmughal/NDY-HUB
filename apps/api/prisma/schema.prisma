@@ -59,6 +59,13 @@ model User {
   emailVerificationTokenHash String?   @unique
   emailVerificationExpiresAt DateTime?
 
+  // Same single-use/TTL shape again, for the forgot-password flow. Shorter
+  // TTL than email verification (1h vs 24h) — a password reset link is a
+  // more sensitive credential than an email-confirm link, worth a tighter
+  // window.
+  passwordResetTokenHash String?   @unique
+  passwordResetExpiresAt DateTime?
+
   role              Role              @default(USER)
   suspended         Boolean           @default(false)
   suspendedAt       DateTime?

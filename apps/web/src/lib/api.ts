@@ -97,22 +97,42 @@ export function getPublicPassport(ndyId: string): Promise<PublicPassport> {
   return apiFetch<PublicPassport>(`/passport/${ndyId}`);
 }
 
-// --- Dev-only helpers, used by the "skip NDYAPPS" shortcut on /login ---
-// Real approval always requires NDYAPPS's own bearer token (JwtAuthGuard on
-// the server enforces that); these just get one the same way NDYAPPS would,
-// without a phone in the loop, for local testing before NDYAPPS exists.
+// --- Email + password auth ---
+// Same two calls back the real password login/register form on /login and
+// the "skip NDYAPPS" dev shortcut on the QR card — approving a login
+// request for real always requires NDYAPPS's own bearer token (JwtAuthGuard
+// on the server enforces that); the dev shortcut just gets one the same way
+// NDYAPPS would, without a phone in the loop, for local testing.
 
-export function devLogin(email: string, password: string): Promise<IssuedSession> {
+export function loginWithPassword(email: string, password: string): Promise<IssuedSession> {
   return apiFetch<IssuedSession>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
 }
 
-export function devRegister(email: string, password: string, fullName: string): Promise<IssuedSession> {
+export function registerWithPassword(
+  email: string,
+  password: string,
+  fullName: string,
+): Promise<IssuedSession> {
   return apiFetch<IssuedSession>("/auth/register", {
     method: "POST",
     body: JSON.stringify({ email, password, fullName }),
+  });
+}
+
+export function forgotPassword(email: string): Promise<void> {
+  return apiFetch<void>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPassword(token: string, newPassword: string): Promise<void> {
+  return apiFetch<void>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, newPassword }),
   });
 }
 

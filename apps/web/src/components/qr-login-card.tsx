@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import { Check, X } from "lucide-react";
-import { buildLoginDeepLink, devLogin, devRegister, approveLoginRequestAs } from "@/lib/api";
+import { buildLoginDeepLink, loginWithPassword, registerWithPassword, approveLoginRequestAs } from "@/lib/api";
 import { useLoginRequest } from "@/lib/use-login-request";
 import { useAuth } from "@/lib/auth-context";
 
@@ -75,8 +75,8 @@ function PendingView({ token, expiresAt }: { token: string; expiresAt: string })
       // Same thing NDYAPPS would do: get a bearer token for a real account,
       // then approve with it. Falls back to registering the dev account the
       // first time this runs on a fresh database.
-      const session = await devLogin(DEV_EMAIL, DEV_PASSWORD).catch(() =>
-        devRegister(DEV_EMAIL, DEV_PASSWORD, "Dev Test User"),
+      const session = await loginWithPassword(DEV_EMAIL, DEV_PASSWORD).catch(() =>
+        registerWithPassword(DEV_EMAIL, DEV_PASSWORD, "Dev Test User"),
       );
       await approveLoginRequestAs(token, session.accessToken);
       // No further action needed here — the WebSocket subscription already

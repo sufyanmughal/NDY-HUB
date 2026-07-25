@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { QrLoginCard } from "@/components/qr-login-card";
+import { PasswordAuthForm } from "@/components/password-auth-form";
 import { useAuth } from "@/lib/auth-context";
 
 /** `next` comes straight off the query string of a page anyone can link to
@@ -40,10 +41,14 @@ function LoginPageInner() {
         <p className="mt-1 text-sm text-foreground-muted">One Identity. One Passport. One Ecosystem.</p>
       </div>
       <QrLoginCard redirectTo={next} />
-      <p className="max-w-sm text-center text-xs text-foreground-muted">
-        Don&apos;t have NDYAPPS yet? Email and password login lands alongside NDYAPPS in this same
-        milestone.
-      </p>
+
+      <div className="flex w-full max-w-sm items-center gap-3 text-xs text-foreground-muted">
+        <span className="h-px flex-1 bg-border" />
+        or
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <PasswordAuthForm />
     </div>
   );
 }
