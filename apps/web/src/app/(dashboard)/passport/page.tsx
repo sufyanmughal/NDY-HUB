@@ -58,12 +58,12 @@ export default function PassportPage() {
 
   const canDownload = Boolean(passport && qrDataUrl);
 
-  function handleDownload() {
+  async function handleDownload() {
     if (!passport || !qrDataUrl || auth.status !== "authenticated") return;
     setDownloadError(null);
     setDownloading(true);
     try {
-      downloadPassportPdf({
+      await downloadPassportPdf({
         ndyId: auth.ndyId,
         fullName: displayName,
         verified,
@@ -73,6 +73,7 @@ export default function PassportPage() {
         ndybitsBalanceLabel: ndybitsLabel,
         connectedPlatformsLabel,
         qrDataUrl,
+        photoUrl: passport.profilePhotoUrl,
       });
     } catch (err) {
       setDownloadError((err as Error).message);

@@ -28,10 +28,14 @@ export interface PassportPdfData {
    * `qrcode` package) — reused here rather than re-rendered, so the QR in
    * the PDF is guaranteed to match what's on screen. */
   qrDataUrl: string;
+  /** A square-cropped data: URL, produced by loadSquarePhotoDataUrl below.
+   * Optional/nullable — falls back to the initials avatar when absent
+   * (no photo set, or the fetch/crop failed for any reason). */
+  photoDataUrl?: string | null;
 }
 
 const PAGE_WIDTH = 400;
-const PAGE_HEIGHT = 720;
+const PAGE_HEIGHT = 760;
 const MARGIN = 32;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const CENTER_X = PAGE_WIDTH / 2;
@@ -41,7 +45,7 @@ const CENTER_X = PAGE_WIDTH / 2;
 // element inside it (drawn after) agree on the same numbers instead of one
 // being inferred from where the other happened to land.
 const CARD_PAD_TOP = 36;
-const AVATAR_R = 32;
+const AVATAR_R = 40;
 const QR_SIZE = 130;
 const NAME_Y = CARD_PAD_TOP + AVATAR_R * 2 + 16;
 const LABEL_Y = NAME_Y + 20;
@@ -93,16 +97,33 @@ export function buildPassportPdf(data: PassportPdfData): jsPDF {
   doc.setTextColor(COLORS.foregroundMuted);
   doc.text("NDY PASSPORT", MARGIN + 16, cardTop + 18);
 
-  // Avatar (initials only — no external photo fetch in the PDF path, see
-  // the page component for why real profilePhotoUrls only render on screen)
+  // Avatar — the real photo, circle-clipped, when one loaded successfully;
+  // otherwise the same gradient-initial fallback the on-screen Avatar
+  // component uses.
   const avatarCenterY = cardTop + CARD_PAD_TOP + AVATAR_R;
-  doc.setFillColor(COLORS.accent);
-  doc.circle(CENTER_X, avatarCenterY, AVATAR_R, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.setTextColor("#ffffff");
-  const initial = (data.fullName.trim().charAt(0) || "N").toUpperCase();
-  centerText(doc, initial, CENTER_X, avatarCenterY + 8);
+  if (data.photoDataUrl) {
+    doc.saveGraphicsState();
+    doc.ellipse(CENTER_X, avatarCenterY, AVATAR_R, AVATAR_R, null);
+    doc.clip();
+    doc.discardPath();
+    doc.addImage(
+      data.photoDataUrl,
+      "PNG",
+      CENTER_X - AVATAR_R,
+      avatarCenterY - AVATAR_R,
+      AVATAR_R * 2,
+      AVATAR_R * 2,
+    );
+    doc.restoreGraphicsState();
+  } else {
+    doc.setFillColor(COLORS.accent);
+    doc.circle(CENTER_X, avatarCenterY, AVATAR_R, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(26);
+    doc.setTextColor("#ffffff");
+    const initial = (data.fullName.trim().charAt(0) || "N").toUpperCase();
+    centerText(doc, initial, CENTER_X, avatarCenterY + 9);
+  }
 
   // Name
   doc.setFont("helvetica", "bold");
@@ -195,10 +216,47 @@ export function buildPassportPdf(data: PassportPdfData): jsPDF {
   return doc;
 }
 
-/** Browser-only: builds the PDF and triggers a file download. */
-export function downloadPassportPdf(data: PassportPdfData): void {
-  const doc = buildPassportPdf(data);
+/**
+ * Browser-only: fetches and crops the real photo (if there is one), builds
+ * the PDF, and triggers a file download. A failed photo fetch — network
+ * error, no photo set, CORS misconfigured in some future environment —
+ * degrades to the initials avatar rather than failing the whole download;
+ * the PDF is still worth having without a photo.
+ */
+export async function downloadPassportPdf(
+  data: Omit<PassportPdfData, "photoDataUrl"> & { photoUrl?: string | null },
+): Promise<void> {
+  const { photoUrl, ...rest } = data;
+  const photoDataUrl = photoUrl ? await loadSquarePhotoDataUrl(photoUrl, 256).catch(() => null) : null;
+  const doc = buildPassportPdf({ ...rest, photoDataUrl });
   doc.save(`ndy-passport-${data.ndyId}.pdf`);
+}
+
+/**
+ * Fetches the photo directly (not via an <img> tag) so the raw bytes are
+ * available to redraw into a canvas — reading pixels back out of a
+ * cross-origin image requires the server's opt-in via CORS either way,
+ * whether that's a fetch() of the bytes or a canvas draw of an <img>.
+ * Crops to a square with "cover" scaling — the same behavior the
+ * on-screen Avatar gets for free from CSS's object-cover — so a
+ * non-square upload doesn't get squashed into an oval by the PDF's
+ * circular clip.
+ */
+async function loadSquarePhotoDataUrl(photoUrl: string, size: number): Promise<string> {
+  const res = await fetch(photoUrl);
+  if (!res.ok) throw new Error(`Failed to fetch photo: ${res.status}`);
+  const blob = await res.blob();
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D context unavailable.");
+  const scale = Math.max(size / bitmap.width, size / bitmap.height);
+  const drawWidth = bitmap.width * scale;
+  const drawHeight = bitmap.height * scale;
+  ctx.drawImage(bitmap, (size - drawWidth) / 2, (size - drawHeight) / 2, drawWidth, drawHeight);
+  return canvas.toDataURL("image/png");
 }
 
 function centerText(doc: jsPDF, text: string, centerX: number, y: number): void {

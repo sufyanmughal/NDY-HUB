@@ -17,11 +17,18 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
-  app.useStaticAssets(UPLOADS_ROOT_DIR, { prefix: '/uploads/' });
+  // enableCors() has to come before useStaticAssets() — Express runs
+  // middleware in registration order, and static-file serving ends the
+  // response before anything registered after it ever runs. Registered in
+  // the other order (as this originally was), every normal API route got
+  // CORS headers but /uploads/* never did — invisible for an <img> tag
+  // (which doesn't enforce CORS) and completely broken for a cross-origin
+  // fetch() of the same URL, e.g. to embed a photo in a client-generated PDF.
   app.enableCors({
     origin: process.env.WEB_APP_URL ?? 'http://localhost:3001',
     credentials: true,
   });
+  app.useStaticAssets(UPLOADS_ROOT_DIR, { prefix: '/uploads/' });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   await app.listen(process.env.PORT ?? 3000);
 }
