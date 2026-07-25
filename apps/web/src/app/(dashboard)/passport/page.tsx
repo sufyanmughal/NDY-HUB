@@ -11,6 +11,7 @@ import { useMembershipSummary } from "@/lib/use-membership";
 import { mockConnectedPlatformsCount } from "@/lib/mock-data";
 import { API_BASE_URL } from "@/lib/api";
 import { downloadPassportPdf } from "@/lib/passport-pdf";
+import { Avatar } from "@/components/avatar";
 
 export default function PassportPage() {
   const { auth } = useAuth();
@@ -111,8 +112,8 @@ export default function PassportPage() {
             NDY Passport
           </div>
 
-          <div className="mx-auto mt-5 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-2 text-xl font-semibold text-white">
-            {displayName.charAt(0)}
+          <div className="mx-auto mt-5">
+            <Avatar photoUrl={passport?.profilePhotoUrl} name={displayName} size={64} className="mx-auto text-xl" />
           </div>
 
           <div className="mt-3 text-lg font-semibold">{displayName}</div>

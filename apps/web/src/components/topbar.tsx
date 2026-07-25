@@ -3,6 +3,7 @@
 import { Search, Bell } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { usePassport } from "@/lib/use-passport";
+import { Avatar } from "@/components/avatar";
 
 export function Topbar() {
   const { auth, logout } = useAuth();
@@ -11,7 +12,6 @@ export function Topbar() {
   if (auth.status !== "authenticated") return null;
 
   const displayName = passport?.fullName ?? auth.ndyId;
-  const initial = displayName.charAt(0);
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-surface px-6 py-4">
@@ -43,9 +43,7 @@ export function Topbar() {
         >
           Log out
         </button>
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-2 text-xs font-semibold text-white">
-          {initial}
-        </div>
+        <Avatar photoUrl={passport?.profilePhotoUrl} name={displayName} size={32} />
       </div>
     </header>
   );

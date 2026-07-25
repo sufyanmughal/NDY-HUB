@@ -1,16 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { Avatar } from "@/components/avatar";
 import {
   getMe,
   updateProfile,
+  uploadProfilePhoto,
   changePassword,
   downloadDataExport,
   deleteAccount,
   resendEmailVerification,
   type MeProfile,
 } from "@/lib/api";
+
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export default function SettingsPage() {
   const { auth, logout } = useAuth();
@@ -72,6 +77,10 @@ function ProfileForm({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "good" | "critical"; text: string } | null>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -87,9 +96,58 @@ function ProfileForm({
     }
   }
 
+  async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // lets picking the same file again re-trigger onChange
+    if (!file) return;
+
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      setPhotoError("Only JPEG, PNG, and WebP images are allowed.");
+      return;
+    }
+    if (file.size > MAX_PHOTO_SIZE_BYTES) {
+      setPhotoError("Photo must be 5MB or smaller.");
+      return;
+    }
+
+    setPhotoError(null);
+    setPhotoBusy(true);
+    try {
+      const { profilePhotoUrl } = await uploadProfilePhoto(accessToken, file);
+      onSaved({ ...profile, profilePhotoUrl });
+    } catch (err) {
+      setPhotoError((err as Error).message);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
   return (
     <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-surface p-5">
       <h2 className="text-sm font-medium text-foreground-muted">Profile</h2>
+
+      <div className="mt-4 flex items-center gap-4">
+        <Avatar photoUrl={profile.profilePhotoUrl} name={profile.fullName ?? profile.ndyId} size={56} />
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handlePhotoSelected}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={photoBusy}
+            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {photoBusy ? "Uploading…" : "Change photo"}
+          </button>
+          <p className="mt-1 text-xs text-foreground-muted">JPEG, PNG, or WebP. Up to 5MB.</p>
+        </div>
+      </div>
+      {photoError && <p className="mt-2 text-sm text-critical">{photoError}</p>}
 
       <label className="mt-4 block text-xs uppercase tracking-wide text-foreground-muted">Email</label>
       <input

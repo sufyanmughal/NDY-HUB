@@ -9,6 +9,8 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { customAlphabet } from 'nanoid';
 import { createHash } from 'crypto';
+import { unlink } from 'fs/promises';
+import { join } from 'path';
 import {
   LoginRequestMethod,
   LoginRequestStatus,
@@ -16,6 +18,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
+import { PROFILE_PHOTOS_DIR } from '../common/upload-dir.util';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
 import { LoginRequestGateway } from './login-request.gateway';
 import { RegisterDto } from './dto/register.dto';
@@ -103,6 +106,43 @@ export class AuthService {
       fullName: user.fullName,
       profilePhotoUrl: user.profilePhotoUrl,
     };
+  }
+
+  /**
+   * The upload endpoint's counterpart to updateProfile's arbitrary-URL
+   * path — this one is what the file actually landed on disk as, not a
+   * client-supplied string. Deletes whatever photo the user had before
+   * (best-effort — a leftover file if this fails is harmless, unlike
+   * failing the new upload over it) so re-uploading doesn't pile up
+   * orphaned files on disk forever.
+   */
+  async updateProfilePhoto(
+    userId: string,
+    filename: string,
+  ): Promise<{ profilePhotoUrl: string }> {
+    const user = await this.identity.findById(userId);
+    const apiUrl =
+      this.config.get<string>('API_URL') ??
+      `http://localhost:${this.config.get('PORT') ?? 3000}`;
+    const profilePhotoUrl = `${apiUrl}/uploads/profile-photos/${filename}`;
+
+    await this.deleteStalePhoto(user.profilePhotoUrl);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { profilePhotoUrl },
+    });
+
+    return { profilePhotoUrl };
+  }
+
+  private async deleteStalePhoto(currentUrl: string | null): Promise<void> {
+    const marker = '/uploads/profile-photos/';
+    if (!currentUrl?.includes(marker)) return;
+    const filename = currentUrl.split(marker)[1];
+    if (!filename) return;
+    await unlink(join(PROFILE_PHOTOS_DIR, filename)).catch(() => {
+      /* best-effort — a stray file left on disk is harmless */
+    });
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {

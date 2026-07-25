@@ -289,6 +289,27 @@ export function updateProfile(
   return authedFetch("/auth/me", accessToken, { method: "PATCH", body: JSON.stringify(updates) });
 }
 
+/** Multipart upload, not JSON — can't use authedFetch (it always sets
+ * Content-Type: application/json). Letting fetch set the multipart
+ * boundary itself means never setting Content-Type explicitly here. */
+export async function uploadProfilePhoto(
+  accessToken: string,
+  file: File,
+): Promise<{ profilePhotoUrl: string }> {
+  const formData = new FormData();
+  formData.append("photo", file);
+  const res = await fetch(`${API_BASE_URL}/auth/me/photo`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.message ?? `Upload failed with status ${res.status}`, res.status);
+  }
+  return res.json();
+}
+
 export function changePassword(
   accessToken: string,
   currentPassword: string,

@@ -5,3 +5,7 @@ node_modules/
 *.log
 .DS_Store
 .claude/worktrees/
+
+# User-uploaded files (profile photos, etc.) — local-disk dev storage,
+# see apps/api/src/common/upload-dir.util.ts. Not source, not committed.
+apps/api/uploads/

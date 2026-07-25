@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -6,9 +7,16 @@ import {
   Patch,
   Post,
   Req,
+  UnsupportedMediaTypeException,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { randomUUID } from 'crypto';
+import { extname } from 'path';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -22,12 +30,19 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthenticatedRequestUser } from './guards/jwt-auth.guard';
 import type { SessionMeta } from './session.service';
+import { PROFILE_PHOTOS_DIR } from '../common/upload-dir.util';
 
 // 5 attempts/minute/IP — the actual credential-guessing targets. Tighter
 // than the app-wide default (100/min, set in AppModule) on purpose: these
 // three are exactly what §21 of the brief meant by "protection against
 // brute-force attacks," and until now nothing enforced it at all.
 const BRUTE_FORCE_GUARD = { default: { limit: 5, ttl: 60_000 } };
+
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+// SVG deliberately excluded — an uploaded SVG can carry inline <script>,
+// making "profile photo" an XSS vector if it's ever served or embedded
+// without sanitization. JPEG/PNG/WebP can't do that.
+const ALLOWED_PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 @Controller('auth')
 export class AuthController {
@@ -105,6 +120,48 @@ export class AuthController {
     @CurrentUser() user: AuthenticatedRequestUser,
   ) {
     return this.auth.updateProfile(user.sub, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/photo')
+  @UseInterceptors(
+    FileInterceptor('photo', {
+      storage: diskStorage({
+        destination: PROFILE_PHOTOS_DIR,
+        // A random filename, not the original — the original is
+        // attacker-controlled input and never trusted for a path, and a
+        // random name also means re-uploading always produces a fresh URL
+        // (no browser/CDN cache serving a stale image back).
+        filename: (_req, file, cb) => {
+          cb(
+            null,
+            `${randomUUID()}${extname(file.originalname).toLowerCase()}`,
+          );
+        },
+      }),
+      limits: { fileSize: MAX_PHOTO_SIZE_BYTES },
+      fileFilter: (_req, file, cb) => {
+        if (!ALLOWED_PHOTO_MIME_TYPES.includes(file.mimetype)) {
+          cb(
+            new UnsupportedMediaTypeException(
+              'Only JPEG, PNG, and WebP images are allowed.',
+            ),
+            false,
+          );
+          return;
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  uploadPhoto(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No photo file was uploaded.');
+    }
+    return this.auth.updateProfilePhoto(user.sub, file.filename);
   }
 
   @Throttle(BRUTE_FORCE_GUARD)
