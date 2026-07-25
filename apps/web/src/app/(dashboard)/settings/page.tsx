@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
 import { useAuth } from "@/lib/auth-context";
 import { Avatar } from "@/components/avatar";
 import {
@@ -11,6 +12,9 @@ import {
   downloadDataExport,
   deleteAccount,
   resendEmailVerification,
+  begin2faSetup,
+  confirm2faSetup,
+  disable2fa,
   type MeProfile,
 } from "@/lib/api";
 
@@ -53,6 +57,7 @@ export default function SettingsPage() {
 
       {profile && <ProfileForm accessToken={auth.accessToken} profile={profile} onSaved={setProfile} />}
       <PasswordForm accessToken={auth.accessToken} />
+      {profile && <TwoFactorSection accessToken={auth.accessToken} profile={profile} onChanged={setProfile} />}
       {profile && (
         <DataPrivacySection
           accessToken={auth.accessToken}
@@ -279,6 +284,245 @@ function PasswordForm({ accessToken }: { accessToken: string }) {
         {busy ? "Changing…" : "Change password"}
       </button>
     </form>
+  );
+}
+
+/**
+ * Three states: not enabled (just a toggle-on button), mid-setup (QR code
+ * + manual secret + confirm-with-a-real-code, then backup codes shown
+ * exactly once), or enabled (a disable form gated on password + code —
+ * high friction on purpose for a security-downgrading action, same
+ * reasoning as the server-side check in TotpService.disable).
+ */
+function TwoFactorSection({
+  accessToken,
+  profile,
+  onChanged,
+}: {
+  accessToken: string;
+  profile: MeProfile;
+  onChanged: (profile: MeProfile) => void;
+}) {
+  const [setupStep, setSetupStep] = useState<"idle" | "confirm" | "backup-codes">("idle");
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [secret, setSecret] = useState<string | null>(null);
+  const [confirmCode, setConfirmCode] = useState("");
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [disableOpen, setDisableOpen] = useState(false);
+  const [disablePassword, setDisablePassword] = useState("");
+  const [disableCode, setDisableCode] = useState("");
+  const [disableBusy, setDisableBusy] = useState(false);
+  const [disableError, setDisableError] = useState<string | null>(null);
+
+  async function handleStartSetup() {
+    setBusy(true);
+    setError(null);
+    try {
+      const { secret, otpauthUri } = await begin2faSetup(accessToken);
+      setSecret(secret);
+      setQrDataUrl(await QRCode.toDataURL(otpauthUri, { margin: 1, width: 200 }));
+      setSetupStep("confirm");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleConfirmSetup(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const { backupCodes } = await confirm2faSetup(accessToken, confirmCode);
+      setBackupCodes(backupCodes);
+      setSetupStep("backup-codes");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleFinishSetup() {
+    setSetupStep("idle");
+    setQrDataUrl(null);
+    setSecret(null);
+    setConfirmCode("");
+    setBackupCodes([]);
+    onChanged({ ...profile, twoFactorEnabled: true });
+  }
+
+  async function handleDisable(e: React.FormEvent) {
+    e.preventDefault();
+    setDisableBusy(true);
+    setDisableError(null);
+    try {
+      await disable2fa(accessToken, disablePassword, disableCode);
+      setDisableOpen(false);
+      setDisablePassword("");
+      setDisableCode("");
+      onChanged({ ...profile, twoFactorEnabled: false });
+    } catch (err) {
+      setDisableError((err as Error).message);
+    } finally {
+      setDisableBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-surface p-5">
+      <h2 className="text-sm font-medium text-foreground-muted">Two-factor authentication</h2>
+
+      {profile.twoFactorEnabled && setupStep === "idle" && (
+        <div className="mt-3">
+          <p className="text-sm text-foreground-muted">
+            Enabled — signing in requires a code from your authenticator app or a backup code.
+          </p>
+          {!disableOpen ? (
+            <button
+              onClick={() => setDisableOpen(true)}
+              className="mt-3 rounded-md border border-critical/40 px-4 py-2 text-sm font-medium text-critical hover:bg-critical/10"
+            >
+              Disable two-factor authentication
+            </button>
+          ) : (
+            <form onSubmit={handleDisable} className="mt-3 space-y-3">
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                  Current password
+                </label>
+                <input
+                  type="password"
+                  value={disablePassword}
+                  onChange={(e) => setDisablePassword(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                  Authenticator code or backup code
+                </label>
+                <input
+                  value={disableCode}
+                  onChange={(e) => setDisableCode(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              {disableError && <p className="text-sm text-critical">{disableError}</p>}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDisableOpen(false)}
+                  className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={disableBusy || !disablePassword || !disableCode}
+                  className="rounded-md bg-critical px-4 py-2 text-sm font-medium text-white hover:bg-critical/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {disableBusy ? "Disabling…" : "Disable"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {!profile.twoFactorEnabled && setupStep === "idle" && (
+        <div className="mt-3">
+          <p className="text-sm text-foreground-muted">
+            Not enabled. Add an authenticator app (Google Authenticator, 1Password, Authy…) as a
+            second step when signing in.
+          </p>
+          {error && <p className="mt-2 text-sm text-critical">{error}</p>}
+          <button
+            onClick={handleStartSetup}
+            disabled={busy}
+            className="mt-3 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
+          >
+            {busy ? "Starting…" : "Enable two-factor authentication"}
+          </button>
+        </div>
+      )}
+
+      {setupStep === "confirm" && (
+        <div className="mt-3 space-y-3">
+          <p className="text-sm text-foreground-muted">
+            Scan this QR code with your authenticator app, then enter the 6-digit code it shows.
+          </p>
+          {qrDataUrl && (
+            /* eslint-disable-next-line @next/next/no-img-element -- a data: URL, not a remote image */
+            <img src={qrDataUrl} alt="2FA setup QR code" width={200} height={200} className="rounded-md" />
+          )}
+          {secret && (
+            <p className="text-xs text-foreground-muted">
+              Can&apos;t scan it? Enter this code manually:{" "}
+              <span className="font-mono text-foreground">{secret}</span>
+            </p>
+          )}
+          <form onSubmit={handleConfirmSetup} className="space-y-3">
+            <input
+              value={confirmCode}
+              onChange={(e) => setConfirmCode(e.target.value)}
+              autoFocus
+              required
+              placeholder="123456"
+              className="w-full max-w-[200px] rounded-md border border-border bg-background px-3 py-2 text-center text-lg tracking-widest"
+            />
+            {error && <p className="text-sm text-critical">{error}</p>}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSetupStep("idle");
+                  setQrDataUrl(null);
+                  setSecret(null);
+                  setConfirmCode("");
+                  setError(null);
+                }}
+                className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={busy || !confirmCode}
+                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {busy ? "Confirming…" : "Confirm"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {setupStep === "backup-codes" && (
+        <div className="mt-3 space-y-3">
+          <p className="text-sm font-medium text-good">Two-factor authentication is now enabled.</p>
+          <p className="text-sm text-foreground-muted">
+            Save these backup codes somewhere safe — each works once, as a way back in if you lose
+            your authenticator app. They won&apos;t be shown again.
+          </p>
+          <div className="grid grid-cols-2 gap-2 rounded-md border border-border bg-surface-2 p-3 font-mono text-sm">
+            {backupCodes.map((c) => (
+              <span key={c}>{c}</span>
+            ))}
+          </div>
+          <button
+            onClick={handleFinishSetup}
+            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+          >
+            I&apos;ve saved these codes
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

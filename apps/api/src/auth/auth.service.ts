@@ -113,6 +113,7 @@ export class AuthService {
       profilePhotoUrl: user.profilePhotoUrl,
       verificationLevel: user.verificationLevel,
       ndyappsConnected: user.ndyappsConnected,
+      twoFactorEnabled: Boolean(user.totpEnabledAt),
       createdAt: user.createdAt,
     };
   }

@@ -75,10 +75,15 @@ function PendingView({ token, expiresAt }: { token: string; expiresAt: string })
       // Same thing NDYAPPS would do: get a bearer token for a real account,
       // then approve with it. Falls back to registering the dev account the
       // first time this runs on a fresh database.
-      const session = await loginWithPassword(DEV_EMAIL, DEV_PASSWORD).catch(() =>
+      const result = await loginWithPassword(DEV_EMAIL, DEV_PASSWORD).catch(() =>
         registerWithPassword(DEV_EMAIL, DEV_PASSWORD, "Dev Test User"),
       );
-      await approveLoginRequestAs(token, session.accessToken);
+      if ("requires2fa" in result) {
+        throw new Error(
+          "The dev shortcut account has 2FA enabled — disable it in Settings to use this shortcut.",
+        );
+      }
+      await approveLoginRequestAs(token, result.accessToken);
       // No further action needed here — the WebSocket subscription already
       // listening on this token (in useLoginRequest) picks up APPROVED and
       // drives the rest of the flow itself.

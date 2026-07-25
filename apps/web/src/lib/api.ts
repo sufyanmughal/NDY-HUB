@@ -104,8 +104,10 @@ export function getPublicPassport(ndyId: string): Promise<PublicPassport> {
 // on the server enforces that); the dev shortcut just gets one the same way
 // NDYAPPS would, without a phone in the loop, for local testing.
 
-export function loginWithPassword(email: string, password: string): Promise<IssuedSession> {
-  return apiFetch<IssuedSession>("/auth/login", {
+export type LoginResult = IssuedSession | { requires2fa: true; challengeToken: string };
+
+export function loginWithPassword(email: string, password: string): Promise<LoginResult> {
+  return apiFetch<LoginResult>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
@@ -295,6 +297,7 @@ export interface MeProfile {
   profilePhotoUrl: string | null;
   verificationLevel: string;
   ndyappsConnected: boolean;
+  twoFactorEnabled: boolean;
   createdAt: string;
 }
 
@@ -338,6 +341,33 @@ export function changePassword(
   return authedFetch<void>("/auth/change-password", accessToken, {
     method: "POST",
     body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
+// --- Two-factor authentication (TOTP) ---
+
+export function verify2fa(challengeToken: string, code: string): Promise<IssuedSession> {
+  return apiFetch<IssuedSession>("/auth/2fa/verify", {
+    method: "POST",
+    body: JSON.stringify({ challengeToken, code }),
+  });
+}
+
+export function begin2faSetup(accessToken: string): Promise<{ secret: string; otpauthUri: string }> {
+  return authedFetch("/auth/2fa/setup", accessToken, { method: "POST" });
+}
+
+export function confirm2faSetup(accessToken: string, code: string): Promise<{ backupCodes: string[] }> {
+  return authedFetch("/auth/2fa/enable", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
+export function disable2fa(accessToken: string, currentPassword: string, code: string): Promise<void> {
+  return authedFetch<void>("/auth/2fa/disable", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, code }),
   });
 }
 

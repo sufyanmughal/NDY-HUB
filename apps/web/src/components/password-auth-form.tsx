@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { loginWithPassword, registerWithPassword } from "@/lib/api";
+import { loginWithPassword, registerWithPassword, verify2fa } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
 /**
@@ -18,21 +18,82 @@ export function PasswordAuthForm() {
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [code, setCode] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const session =
+      const result =
         mode === "signin"
           ? await loginWithPassword(email, password)
           : await registerWithPassword(email, password, fullName);
+      if ("requires2fa" in result) {
+        setChallengeToken(result.challengeToken);
+        setBusy(false);
+        return;
+      }
+      login(result);
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  }
+
+  async function handleVerify2fa(e: React.FormEvent) {
+    e.preventDefault();
+    if (!challengeToken) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const session = await verify2fa(challengeToken, code);
       login(session);
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
     }
+  }
+
+  if (challengeToken) {
+    return (
+      <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6">
+        <h2 className="text-sm font-medium text-foreground">Two-factor authentication</h2>
+        <p className="mt-1 text-xs text-foreground-muted">
+          Enter the 6-digit code from your authenticator app, or one of your backup codes.
+        </p>
+        <form onSubmit={handleVerify2fa} className="mt-4 space-y-3">
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            autoFocus
+            required
+            placeholder="123456"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-center text-lg tracking-widest"
+          />
+          {error && <p className="text-sm text-critical">{error}</p>}
+          <button
+            type="submit"
+            disabled={busy || !code}
+            className="w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? "Verifying…" : "Verify"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setChallengeToken(null);
+              setCode("");
+              setError(null);
+            }}
+            className="w-full text-center text-xs text-foreground-muted hover:underline"
+          >
+            Back to sign in
+          </button>
+        </form>
+      </div>
+    );
   }
 
   return (
