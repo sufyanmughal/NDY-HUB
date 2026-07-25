@@ -119,6 +119,7 @@ model User {
   webauthnChallenges      WebauthnChallenge[]
   authIdentities          AuthIdentity[]
   oauthLoginExchanges     OAuthLoginExchange[]
+  externalAuthLinkStates  ExternalAuthState[]
 
   @@index([ndyId])
 }
@@ -223,13 +224,20 @@ enum WebauthnChallengeType {
 // re-checked against the *id_token's* own nonce claim — state proves the
 // callback correlates to a request this server made; nonce proves the
 // id_token wasn't lifted from a different, earlier authentication.
-// Fully anonymous — there's no account to attach this to until the
+// Usually fully anonymous — there's no account to attach this to until the
 // provider's response resolves one, same reasoning as WebauthnChallenge's
-// login branch.
+// login branch. The one exception is linkUserId: Settings' "Connect
+// Google/Apple" starts this same flow already signed in, and needs the
+// callback to attach the resulting identity to *that* account rather than
+// running the normal login-or-create resolution — which matters
+// specifically when the provider account's email doesn't match the
+// signed-in account's, so email-matching alone can't be trusted to do it.
 model ExternalAuthState {
-  id        String       @id @default(uuid())
-  provider  AuthProvider
-  nonce     String
+  id         String       @id @default(uuid())
+  provider   AuthProvider
+  nonce      String
+  linkUserId String?
+  linkUser   User?        @relation(fields: [linkUserId], references: [id], onDelete: Cascade)
   // Where to send the browser after a successful login — validated the
   // same way LoginPage's own `next` query param is (must be an in-app
   // relative path), stored here rather than round-tripped through the

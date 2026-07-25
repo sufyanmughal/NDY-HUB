@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -88,23 +89,67 @@ export class SocialAuthService {
     provider: SocialProvider,
     next: string | undefined,
   ): Promise<string> {
+    this.assertConfigured(provider);
+    const redirectPath = sanitizeRedirectPath(next);
+    const { state, nonce } = await this.createState(provider, redirectPath);
+    return this.buildAuthorizeUrl(provider, state, nonce);
+  }
+
+  /**
+   * Settings' "Connect Google/Apple" — same redirect dance as beginAuth,
+   * but the state row carries linkUserId so the callback attaches the
+   * resulting identity to the already-signed-in account instead of
+   * running the normal login-or-create resolution. Called from an
+   * authenticated fetch (not a plain <a href>, unlike beginAuth) since it
+   * needs the bearer token to know which account to link to — the
+   * frontend then navigates the browser to the URL this returns.
+   */
+  async beginLink(
+    userId: string,
+    provider: SocialProvider,
+    next: string | undefined,
+  ): Promise<string> {
+    this.assertConfigured(provider);
+    const redirectPath = sanitizeRedirectPath(next ?? '/settings');
+    const { state, nonce } = await this.createState(
+      provider,
+      redirectPath,
+      userId,
+    );
+    return this.buildAuthorizeUrl(provider, state, nonce);
+  }
+
+  private assertConfigured(provider: SocialProvider): void {
     if (!this.isConfigured(provider)) {
       throw new BadRequestException(
         `${provider === 'GOOGLE' ? 'Google' : 'Apple'} sign-in isn't configured on this server yet.`,
       );
     }
+  }
 
-    const redirectPath = sanitizeRedirectPath(next);
+  private async createState(
+    provider: SocialProvider,
+    redirectPath: string,
+    linkUserId?: string,
+  ): Promise<{ state: string; nonce: string }> {
     const nonce = randomBytes(24).toString('base64url');
     const { id: state } = await this.prisma.externalAuthState.create({
       data: {
         provider,
         nonce,
         redirectPath,
+        linkUserId,
         expiresAt: new Date(Date.now() + STATE_TTL_MS),
       },
     });
+    return { state, nonce };
+  }
 
+  private buildAuthorizeUrl(
+    provider: SocialProvider,
+    state: string,
+    nonce: string,
+  ): string {
     const redirectUri = this.redirectUriFor(provider);
 
     if (provider === 'GOOGLE') {
@@ -188,6 +233,17 @@ export class SocialAuthService {
         emailVerified: payload.email_verified === true,
         fullName: (payload.name as string | undefined) ?? undefined,
       };
+
+      if (authState.linkUserId) {
+        return {
+          redirectUrl: await this.finishLink(
+            authState.linkUserId,
+            'GOOGLE',
+            identity,
+            authState.redirectPath,
+          ),
+        };
+      }
       const user = await this.resolveOrCreateUser('GOOGLE', identity);
       return {
         redirectUrl: await this.buildSuccessRedirect(
@@ -259,6 +315,17 @@ export class SocialAuthService {
           payload.email_verified === true || payload.email_verified === 'true',
         fullName: firstTimeName,
       };
+
+      if (authState.linkUserId) {
+        return {
+          redirectUrl: await this.finishLink(
+            authState.linkUserId,
+            'APPLE',
+            identity,
+            authState.redirectPath,
+          ),
+        };
+      }
       const user = await this.resolveOrCreateUser('APPLE', identity);
       return {
         redirectUrl: await this.buildSuccessRedirect(
@@ -363,6 +430,94 @@ export class SocialAuthService {
   }
 
   /**
+   * Attaches a verified provider identity to an already-signed-in account
+   * instead of resolving/creating one — the Settings "Connect" path.
+   * Never throws: an already-linked-elsewhere identity is a normal outcome
+   * to redirect back with, not a server error.
+   */
+  private async finishLink(
+    linkUserId: string,
+    provider: SocialProvider,
+    identity: VerifiedIdentity,
+    redirectPath: string,
+  ): Promise<string> {
+    const existing = await this.prisma.authIdentity.findUnique({
+      where: {
+        provider_providerUserId: {
+          provider,
+          providerUserId: identity.providerUserId,
+        },
+      },
+    });
+    if (existing && existing.userId !== linkUserId) {
+      return this.linkRedirect(redirectPath, {
+        linkError: 'already_linked_elsewhere',
+      });
+    }
+    if (!existing) {
+      await this.prisma.authIdentity.create({
+        data: {
+          userId: linkUserId,
+          provider,
+          providerUserId: identity.providerUserId,
+          email: identity.email,
+        },
+      });
+    }
+    return this.linkRedirect(redirectPath, { linked: provider.toLowerCase() });
+  }
+
+  private linkRedirect(
+    redirectPath: string,
+    params: Record<string, string>,
+  ): string {
+    const webAppUrl = this.config.getOrThrow<string>('WEB_APP_URL');
+    const url = new URL(`${webAppUrl}${redirectPath}`);
+    for (const [key, value] of Object.entries(params)) {
+      url.searchParams.set(key, value);
+    }
+    return url.toString();
+  }
+
+  async listConnectedAccounts(userId: string) {
+    return this.prisma.authIdentity.findMany({
+      where: { userId },
+      select: { id: true, provider: true, email: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /**
+   * Guards against locking someone out of their own account: unlinking is
+   * only safe if a password, another linked identity, or a passkey is
+   * still there to sign in with afterward. A user who signed up through
+   * Google with no password and no other identity can't disconnect it.
+   */
+  async unlinkAccount(userId: string, identityId: string): Promise<void> {
+    const identity = await this.prisma.authIdentity.findUnique({
+      where: { id: identityId },
+    });
+    if (!identity || identity.userId !== userId) {
+      throw new BadRequestException('No connected account with that id.');
+    }
+
+    const [user, otherIdentityCount, passkeyCount] = await Promise.all([
+      this.identity.findById(userId),
+      this.prisma.authIdentity.count({
+        where: { userId, id: { not: identityId } },
+      }),
+      this.prisma.passkey.count({ where: { userId } }),
+    ]);
+    if (!user.passwordHash && otherIdentityCount === 0 && passkeyCount === 0) {
+      throw new ConflictException(
+        'Disconnecting this would leave your account with no way to sign in — set a password or add a passkey first.',
+      );
+    }
+
+    await this.prisma.authIdentity.delete({ where: { id: identityId } });
+  }
+
+  /**
    * The callback is a real browser navigation, not a fetch this app's
    * frontend controls — there's nothing to hand a JSON response to. So
    * this resolves to a redirect URL: either straight into the existing
@@ -423,7 +578,11 @@ export class SocialAuthService {
   private async consumeState(
     state: string | undefined,
     provider: SocialProvider,
-  ): Promise<{ nonce: string; redirectPath: string } | null> {
+  ): Promise<{
+    nonce: string;
+    redirectPath: string;
+    linkUserId: string | null;
+  } | null> {
     if (!state) return null;
     const row = await this.prisma.externalAuthState.findUnique({
       where: { id: state },

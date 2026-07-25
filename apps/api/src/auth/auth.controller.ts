@@ -353,6 +353,40 @@ export class AuthController {
   exchangeOAuthLogin(@Body() dto: OAuthExchangeDto, @Req() req: Request) {
     return this.social.exchangeLoginCode(dto.code, sessionMeta(req));
   }
+
+  // Settings' "Connect Google/Apple" — unlike beginOAuth above, this needs
+  // the bearer token to know which account to link to, so it can't be a
+  // plain <a href>. Returns the authorize URL as JSON; the frontend
+  // navigates the browser there itself.
+  @UseGuards(JwtAuthGuard)
+  @Post('oauth/:provider/connect')
+  async connectOAuthProvider(
+    @Param('provider') provider: string,
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Query('next') next?: string,
+  ) {
+    const url = await this.social.beginLink(
+      user.sub,
+      normalizeProvider(provider),
+      next,
+    );
+    return { url };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('connected-accounts')
+  listConnectedAccounts(@CurrentUser() user: AuthenticatedRequestUser) {
+    return this.social.listConnectedAccounts(user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('connected-accounts/:id')
+  unlinkConnectedAccount(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.social.unlinkAccount(user.sub, id);
+  }
 }
 
 function normalizeProvider(raw: string): SocialProvider {

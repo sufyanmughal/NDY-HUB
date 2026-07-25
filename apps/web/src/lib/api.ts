@@ -455,6 +455,40 @@ export function exchangeOAuthCode(code: string): Promise<IssuedSession> {
   });
 }
 
+// --- Connected accounts (Settings > linking Google/Apple to an existing,
+// already-signed-in account) ---
+
+export interface ConnectedAccount {
+  id: string;
+  provider: "GOOGLE" | "APPLE";
+  email: string | null;
+  createdAt: string;
+}
+
+export function getConnectedAccounts(accessToken: string): Promise<ConnectedAccount[]> {
+  return authedFetch<ConnectedAccount[]>("/auth/connected-accounts", accessToken);
+}
+
+export function unlinkConnectedAccount(accessToken: string, id: string): Promise<void> {
+  return authedFetch<void>(`/auth/connected-accounts/${id}`, accessToken, { method: "DELETE" });
+}
+
+/** Unlike buildOAuthStartUrl, this needs the bearer token to know which
+ * account to link to, so it's a real authed fetch (returning the authorize
+ * URL as JSON) rather than a plain <a href> — the caller navigates the
+ * browser there itself once this resolves. */
+export async function beginConnectOAuthProvider(
+  accessToken: string,
+  provider: "google" | "apple",
+): Promise<string> {
+  const { url } = await authedFetch<{ url: string }>(
+    `/auth/oauth/${provider}/connect?next=${encodeURIComponent("/settings")}`,
+    accessToken,
+    { method: "POST" },
+  );
+  return url;
+}
+
 // --- Email verification ---
 
 export function confirmEmailVerification(token: string): Promise<{ verificationLevel: string }> {

@@ -17,8 +17,13 @@ import {
   disable2fa,
   getMyPasskeys,
   removeMyPasskey,
+  getOAuthProviders,
+  getConnectedAccounts,
+  unlinkConnectedAccount,
+  beginConnectOAuthProvider,
   type MeProfile,
   type PasskeySummary,
+  type ConnectedAccount,
 } from "@/lib/api";
 import { registerPasskey, browserSupportsWebAuthn } from "@/lib/passkey";
 
@@ -63,6 +68,7 @@ export default function SettingsPage() {
       <PasswordForm accessToken={auth.accessToken} />
       {profile && <TwoFactorSection accessToken={auth.accessToken} profile={profile} onChanged={setProfile} />}
       <PasskeysSection accessToken={auth.accessToken} />
+      <ConnectedAccountsSection accessToken={auth.accessToken} />
       {profile && (
         <DataPrivacySection
           accessToken={auth.accessToken}
@@ -660,6 +666,164 @@ function guessDeviceLabel(userAgent: string): string {
           ? "Safari"
           : "browser";
   return `${browser} on ${os}`;
+}
+
+const PROVIDER_LABELS: Record<ConnectedAccount["provider"], string> = {
+  GOOGLE: "Google",
+  APPLE: "Apple",
+};
+
+/**
+ * Shows what's linked (from AuthIdentity, via the "sign in with the same
+ * email" auto-link or an explicit Connect below) and lets a signed-in user
+ * explicitly connect a Google/Apple account whose email doesn't match
+ * theirs — beginConnectOAuthProvider carries the current session into the
+ * redirect via linkUserId server-side, so that case doesn't depend on
+ * email matching to know which account to attach to.
+ */
+function ConnectedAccountsSection({ accessToken }: { accessToken: string }) {
+  const [accounts, setAccounts] = useState<ConnectedAccount[] | null>(null);
+  const [providers, setProviders] = useState<{ google: boolean; apple: boolean } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [connectBusy, setConnectBusy] = useState<"GOOGLE" | "APPLE" | null>(null);
+  const [unlinkBusy, setUnlinkBusy] = useState<string | null>(null);
+  // The connect flow lands back here via a real browser redirect (Settings'
+  // "Connect" button navigates the whole page, same as Google/Apple sign-in
+  // does), not a fetch this component controls — so success/failure arrives
+  // as query params already present on first render, read as lazy initial
+  // state rather than set from an effect.
+  const [actionError, setActionError] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const linkError = new URLSearchParams(window.location.search).get("linkError");
+    if (!linkError) return null;
+    return linkError === "already_linked_elsewhere"
+      ? "That account is already connected to a different NDY HUB account."
+      : "Something went wrong connecting that account — try again.";
+  });
+  const [notice] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const linked = new URLSearchParams(window.location.search).get("linked");
+    if (!linked) return null;
+    const provider = linked.toUpperCase() as ConnectedAccount["provider"];
+    return `${PROVIDER_LABELS[provider] ?? linked} connected.`;
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([getConnectedAccounts(accessToken), getOAuthProviders()])
+      .then(([accountsResult, providersResult]) => {
+        if (cancelled) return;
+        setAccounts(accountsResult);
+        setProviders(providersResult);
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError((err as Error).message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
+  // Purely clearing the URL, no state to set — a refresh shouldn't re-show
+  // the notice/error above.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("linked") && !url.searchParams.has("linkError")) return;
+    url.searchParams.delete("linked");
+    url.searchParams.delete("linkError");
+    window.history.replaceState({}, "", url.toString());
+  }, []);
+
+  async function handleConnect(provider: "GOOGLE" | "APPLE") {
+    setConnectBusy(provider);
+    setActionError(null);
+    try {
+      const url = await beginConnectOAuthProvider(accessToken, provider.toLowerCase() as "google" | "apple");
+      window.location.href = url;
+    } catch (err) {
+      setActionError((err as Error).message);
+      setConnectBusy(null);
+    }
+  }
+
+  async function handleUnlink(id: string) {
+    setUnlinkBusy(id);
+    setActionError(null);
+    try {
+      await unlinkConnectedAccount(accessToken, id);
+      setAccounts((prev) => (prev ?? []).filter((a) => a.id !== id));
+    } catch (err) {
+      setActionError((err as Error).message);
+    } finally {
+      setUnlinkBusy(null);
+    }
+  }
+
+  const connectedProviders = new Set((accounts ?? []).map((a) => a.provider));
+
+  return (
+    <div className="rounded-lg border border-border bg-surface p-5">
+      <h2 className="text-sm font-medium text-foreground-muted">Connected accounts</h2>
+      <p className="mt-2 text-sm text-foreground-muted">
+        Sign in faster with Google or Apple, or attach one to this account for a backup way in.
+      </p>
+
+      {notice && <p className="mt-3 text-sm text-good">{notice}</p>}
+      {loadError && <p className="mt-3 text-sm text-critical">{loadError}</p>}
+      {actionError && <p className="mt-3 text-sm text-critical">{actionError}</p>}
+
+      {accounts && accounts.length > 0 && (
+        <ul className="mt-4 space-y-2">
+          {accounts.map((a) => (
+            <li
+              key={a.id}
+              className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
+            >
+              <div>
+                <p className="font-medium">{PROVIDER_LABELS[a.provider]}</p>
+                <p className="text-xs text-foreground-muted">
+                  {a.email ?? "No email on file"} · connected {new Date(a.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+              <button
+                onClick={() => handleUnlink(a.id)}
+                disabled={unlinkBusy === a.id}
+                className="rounded-md border border-critical/40 px-3 py-1.5 text-xs font-medium text-critical hover:bg-critical/10 disabled:opacity-50"
+              >
+                {unlinkBusy === a.id ? "Disconnecting…" : "Disconnect"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {providers?.google && !connectedProviders.has("GOOGLE") && (
+          <button
+            onClick={() => handleConnect("GOOGLE")}
+            disabled={connectBusy === "GOOGLE"}
+            className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {connectBusy === "GOOGLE" ? "Redirecting…" : "Connect Google"}
+          </button>
+        )}
+        {providers?.apple && !connectedProviders.has("APPLE") && (
+          <button
+            onClick={() => handleConnect("APPLE")}
+            disabled={connectBusy === "APPLE"}
+            className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {connectBusy === "APPLE" ? "Redirecting…" : "Connect Apple"}
+          </button>
+        )}
+        {providers && !providers.google && !providers.apple && accounts?.length === 0 && (
+          <p className="text-xs text-foreground-muted">
+            Google and Apple sign-in aren&apos;t configured on this server yet.
+          </p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function DataPrivacySection({
