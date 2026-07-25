@@ -74,6 +74,36 @@ export function getPublicPassport(ndyId: string): Promise<PublicPassport> {
   return apiFetch<PublicPassport>(`/passport/${ndyId}`);
 }
 
+// --- Dev-only helpers, used by the "skip NDYAPPS" shortcut on /login ---
+// Real approval always requires NDYAPPS's own bearer token (JwtAuthGuard on
+// the server enforces that); these just get one the same way NDYAPPS would,
+// without a phone in the loop, for local testing before NDYAPPS exists.
+
+export function devLogin(email: string, password: string): Promise<IssuedSession> {
+  return apiFetch<IssuedSession>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function devRegister(email: string, password: string, fullName: string): Promise<IssuedSession> {
+  return apiFetch<IssuedSession>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email, password, fullName }),
+  });
+}
+
+export async function approveLoginRequestAs(token: string, accessToken: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/auth/login-request/${token}/approve`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? `Approve failed with status ${res.status}`);
+  }
+}
+
 /**
  * What the QR code actually encodes — a deep link NDYAPPS registers itself
  * to open. The web-only fallback query param lets a browser that scans this

@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { buildLoginDeepLink } from "@/lib/api";
+import { buildLoginDeepLink, devLogin, devRegister, approveLoginRequestAs } from "@/lib/api";
 import { useLoginRequest } from "@/lib/use-login-request";
 import { useAuth } from "@/lib/auth-context";
+
+const DEV_EMAIL = "dev-test@ndyhub.local";
+const DEV_PASSWORD = "dev-test-password-123";
 
 export function QrLoginCard() {
   const { state, restart } = useLoginRequest();
@@ -50,6 +53,8 @@ export function QrLoginCard() {
 
 function PendingView({ token, expiresAt }: { token: string; expiresAt: string }) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [devBusy, setDevBusy] = useState(false);
+  const [devError, setDevError] = useState<string | null>(null);
   const secondsLeft = useCountdown(expiresAt);
 
   useEffect(() => {
@@ -61,6 +66,26 @@ function PendingView({ token, expiresAt }: { token: string; expiresAt: string })
       cancelled = true;
     };
   }, [token]);
+
+  async function handleDevApprove() {
+    setDevBusy(true);
+    setDevError(null);
+    try {
+      // Same thing NDYAPPS would do: get a bearer token for a real account,
+      // then approve with it. Falls back to registering the dev account the
+      // first time this runs on a fresh database.
+      const session = await devLogin(DEV_EMAIL, DEV_PASSWORD).catch(() =>
+        devRegister(DEV_EMAIL, DEV_PASSWORD, "Dev Test User"),
+      );
+      await approveLoginRequestAs(token, session.accessToken);
+      // No further action needed here — the WebSocket subscription already
+      // listening on this token (in useLoginRequest) picks up APPROVED and
+      // drives the rest of the flow itself.
+    } catch (err) {
+      setDevError((err as Error).message);
+      setDevBusy(false);
+    }
+  }
 
   return (
     <div>
@@ -76,6 +101,19 @@ function PendingView({ token, expiresAt }: { token: string; expiresAt: string })
       <p className="mt-3 font-mono text-xs text-foreground-muted">
         {secondsLeft > 0 ? `Expires in ${secondsLeft}s` : "Expiring…"}
       </p>
+
+      {process.env.NODE_ENV !== "production" && (
+        <div className="mt-5 border-t border-border pt-4">
+          <button
+            onClick={handleDevApprove}
+            disabled={devBusy}
+            className="w-full rounded-md border border-dashed border-accent/50 px-3 py-2 text-xs font-medium text-accent hover:bg-accent/10 disabled:opacity-50"
+          >
+            {devBusy ? "Approving…" : "Skip NDYAPPS — approve as test user (dev only)"}
+          </button>
+          {devError && <p className="mt-2 text-xs text-critical">{devError}</p>}
+        </div>
+      )}
     </div>
   );
 }
