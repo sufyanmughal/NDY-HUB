@@ -1,9 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { sign as signJwt } from 'jsonwebtoken';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { parseScope } from './scopes';
+import { OidcKeysService } from './oidc-keys.service';
 
 const ACCESS_TOKEN_TTL = '1h';
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days, matches Session's own refresh TTL
@@ -28,9 +30,12 @@ export interface OAuthAccessTokenPayload {
 /**
  * Issues tokens scoped to a specific third-party client — deliberately
  * separate from SessionService, which issues NDY HUB's own dashboard
- * session. Signed with the same app-wide JWT secret as everything else
- * here (see the comment on issueTokenSet for why that's a documented
- * phase-1 simplification, not a long-term design).
+ * session. access_token stays HS256 with the app-wide secret (it's a
+ * bearer credential NDY HUB itself verifies via OAuthAccessTokenGuard,
+ * never something a relying party needs to check the signature of
+ * independently). id_token is RS256, signed with OidcKeysService's
+ * private key and verifiable by any relying party via GET
+ * /.well-known/jwks.json — see issueTokenSet for why that split exists.
  */
 @Injectable()
 export class OAuthTokenService {
@@ -38,17 +43,21 @@ export class OAuthTokenService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly keys: OidcKeysService,
   ) {}
 
   /**
-   * id_token is signed with NDY HUB's own app-wide secret rather than each
-   * client's individual client_secret (the spec-correct approach for
-   * confidential clients using HS256). That would need the client secret
-   * stored reversibly instead of hashed — a real tradeoff, not done here.
-   * Until this moves to RS256 + a JWKS endpoint (the real fix, works for
-   * public clients too), a relying party should treat the id_token as
-   * opaque and confirm identity via GET /oauth/userinfo rather than
-   * verifying the signature itself.
+   * id_token is RS256-signed with NDY HUB's own keypair (OidcKeysService)
+   * rather than HS256 with either the app-wide secret or a per-client
+   * secret. HS256 with a per-client secret was the original spec-correct
+   * idea for confidential clients, but that needs the client secret stored
+   * reversibly instead of hashed — a real tradeoff this schema doesn't
+   * take. RS256 sidesteps the whole question: the private key never
+   * leaves this server, and any relying party (confidential or public)
+   * can verify the signature itself using the public key published at
+   * GET /.well-known/jwks.json, instead of having to trust the token
+   * blindly or fall back to GET /oauth/userinfo the way this comment used
+   * to recommend.
    */
   async issueTokenSet(params: {
     userId: string;
@@ -71,7 +80,7 @@ export class OAuthTokenService {
       { expiresIn: ACCESS_TOKEN_TTL },
     );
 
-    const idToken = await this.jwt.signAsync(
+    const idToken = signJwt(
       {
         iss: issuer,
         sub: params.userId,
@@ -79,7 +88,12 @@ export class OAuthTokenService {
         token_use: 'id_token',
         ...params.claims,
       },
-      { expiresIn: ACCESS_TOKEN_TTL },
+      this.keys.privateKey,
+      {
+        algorithm: 'RS256',
+        keyid: this.keys.keyId,
+        expiresIn: ACCESS_TOKEN_TTL,
+      },
     );
 
     const refreshToken = randomBytes(48).toString('base64url');

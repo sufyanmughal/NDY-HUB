@@ -4,6 +4,7 @@ import { OAuthClientAdminController } from './oauth-client-admin.controller';
 import { AuthorizationCodeService } from './authorization-code.service';
 import { GrantService } from './grant.service';
 import { OAuthTokenService } from './oauth-token.service';
+import { OidcKeysService } from './oidc-keys.service';
 import { OAuthAccessTokenGuard } from './guards/oauth-access-token.guard';
 import { AuthorizeController } from './authorize.controller';
 import { TokenController } from './token.controller';
@@ -31,6 +32,7 @@ import { IdentityModule } from '../identity/identity.module';
     OAuthClientService,
     AuthorizationCodeService,
     GrantService,
+    OidcKeysService,
     OAuthTokenService,
     OAuthAccessTokenGuard,
   ],
