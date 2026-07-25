@@ -28,7 +28,11 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      {/* suppressHydrationWarning: browser extensions (ColorZilla and
+          similar) inject attributes like cz-shortcut-listen onto <body>
+          before React hydrates — a real client/server mismatch, but one
+          coming from outside this app, not a bug in it. */}
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
