@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -13,8 +14,11 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { CreateLoginRequestDto } from './dto/create-login-request.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
+import type { AuthenticatedRequestUser } from './guards/jwt-auth.guard';
 import type { SessionMeta } from './session.service';
 
 @Controller('auth')
@@ -76,6 +80,30 @@ export class AuthController {
     // Called by the desktop browser once it sees the request go APPROVED —
     // trades the one-time approval for a real access/refresh session pair.
     return this.auth.exchangeLoginRequest(token, sessionMeta(req));
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  getMe(@CurrentUser() user: AuthenticatedRequestUser) {
+    return this.auth.getMe(user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  updateMe(
+    @Body() dto: UpdateProfileDto,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.auth.updateProfile(user.sub, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  changePassword(
+    @Body() dto: ChangePasswordDto,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.auth.changePassword(user.sub, dto);
   }
 }
 

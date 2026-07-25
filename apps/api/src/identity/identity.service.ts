@@ -65,6 +65,19 @@ export class IdentityService {
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({ where: { email } });
   }
+
+  async findById(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('No account with that id.');
+    return user;
+  }
+
+  async updateProfile(
+    userId: string,
+    updates: { fullName?: string; profilePhotoUrl?: string },
+  ) {
+    return this.prisma.user.update({ where: { id: userId }, data: updates });
+  }
 }
 
 function isUniqueConstraintError(err: unknown, field: string): boolean {

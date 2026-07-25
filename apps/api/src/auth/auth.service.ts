@@ -14,6 +14,8 @@ import { LoginRequestGateway } from './login-request.gateway';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { CreateLoginRequestDto } from './dto/create-login-request.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 const SALT_ROUNDS = 12;
 const LOGIN_REQUEST_TTL_MS = 90_000; // 90 seconds, per the desktop-QR / deep-link spec
@@ -62,6 +64,47 @@ export class AuthService {
 
   async logout(refreshToken: string): Promise<void> {
     return this.sessions.revokeSession(refreshToken);
+  }
+
+  async getMe(userId: string) {
+    const user = await this.identity.findById(userId);
+    return {
+      ndyId: user.ndyId,
+      email: user.email,
+      fullName: user.fullName,
+      profilePhotoUrl: user.profilePhotoUrl,
+      verificationLevel: user.verificationLevel,
+      ndyappsConnected: user.ndyappsConnected,
+      createdAt: user.createdAt,
+    };
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.identity.updateProfile(userId, dto);
+    return {
+      ndyId: user.ndyId,
+      email: user.email,
+      fullName: user.fullName,
+      profilePhotoUrl: user.profilePhotoUrl,
+    };
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+    const user = await this.identity.findById(userId);
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        'This account has no password set — it was created through NDYAPPS/Google/Apple.',
+      );
+    }
+    const valid = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Current password is incorrect.');
+    }
+    const newHash = await bcrypt.hash(dto.newPassword, SALT_ROUNDS);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newHash },
+    });
   }
 
   /**

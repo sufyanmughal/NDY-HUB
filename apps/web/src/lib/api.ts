@@ -253,6 +253,40 @@ export function revokeAllSessions(accessToken: string): Promise<{ revokedCount: 
   });
 }
 
+// --- Settings ---
+
+export interface MeProfile {
+  ndyId: string;
+  email: string;
+  fullName: string | null;
+  profilePhotoUrl: string | null;
+  verificationLevel: string;
+  ndyappsConnected: boolean;
+  createdAt: string;
+}
+
+export function getMe(accessToken: string): Promise<MeProfile> {
+  return authedFetch<MeProfile>("/auth/me", accessToken);
+}
+
+export function updateProfile(
+  accessToken: string,
+  updates: { fullName?: string; profilePhotoUrl?: string },
+): Promise<Pick<MeProfile, "ndyId" | "email" | "fullName" | "profilePhotoUrl">> {
+  return authedFetch("/auth/me", accessToken, { method: "PATCH", body: JSON.stringify(updates) });
+}
+
+export function changePassword(
+  accessToken: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  return authedFetch<void>("/auth/change-password", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
 /**
  * What the QR code actually encodes — a deep link NDYAPPS registers itself
  * to open. The web-only fallback query param lets a browser that scans this
