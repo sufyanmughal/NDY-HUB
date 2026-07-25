@@ -501,7 +501,15 @@ export interface OAuthConsentResult {
 
 export function submitOAuthConsent(
   accessToken: string,
-  params: { clientId: string; redirectUri: string; scope: string; state?: string; approve: boolean },
+  params: {
+    clientId: string;
+    redirectUri: string;
+    scope: string;
+    state?: string;
+    approve: boolean;
+    codeChallenge?: string;
+    codeChallengeMethod?: string;
+  },
 ): Promise<OAuthConsentResult> {
   return authedFetch<OAuthConsentResult>("/oauth/authorize/consent", accessToken, {
     method: "POST",

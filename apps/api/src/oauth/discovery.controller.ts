@@ -29,6 +29,7 @@ export class DiscoveryController {
       // yet because there's no RSA keypair to publish; that's the real fix.
       id_token_signing_alg_values_supported: ['HS256'],
       token_endpoint_auth_methods_supported: ['client_secret_post'],
+      code_challenge_methods_supported: ['S256'],
     };
   }
 }

@@ -6,7 +6,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { OAuthClientService } from './oauth-client.service';
-import { AuthorizationCodeService } from './authorization-code.service';
+import {
+  AuthorizationCodeService,
+  verifyPkceChallenge,
+} from './authorization-code.service';
 import { OAuthTokenService, scopesGrantClaims } from './oauth-token.service';
 import { TokenDto } from './dto/token.dto';
 import { IdentityService } from '../identity/identity.service';
@@ -53,6 +56,20 @@ export class TokenController {
       client.id,
       dto.redirect_uri,
     );
+
+    if (authCode.codeChallenge) {
+      if (!dto.code_verifier) {
+        throw new BadRequestException(
+          'code_verifier is required — this authorization request used PKCE.',
+        );
+      }
+      if (!verifyPkceChallenge(dto.code_verifier, authCode.codeChallenge)) {
+        throw new BadRequestException(
+          'code_verifier does not match code_challenge.',
+        );
+      }
+    }
+
     const user = await this.identity.findById(authCode.userId);
 
     return this.tokens.issueTokenSet({

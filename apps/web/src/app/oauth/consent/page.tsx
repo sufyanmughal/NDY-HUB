@@ -29,6 +29,8 @@ function ConsentPageInner() {
   const redirectUri = searchParams.get("redirect_uri");
   const scope = searchParams.get("scope") ?? "openid";
   const state = searchParams.get("state") ?? undefined;
+  const codeChallenge = searchParams.get("code_challenge") ?? undefined;
+  const codeChallengeMethod = searchParams.get("code_challenge_method") ?? undefined;
   const paramsError =
     !clientId || !redirectUri ? "This sign-in link is missing required parameters." : null;
 
@@ -66,6 +68,8 @@ function ConsentPageInner() {
           scope,
           state,
           approve: true,
+          codeChallenge,
+          codeChallengeMethod,
         }).then((result) => {
           if (!cancelled) window.location.href = result.redirectUrl;
         });
@@ -90,6 +94,8 @@ function ConsentPageInner() {
         scope,
         state,
         approve,
+        codeChallenge,
+        codeChallengeMethod,
       });
       window.location.href = result.redirectUrl;
     } catch (err) {

@@ -44,10 +44,20 @@ export class AuthorizeController {
     @Query('response_type') responseType: string,
     @Query('scope') scope: string | undefined,
     @Query('state') state: string | undefined,
+    @Query('code_challenge') codeChallenge: string | undefined,
+    @Query('code_challenge_method') codeChallengeMethod: string | undefined,
     @Res() res: Response,
   ) {
     if (responseType !== 'code') {
       throw new BadRequestException('Only response_type=code is supported.');
+    }
+    // PKCE is optional, but if a challenge is present it must be S256 —
+    // "plain" is deliberately not accepted (see the schema note on
+    // OAuthAuthorizationCode).
+    if (codeChallenge && codeChallengeMethod !== 'S256') {
+      throw new BadRequestException(
+        'code_challenge_method must be S256 when code_challenge is present.',
+      );
     }
     const client = await this.clients
       .findByClientId(clientId)
@@ -74,6 +84,10 @@ export class AuthorizeController {
     consentUrl.searchParams.set('redirect_uri', redirectUri);
     consentUrl.searchParams.set('scope', requestedScope.join(' '));
     if (state) consentUrl.searchParams.set('state', state);
+    if (codeChallenge) {
+      consentUrl.searchParams.set('code_challenge', codeChallenge);
+      consentUrl.searchParams.set('code_challenge_method', 'S256');
+    }
 
     res.redirect(consentUrl.toString());
   }
@@ -124,6 +138,11 @@ export class AuthorizeController {
         'One or more requested scopes are not allowed for this client.',
       );
     }
+    if (dto.codeChallenge && !dto.codeChallengeMethod) {
+      throw new BadRequestException(
+        'code_challenge_method is required when code_challenge is present.',
+      );
+    }
 
     const redirectUrl = new URL(dto.redirectUri);
 
@@ -139,6 +158,8 @@ export class AuthorizeController {
       clientId: client.id,
       redirectUri: dto.redirectUri,
       scope: dto.scope,
+      codeChallenge: dto.codeChallenge,
+      codeChallengeMethod: dto.codeChallengeMethod,
     });
 
     redirectUrl.searchParams.set('code', code);

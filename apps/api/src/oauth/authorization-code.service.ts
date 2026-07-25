@@ -4,6 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { customAlphabet } from 'nanoid';
+import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 const AUTH_CODE_TTL_MS = 60_000; // 60 seconds — codes are exchanged immediately, server-to-server
@@ -21,6 +22,8 @@ export class AuthorizationCodeService {
     clientId: string;
     redirectUri: string;
     scope: string;
+    codeChallenge?: string;
+    codeChallengeMethod?: string;
   }) {
     const code = generateCode();
     await this.prisma.oAuthAuthorizationCode.create({
@@ -30,6 +33,8 @@ export class AuthorizationCodeService {
         clientId: params.clientId,
         redirectUri: params.redirectUri,
         scope: params.scope,
+        codeChallenge: params.codeChallenge,
+        codeChallengeMethod: params.codeChallengeMethod,
         expiresAt: new Date(Date.now() + AUTH_CODE_TTL_MS),
       },
     });
@@ -73,4 +78,20 @@ export class AuthorizationCodeService {
 
     return record;
   }
+}
+
+/**
+ * RFC 7636 S256: challenge = BASE64URL(SHA256(verifier)). The client that
+ * started the /authorize redirect sent the challenge; only the client that
+ * holds the original verifier can produce a matching hash — which is what
+ * proves the app redeeming the code at /oauth/token is the same app that
+ * initiated the request, even if the code itself got intercepted in
+ * between (a malicious app on the same device, a leaky redirect, etc).
+ */
+export function verifyPkceChallenge(
+  verifier: string,
+  challenge: string,
+): boolean {
+  const computed = createHash('sha256').update(verifier).digest('base64url');
+  return computed === challenge;
 }

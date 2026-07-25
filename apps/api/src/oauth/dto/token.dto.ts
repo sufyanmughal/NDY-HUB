@@ -25,4 +25,11 @@ export class TokenDto {
   @IsOptional()
   @IsString()
   refresh_token?: string;
+
+  // Required only if the authorization_code was issued with a
+  // code_challenge — checked in the controller, not here, since that
+  // depends on the code being redeemed first.
+  @IsOptional()
+  @IsString()
+  code_verifier?: string;
 }

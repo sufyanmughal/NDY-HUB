@@ -308,6 +308,15 @@ model OAuthAuthorizationCode {
   client      OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
   redirectUri String
   scope       String      // space-separated, the actual scopes approved for this grant
+  // PKCE (RFC 7636) — optional per-request, verified at /oauth/token if
+  // present. Only S256 is accepted; "plain" is deliberately unsupported
+  // (OAuth 2.1 drops it too — a challenge that doesn't need hashing to
+  // verify isn't proof of anything). Every OAuthClient here is confidential
+  // (has a client_secret), so PKCE isn't covering for a missing client
+  // secret the way it does for a public/mobile client — it's an extra
+  // layer against authorization-code interception regardless of client type.
+  codeChallenge       String?
+  codeChallengeMethod String?
   expiresAt   DateTime
   usedAt      DateTime?
   createdAt   DateTime    @default(now())
