@@ -27,6 +27,16 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** Same as apiFetch, but for the guarded endpoints — every real dashboard
+ * fetch (memberships, and soon CRYNDY/NDYBITS) needs the caller's session
+ * attached, not just a JSON body. */
+function authedFetch<T>(path: string, accessToken: string, init?: RequestInit): Promise<T> {
+  return apiFetch<T>(path, {
+    ...init,
+    headers: { Authorization: `Bearer ${accessToken}`, ...init?.headers },
+  });
+}
+
 export function createLoginRequest(): Promise<LoginRequest> {
   return apiFetch<LoginRequest>("/auth/login-request", {
     method: "POST",
@@ -102,6 +112,62 @@ export async function approveLoginRequestAs(token: string, accessToken: string):
     const body = await res.json().catch(() => ({}));
     throw new Error(body.message ?? `Approve failed with status ${res.status}`);
   }
+}
+
+// --- Membership (M4) ---
+
+export type MembershipTier = "RISE" | "FLOW" | "PULSE" | "VAULT" | "MODE" | "LEGACY";
+export type BillingCycle = "MONTHLY" | "ANNUAL";
+export type MembershipStatus = "ACTIVE" | "CANCELLED" | "EXPIRED";
+
+export interface TierInfo {
+  label: string;
+  monthlyPriceCents: number;
+  annualPriceCents: number;
+  benefits: string[];
+}
+
+export interface Membership {
+  id: string;
+  tier: MembershipTier;
+  tierLabel: string;
+  billingCycle: BillingCycle;
+  status: MembershipStatus;
+  startedAt: string;
+  currentPeriodEnd: string;
+  cancelledAt: string | null;
+}
+
+export interface MembershipSummary {
+  current: Membership | null;
+  history: Membership[];
+}
+
+export type SubscribeResult =
+  | { mode: "checkout"; checkoutUrl: string }
+  | { mode: "dev-activated"; membershipId: string };
+
+export function getMembershipTiers(): Promise<Record<MembershipTier, TierInfo>> {
+  return apiFetch<Record<MembershipTier, TierInfo>>("/memberships/tiers");
+}
+
+export function getMyMembership(accessToken: string): Promise<MembershipSummary> {
+  return authedFetch<MembershipSummary>("/memberships/me", accessToken);
+}
+
+export function subscribeToTier(
+  accessToken: string,
+  tier: MembershipTier,
+  billingCycle: BillingCycle,
+): Promise<SubscribeResult> {
+  return authedFetch<SubscribeResult>("/memberships/subscribe", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ tier, billingCycle }),
+  });
+}
+
+export function cancelMembership(accessToken: string, membershipId: string): Promise<void> {
+  return authedFetch<void>(`/memberships/${membershipId}/cancel`, accessToken, { method: "POST" });
 }
 
 /**

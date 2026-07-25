@@ -54,6 +54,7 @@ model User {
   sessions            Session[]
   cryndyPurchases     CryndyPurchase[]
   ndybitsLedgerEntries NdybitsLedgerEntry[]
+  memberships          Membership[]
 
   @@index([ndyId])
 }
@@ -165,6 +166,59 @@ model NdybitsLedgerEntry {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// Milestone 4: tier names and real pricing are a business decision the
+// client still needs to confirm (see NDYAPPS-INTEGRATION.md-style open
+// items) — these six match the brief's placeholder names exactly so
+// renaming later is a find/replace, not a data-model change.
+enum MembershipTier {
+  RISE
+  FLOW
+  PULSE
+  VAULT
+  MODE
+  LEGACY
+}
+
+enum BillingCycle {
+  MONTHLY
+  ANNUAL
+}
+
+enum MembershipStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+// One row per subscription period, not one row per user — cancelling and
+// resubscribing (or changing tiers) creates a new row rather than mutating
+// history, so "View membership history" has something real to show.
+model Membership {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tier          MembershipTier
+  billingCycle  BillingCycle
+  status        MembershipStatus @default(ACTIVE)
+
+  startedAt        DateTime  @default(now())
+  currentPeriodEnd DateTime
+  cancelledAt      DateTime?
+
+  // Null in local/dev environments without a Stripe key — see
+  // MembershipService.subscribe for the dev-mode direct-activation path
+  // that fills these in only once real Stripe is configured.
+  stripeSubscriptionId String? @unique
+  stripeCustomerId     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }
 
 model Session {

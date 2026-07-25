@@ -7,6 +7,7 @@ import { IdentityModule } from './identity/identity.module';
 import { AuthModule } from './auth/auth.module';
 import { CryndyModule } from './cryndy/cryndy.module';
 import { NdybitsModule } from './ndybits/ndybits.module';
+import { MembershipModule } from './membership/membership.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { NdybitsModule } from './ndybits/ndybits.module';
     AuthModule,
     CryndyModule,
     NdybitsModule,
+    MembershipModule,
   ],
   controllers: [AppController],
   providers: [AppService],
