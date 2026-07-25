@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { loginWithPassword, registerWithPassword, verify2fa } from "@/lib/api";
+import { loginWithPassword, registerWithPassword, getOAuthProviders, buildOAuthStartUrl } from "@/lib/api";
 import { loginWithPasskey, browserSupportsWebAuthn } from "@/lib/passkey";
 import { useAuth } from "@/lib/auth-context";
+import { TwoFactorChallengeForm } from "./two-factor-challenge-form";
 
 /**
  * The password-based login page's own effect (auth.status === "authenticated"
@@ -20,8 +21,22 @@ export function PasswordAuthForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
-  const [code, setCode] = useState("");
   const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [oauthProviders, setOauthProviders] = useState<{ google: boolean; apple: boolean } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getOAuthProviders()
+      .then((result) => {
+        if (!cancelled) setOauthProviders(result);
+      })
+      .catch(() => {
+        /* best-effort — buttons just stay hidden if this fails */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handlePasskeyLogin() {
     setPasskeyBusy(true);
@@ -57,57 +72,9 @@ export function PasswordAuthForm() {
     }
   }
 
-  async function handleVerify2fa(e: React.FormEvent) {
-    e.preventDefault();
-    if (!challengeToken) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const session = await verify2fa(challengeToken, code);
-      login(session);
-    } catch (err) {
-      setError((err as Error).message);
-      setBusy(false);
-    }
-  }
-
   if (challengeToken) {
     return (
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6">
-        <h2 className="text-sm font-medium text-foreground">Two-factor authentication</h2>
-        <p className="mt-1 text-xs text-foreground-muted">
-          Enter the 6-digit code from your authenticator app, or one of your backup codes.
-        </p>
-        <form onSubmit={handleVerify2fa} className="mt-4 space-y-3">
-          <input
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            autoFocus
-            required
-            placeholder="123456"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-center text-lg tracking-widest"
-          />
-          {error && <p className="text-sm text-critical">{error}</p>}
-          <button
-            type="submit"
-            disabled={busy || !code}
-            className="w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {busy ? "Verifying…" : "Verify"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setChallengeToken(null);
-              setCode("");
-              setError(null);
-            }}
-            className="w-full text-center text-xs text-foreground-muted hover:underline"
-          >
-            Back to sign in
-          </button>
-        </form>
-      </div>
+      <TwoFactorChallengeForm challengeToken={challengeToken} onCancel={() => setChallengeToken(null)} />
     );
   }
 
@@ -190,23 +157,46 @@ export function PasswordAuthForm() {
         </button>
       </form>
 
-      {mode === "signin" && typeof window !== "undefined" && browserSupportsWebAuthn() && (
-        <>
-          <div className="my-3 flex items-center gap-3 text-xs text-foreground-muted">
-            <span className="h-px flex-1 bg-border" />
-            or
-            <span className="h-px flex-1 bg-border" />
-          </div>
-          <button
-            type="button"
-            onClick={handlePasskeyLogin}
-            disabled={passkeyBusy}
-            className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {passkeyBusy ? "Waiting for passkey…" : "Sign in with a passkey"}
-          </button>
-        </>
-      )}
+      {mode === "signin" &&
+        ((typeof window !== "undefined" && browserSupportsWebAuthn()) ||
+          oauthProviders?.google ||
+          oauthProviders?.apple) && (
+          <>
+            <div className="my-3 flex items-center gap-3 text-xs text-foreground-muted">
+              <span className="h-px flex-1 bg-border" />
+              or
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <div className="space-y-2">
+              {typeof window !== "undefined" && browserSupportsWebAuthn() && (
+                <button
+                  type="button"
+                  onClick={handlePasskeyLogin}
+                  disabled={passkeyBusy}
+                  className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {passkeyBusy ? "Waiting for passkey…" : "Sign in with a passkey"}
+                </button>
+              )}
+              {oauthProviders?.google && (
+                <a
+                  href={buildOAuthStartUrl("google", "/")}
+                  className="block w-full rounded-md border border-border px-4 py-2 text-center text-sm font-medium hover:bg-surface-2"
+                >
+                  Continue with Google
+                </a>
+              )}
+              {oauthProviders?.apple && (
+                <a
+                  href={buildOAuthStartUrl("apple", "/")}
+                  className="block w-full rounded-md border border-border px-4 py-2 text-center text-sm font-medium hover:bg-surface-2"
+                >
+                  Continue with Apple
+                </a>
+              )}
+            </div>
+          </>
+        )}
     </div>
   );
 }

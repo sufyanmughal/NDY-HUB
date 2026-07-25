@@ -7,6 +7,8 @@ import {
   Param,
   Patch,
   Post,
+  Query,
+  Redirect,
   Req,
   UnsupportedMediaTypeException,
   UploadedFile,
@@ -22,6 +24,7 @@ import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { TotpService } from './totp.service';
 import { PasskeyService } from './passkey.service';
+import { SocialAuthService, type SocialProvider } from './social-auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { CreateLoginRequestDto } from './dto/create-login-request.dto';
@@ -36,6 +39,8 @@ import { DisableTotpDto } from './dto/disable-totp.dto';
 import { Verify2faDto } from './dto/verify-2fa.dto';
 import { PasskeyRegisterVerifyDto } from './dto/passkey-register-verify.dto';
 import { PasskeyLoginVerifyDto } from './dto/passkey-login-verify.dto';
+import { AppleCallbackDto } from './dto/apple-callback.dto';
+import { OAuthExchangeDto } from './dto/oauth-exchange.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthenticatedRequestUser } from './guards/jwt-auth.guard';
@@ -60,6 +65,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly totp: TotpService,
     private readonly passkeys: PasskeyService,
+    private readonly social: SocialAuthService,
   ) {}
 
   @Throttle(BRUTE_FORCE_GUARD)
@@ -294,6 +300,67 @@ export class AuthController {
   verifyPasskeyLogin(@Body() dto: PasskeyLoginVerifyDto, @Req() req: Request) {
     return this.passkeys.verifyAuthentication(dto, sessionMeta(req));
   }
+
+  // Public: lets the frontend decide whether to render the Google/Apple
+  // buttons at all, rather than showing one that 400s the moment it's
+  // clicked because no credentials are configured on this server.
+  @Get('oauth/providers')
+  getOAuthProviders() {
+    return this.social.getProviderStatus();
+  }
+
+  // A real browser navigation (an <a href>, not a fetch call), so this
+  // redirects rather than returning JSON — same reasoning applies to every
+  // handler below through the callbacks.
+  @Get('oauth/:provider/start')
+  @Redirect('', 302)
+  async beginOAuth(
+    @Param('provider') provider: string,
+    @Query('next') next?: string,
+  ) {
+    const url = await this.social.beginAuth(normalizeProvider(provider), next);
+    return { url };
+  }
+
+  @Get('oauth/google/callback')
+  @Redirect('', 302)
+  async googleCallback(
+    @Query('code') code: string | undefined,
+    @Query('state') state: string | undefined,
+    @Query('error') error: string | undefined,
+  ) {
+    const { redirectUrl } = await this.social.handleGoogleCallback(
+      code,
+      state,
+      error,
+    );
+    return { url: redirectUrl };
+  }
+
+  // Apple posts here (response_mode=form_post), not GET — required
+  // whenever the authorize request asks for name/email scopes.
+  @Post('oauth/apple/callback')
+  @Redirect('', 302)
+  async appleCallback(@Body() dto: AppleCallbackDto) {
+    const { redirectUrl } = await this.social.handleAppleCallback(dto);
+    return { url: redirectUrl };
+  }
+
+  // Public: trades the one-time code from the callback redirect for a real
+  // session — the actual bearer tokens never appear in a URL this way.
+  @Throttle(BRUTE_FORCE_GUARD)
+  @Post('oauth/exchange')
+  exchangeOAuthLogin(@Body() dto: OAuthExchangeDto, @Req() req: Request) {
+    return this.social.exchangeLoginCode(dto.code, sessionMeta(req));
+  }
+}
+
+function normalizeProvider(raw: string): SocialProvider {
+  const upper = raw.toUpperCase();
+  if (upper !== 'GOOGLE' && upper !== 'APPLE') {
+    throw new BadRequestException('Unknown sign-in provider.');
+  }
+  return upper;
 }
 
 function sessionMeta(req: Request): SessionMeta {

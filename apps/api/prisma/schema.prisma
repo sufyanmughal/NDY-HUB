@@ -117,6 +117,8 @@ model User {
   oauthRefreshTokens      OAuthRefreshToken[]
   passkeys                Passkey[]
   webauthnChallenges      WebauthnChallenge[]
+  authIdentities          AuthIdentity[]
+  oauthLoginExchanges     OAuthLoginExchange[]
 
   @@index([ndyId])
 }
@@ -137,15 +139,35 @@ model TotpBackupCode {
   @@index([userId])
 }
 
-// NOTE: there was an AuthIdentity model here (one row per external login
-// method — Google/Apple/NDYAPPS — meant to stop the same person ending up
-// with two accounts). Removed rather than left in place: nothing ever
-// wrote or read it, because Google/Apple login were never built and
-// NDYAPPS approval requires an *existing* password-based account rather
-// than creating one. A dormant table implies protection that wasn't
-// actually happening. Bring this back — for real, wired into a working
-// OAuth flow — when Google/Apple login gets built (passkeys, below, are
-// already real).
+// One row per external identity provider linked to an account — Google or
+// Apple's "sub" claim, the stable subject identifier that outlives an
+// email change on their side. SocialAuthService looks this up first on
+// every callback; a miss falls back to matching by email (linking a new
+// provider onto an existing password-based account instead of minting a
+// duplicate one) before finally creating a brand new account. This is
+// exactly the duplicate-account prevention a dormant AuthIdentity table
+// used to imply without actually doing — this one is wired into a real,
+// working flow.
+model AuthIdentity {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider       AuthProvider
+  providerUserId String
+  // Snapshot of what the provider reported at link time, for support/debug
+  // visibility only — the account's own `email` column is what's actually
+  // used everywhere else; this never overwrites it on later logins.
+  email          String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+enum AuthProvider {
+  GOOGLE
+  APPLE
+}
 
 // One row per registered authenticator (a phone, a security key, a
 // platform credential like Windows Hello/Touch ID). publicKey/counter are
@@ -191,6 +213,47 @@ model WebauthnChallenge {
 enum WebauthnChallengeType {
   REGISTRATION
   AUTHENTICATION
+}
+
+// CSRF/replay protection for the Google/Apple redirect dance: /oauth/:provider/start
+// mints one of these before sending the browser off to the provider, the
+// provider echoes `id` back as `state`, and the callback checks it matches
+// (and hasn't been used or expired) before trusting anything else in the
+// request. `nonce` is separately embedded in the authorize request and
+// re-checked against the *id_token's* own nonce claim — state proves the
+// callback correlates to a request this server made; nonce proves the
+// id_token wasn't lifted from a different, earlier authentication.
+// Fully anonymous — there's no account to attach this to until the
+// provider's response resolves one, same reasoning as WebauthnChallenge's
+// login branch.
+model ExternalAuthState {
+  id        String       @id @default(uuid())
+  provider  AuthProvider
+  nonce     String
+  // Where to send the browser after a successful login — validated the
+  // same way LoginPage's own `next` query param is (must be an in-app
+  // relative path), stored here rather than round-tripped through the
+  // provider since not every provider guarantees passing arbitrary extra
+  // query params back untouched.
+  redirectPath String
+  expiresAt DateTime
+  createdAt DateTime     @default(now())
+}
+
+// The callback endpoints (hit by a real browser redirect from Google/Apple,
+// not a fetch call this app's frontend controls) can't hand back tokens as
+// a JSON response — there's nothing to receive one. So the callback
+// resolves the user, then redirects the browser to the frontend with one
+// of these as a one-time opaque code; the frontend immediately exchanges
+// it for a real session via a normal POST. Keeps the actual bearer
+// credentials out of the URL/browser history/Referer header — only this
+// single-use, 60-second-lived code goes there instead.
+model OAuthLoginExchange {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 // The QR / deep-link login handshake described in the proposal: short-lived, single-use.

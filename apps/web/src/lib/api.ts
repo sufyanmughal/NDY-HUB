@@ -431,6 +431,30 @@ export function verifyPasskeyLogin(challengeId: string, response: any): Promise<
   });
 }
 
+// --- Social login (Google / Apple) ---
+// This app acting as an OAuth *client* against Google/Apple — distinct
+// from the OAuthClient/consent endpoints above, which are the opposite
+// direction (NDY HUB as an OIDC *provider* for third-party sites).
+// start/callback are real browser navigations the API redirects through,
+// not fetch calls — buildOAuthStartUrl just builds the link href, it
+// doesn't call the API itself.
+
+export function getOAuthProviders(): Promise<{ google: boolean; apple: boolean }> {
+  return apiFetch("/auth/oauth/providers");
+}
+
+export function buildOAuthStartUrl(provider: "google" | "apple", next: string): string {
+  const params = new URLSearchParams({ next });
+  return `${API_BASE_URL}/auth/oauth/${provider}/start?${params.toString()}`;
+}
+
+export function exchangeOAuthCode(code: string): Promise<IssuedSession> {
+  return apiFetch<IssuedSession>("/auth/oauth/exchange", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
 // --- Email verification ---
 
 export function confirmEmailVerification(token: string): Promise<{ verificationLevel: string }> {
