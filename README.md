@@ -2,9 +2,9 @@
 
 One Identity. One Passport. One Ecosystem.
 
-This is the local dev scaffold for NDY HUB. See the proposal doc for the full
-architecture and milestone sequence — this repo is those milestones turned into
-actual code, not a rewrite of the plan.
+Local dev build of NDY HUB. See the proposal doc for the full architecture and
+milestone sequence — this repo is those milestones turned into actual code,
+not a rewrite of the plan.
 
 ## Layout
 
@@ -17,78 +17,67 @@ ndy-hub/
 └── package.json         npm workspaces root
 ```
 
-## What's actually built right now
+## What's actually built
 
-**API (`apps/api`) — milestone 1 (identity core), complete**
-- Prisma schema: `User`, `AuthIdentity` (so Google/Apple/NDYAPPS/password all map to
-  one account instead of creating duplicates), `LoginRequest` (the QR/deep-link
-  handshake), `Session`.
-- NDY ID generator — collision-safe, retried on unique-constraint conflict, excludes
-  ambiguous characters (`0/O`, `1/I/L`).
-- `POST /auth/register`, `POST /auth/login` — password auth with bcrypt, both issue
-  a real access/refresh session on success.
-- `POST /auth/refresh`, `POST /auth/logout` — refresh tokens rotate on every use
-  (the old one is revoked the instant a new pair is issued) and are stored as a
-  SHA-256 hash, never in plaintext.
-- The full QR / deep-link handshake:
-  - `POST /auth/login-request` — creates a single-use, 90-second token
-  - `GET /auth/login-request/:token` — status poll (fallback path)
-  - `POST /auth/login-request/:token/approve` / `.../deny` — **requires a valid
-    NDYAPPS bearer token** (`JwtAuthGuard`); this is the endpoint the NDYAPPS
-    developer's build calls
-  - `POST /auth/login-request/:token/exchange` — the desktop browser redeems an
-    APPROVED request for a real session (OAuth2 authorization-code pattern)
-- A WebSocket gateway (`login-request:subscribe` / `login-request:status`) pushes
-  approval/denial live instead of making the desktop poll.
-- `GET /passport/:ndyId` — the public-safe Passport view (no email, no password hash).
-- Approving a login request now actually sets `User.ndyappsConnected` — it didn't
-  before, despite being in the schema and the Passport response.
+Every module below is wired to the real API — not mock data — and has been
+verified end to end against a live local Postgres database: booted the app,
+hit the real endpoints, confirmed the actual behavior (not just that it
+builds and lints clean, which catches far less than it feels like it should).
 
-**API (`apps/api`) — milestone 5 (CRYNDY + NDYBITS pipeline), complete**
-- Prisma schema: `CryndyPurchase` (full lifecycle — `PAYMENT_PENDING` through
-  `DISTRIBUTED_ON_CHAIN`/`CANCELLED`/`REFUNDED`) and `NdybitsLedgerEntry`.
-- `GET /cryndy/me` (guarded) — purchase history plus a full per-status breakdown,
-  so pending/locked/allocated CRYNDY can never be mistaken for spendable. Only
-  `AVAILABLE` and `DISTRIBUTED_ON_CHAIN` count toward the balance.
-- `POST /webhooks/cryndy/purchase` — the presale site's intake endpoint.
-  HMAC-SHA256 signed over the raw request body (`CRYNDY_WEBHOOK_SECRET`,
-  timing-safe comparison), idempotent on `providerTransactionId` (a replay
-  returns `200 { duplicate: true }`, not an error).
-- `GET /ndybits/me` (guarded) — balance (summed from the ledger on read, not a
-  cached counter — see the comment in `ndybits.service.ts` for why) plus recent
-  entries.
+**Identity core** — registration, login, NDY ID generation (collision-safe,
+excludes ambiguous characters), profile editing, password change.
 
-**Web (`apps/web`) — milestone 2 (dashboard shell) + working slices of 3 and 5**
-- Dashboard shell with the full nav from the mockup: Dashboard, NDY Passport,
-  Memberships, CRYNDY, NDYBITS, Connected Platforms, Transactions, Documents,
-  Security, Settings, Support.
-- **`/cryndy`** and **`/ndybits`** — full pages (status breakdown, purchase
-  history, ledger) built against mock data shaped exactly like `GET /cryndy/me`
-  and `GET /ndybits/me`'s real response bodies, so wiring in a live fetch later
-  is a small, mechanical change. The Dashboard overview and Passport page pull
-  the same mock exports — one source of numbers, not three independently
-  hardcoded ones.
-- **`/login`** — a real, working QR login page. Generates the login request against
-  the API, renders the QR code, subscribes to the WebSocket for live status, falls
-  back to polling if the socket doesn't connect, and exchanges an approval for a
-  session the moment it lands.
-- **The session is real end to end now.** `AuthProvider` (`src/lib/auth-context.tsx`)
-  holds it, `DashboardGate` (`src/app/(dashboard)/layout.tsx`) redirects to `/login`
-  if there isn't one and bounces already-logged-in visitors away from `/login`
-  itself, and the access token auto-refreshes on load if it's gone stale. The
-  Dashboard overview, Passport page, and Topbar all show your real NDY ID and
-  Passport (fetched from `GET /passport/:ndyId`) instead of mock data — only
-  Membership is still mock (M4 hasn't landed), and it's commented as such.
-- Everything not yet built is a labeled placeholder stating which milestone fills
-  it in — not a broken link.
-- **Known gap, on purpose:** sessions live in `localStorage`, not an httpOnly
-  cookie (see the comment in `src/lib/auth-client.ts`). Fine for local dev, not
-  the final security posture the proposal commits to — swap this before any real
-  traffic touches it.
+**QR / deep-link login** — the full handshake: create a single-use 90-second
+login request, approve/deny it from an authenticated NDYAPPS session
+(`JwtAuthGuard`), exchange an approval for a real session, all pushed live
+over a WebSocket instead of polling. `/login` is a real working page — see
+"Testing the login flow" below. `NDYAPPS-INTEGRATION.md` is the frozen API
+contract for whoever builds NDYAPPS.
+
+**Sessions & Security** — JWT access tokens (15 min) + rotating opaque
+refresh tokens (30 days, SHA-256 hashed at rest, never stored plaintext).
+`/security` lists every active session with device/IP/sign-in time, lets you
+revoke one or all of them. Revoking stops a session from refreshing; an
+already-issued access token still runs out its own clock — a deliberate,
+documented tradeoff of stateless JWTs, not an oversight.
+
+**Membership (M4)** — six tiers, monthly/annual billing, subscribe/cancel,
+full history. Real Stripe Checkout when `STRIPE_SECRET_KEY` is configured;
+direct activation otherwise (logged clearly as a dev fallback, not silent).
+Stripe webhook handler is signature-verified and structurally correct but
+genuinely untested against a live Stripe account — flagged, not overclaimed.
+
+**CRYNDY + NDYBITS (M5)** — full purchase lifecycle (`PAYMENT_PENDING`
+through `DISTRIBUTED_ON_CHAIN`/`CANCELLED`/`REFUNDED`), a status breakdown so
+pending/locked CRYNDY can never read as spendable, an HMAC-signed idempotent
+webhook intake for the presale site, and an append-only NDYBITS ledger.
+
+**Transactions** — unified history across memberships and CRYNDY purchases,
+newest first.
+
+**Documents** — membership confirmations and CRYNDY certificates, generated
+on demand from real data rather than pretending a file bucket exists (no S3
+credentials in this environment — see the comment in `documents.service.ts`
+for exactly what a real object-storage swap would replace).
+
+**Admin (M6)** — user search, role management, suspend/unsuspend (which
+actually revokes sessions and blocks login, not just a database flag), and
+an audit log recording every admin action with before/after values. Lives at
+`/admin`, outside the regular sidebar — no normal user should see that link.
+See "Bootstrapping the first admin" below.
+
+**Dashboard shell** — full nav from the mockup. Dashboard overview and
+Passport page show real NDY ID, Passport, membership, CRYNDY, and NDYBITS
+data. Connected Platforms and the platform list itself are still mock — no
+platforms backend exists yet.
+
+**Known gap, on purpose:** sessions live in `localStorage`, not an httpOnly
+cookie (see `src/lib/auth-client.ts`). Fine for local dev, not the final
+security posture — swap this before any real traffic touches it.
 
 ## Running it locally
 
-Requires Node 20+, npm, and Docker (for Postgres/Redis).
+Requires Node 20+, npm, and Docker Desktop running (for Postgres/Redis).
 
 ```bash
 # from the repo root
@@ -99,49 +88,68 @@ npm run dev:api                # http://localhost:3000
 npm run dev:web                # http://localhost:3001
 ```
 
-`apps/api/.env` is already set up to match `docker-compose.yml` — no edits needed
-for local dev. `.env.example` files (in both `apps/api` and `apps/web`) document
-every variable if you're pointing at something else.
+`apps/api/.env` is already set up to match `docker-compose.yml` — no edits
+needed for local dev. `.env.example` files (in both `apps/api` and
+`apps/web`) document every variable if you're pointing at something else.
 
-Note: this environment doesn't have Docker installed, so the migration above
-hasn't actually been run against a live database yet — the schema and generated
-Prisma client are verified to compile, and both apps build clean, but
-`prisma migrate dev` still needs to run once against a real Postgres instance to
-create the tables before any of this is live-testable end to end.
+If a rebuild ever hits `EPERM ... rename query_engine-windows.dll.node` or
+similar on Windows: stop the running dev server first (it holds a lock on
+the Prisma engine DLL), then re-run `prisma generate`/`migrate`.
 
-## Testing the QR login flow without NDYAPPS
+## Testing the QR login flow
 
-There's no NDYAPPS build to scan the code with yet, so approve it by hand:
+Open **http://localhost:3001/login**. There's no NDYAPPS build to scan the
+code with yet, so approve it one of two ways:
 
+**The easy way:** click "Skip NDYAPPS — approve as test user (dev only)"
+under the QR code. It does exactly what the curl steps below do, from the
+page itself. Only ever appears outside a production build.
+
+**The manual way**, if you want to see the actual handshake:
 ```bash
-# 1. Register a user (or reuse one) and grab its access token
 curl -s -X POST http://localhost:3000/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"teun@example.com","password":"correct-horse-battery","fullName":"Teun Rietdijk"}'
+  -d '{"email":"you@example.com","password":"something-long-enough","fullName":"Your Name"}'
 # -> { "accessToken": "...", "refreshToken": "...", "expiresIn": "15m" }
 
-# 2. Open http://localhost:3001/login in a browser, copy the token shown in
-#    devtools (or watch the network tab for POST /auth/login-request's response)
-
-# 3. Approve it as that user
+# Open /login in a browser, grab the token from the network tab's
+# POST /auth/login-request response, then:
 curl -s -X POST http://localhost:3000/auth/login-request/<token>/approve \
-  -H "Authorization: Bearer <accessToken from step 1>"
+  -H "Authorization: Bearer <accessToken from above>"
 ```
 
-The browser tab should flip to "You're logged in" within a second or two over the
-WebSocket, without any manual refresh, and land you on a real dashboard showing
-that account's actual NDY ID and Passport.
+Either way, the tab flips to "You're logged in" within a second over the
+WebSocket and lands on a real dashboard.
 
-The login API contract for the NDYAPPS developer is frozen and documented in
-[`NDYAPPS-INTEGRATION.md`](./NDYAPPS-INTEGRATION.md) — everything they need to
-build the approve/deny screen against, independent of anything else in this repo.
+## Bootstrapping the first admin
 
-## Next up (per the build sequence)
+Nothing in the product can create the first admin — that's deliberate, an
+admin-creation button would just move the privilege-escalation problem
+somewhere else. Do it once, directly:
+
+```bash
+cd apps/api
+node -e "
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+prisma.user.update({ where: { email: 'you@example.com' }, data: { role: 'ADMIN' } })
+  .then(u => console.log('promoted:', u.ndyId, u.role))
+  .finally(() => prisma.\$disconnect());
+"
+```
+
+Every admin action after that (role changes, suspensions) goes through
+`/admin` and is written to the audit log — including changes made to other
+admins.
+
+## Next up
 
 1. Move sessions from `localStorage` to an httpOnly cookie set by the API —
    the real security posture, not the dev placeholder.
-2. Membership + Stripe billing (milestone 4) — the one piece of the dashboard
-   still on hardcoded mock data.
-3. Wire `/cryndy` and `/ndybits` to their real endpoints instead of mock data
-   now that a session exists to authenticate the fetch with.
-4. CRYNDY + NDYBITS pipeline (milestone 5).
+2. Real object storage (S3/R2) for Documents, once there's a bucket to point
+   at — the generation logic underneath won't need to change.
+3. A Connected Platforms backend — `/platforms` is still the last page on
+   mock data.
+4. Whatever NDJOYIT decides on the crypto payment rail for the presale
+   (flagged since the very first proposal doc as a legal/business decision,
+   not an engineering one).
