@@ -21,5 +21,10 @@ import { IdentityModule } from '../identity/identity.module';
   ],
   controllers: [AuthController],
   providers: [AuthService, SessionService, JwtAuthGuard, LoginRequestGateway],
+  // JwtModule (for JwtService) and JwtAuthGuard itself need to be visible to
+  // any other module that guards a route with @UseGuards(JwtAuthGuard) —
+  // without this, Nest can resolve JwtAuthGuard's class but not its
+  // JwtService constructor dependency, and refuses to boot.
+  exports: [JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}
