@@ -63,7 +63,6 @@ model User {
   updatedAt         DateTime          @updatedAt
 
   loginRequests      LoginRequest[]
-  authIdentities      AuthIdentity[]
   sessions            Session[]
   cryndyPurchases     CryndyPurchase[]
   ndybitsLedgerEntries NdybitsLedgerEntry[]
@@ -72,19 +71,14 @@ model User {
   @@index([ndyId])
 }
 
-// One row per external login method (Google, Apple, NDYAPPS) linked to a single User,
-// so the same person never ends up with two accounts because they signed in a different way.
-model AuthIdentity {
-  id         String   @id @default(uuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider   String   // "password" | "google" | "apple" | "ndyapps"
-  providerId String   // subject/id from that provider; unused for "password"
-  createdAt  DateTime @default(now())
-
-  @@unique([provider, providerId])
-  @@index([userId])
-}
+// NOTE: there was an AuthIdentity model here (one row per external login
+// method — Google/Apple/NDYAPPS — meant to stop the same person ending up
+// with two accounts). Removed rather than left in place: nothing ever
+// wrote or read it, because Google/Apple login were never built and
+// NDYAPPS approval requires an *existing* password-based account rather
+// than creating one. A dormant table implies protection that wasn't
+// actually happening. Bring this back — for real, wired into a working
+// OAuth flow — when Google/Apple/passkey login gets built.
 
 // The QR / deep-link login handshake described in the proposal: short-lived, single-use.
 model LoginRequest {

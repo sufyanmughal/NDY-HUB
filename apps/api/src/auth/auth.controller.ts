@@ -8,6 +8,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -21,15 +22,23 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthenticatedRequestUser } from './guards/jwt-auth.guard';
 import type { SessionMeta } from './session.service';
 
+// 5 attempts/minute/IP — the actual credential-guessing targets. Tighter
+// than the app-wide default (100/min, set in AppModule) on purpose: these
+// three are exactly what §21 of the brief meant by "protection against
+// brute-force attacks," and until now nothing enforced it at all.
+const BRUTE_FORCE_GUARD = { default: { limit: 5, ttl: 60_000 } };
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  @Throttle(BRUTE_FORCE_GUARD)
   @Post('register')
   register(@Body() dto: RegisterDto, @Req() req: Request) {
     return this.auth.register(dto, sessionMeta(req));
   }
 
+  @Throttle(BRUTE_FORCE_GUARD)
   @Post('login')
   login(@Body() dto: LoginDto, @Req() req: Request) {
     return this.auth.login(dto, sessionMeta(req));
@@ -97,6 +106,7 @@ export class AuthController {
     return this.auth.updateProfile(user.sub, dto);
   }
 
+  @Throttle(BRUTE_FORCE_GUARD)
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
   changePassword(
