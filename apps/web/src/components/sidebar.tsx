@@ -2,34 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  IdCard,
-  Users,
-  Coins,
-  Boxes,
-  Link2,
-  ArrowLeftRight,
-  FileText,
-  ShieldCheck,
-  Settings as SettingsIcon,
-  LifeBuoy,
-  type LucideIcon,
-} from "lucide-react";
-
-const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/passport", label: "NDY Passport", icon: IdCard },
-  { href: "/memberships", label: "Memberships", icon: Users },
-  { href: "/cryndy", label: "CRYNDY", icon: Coins },
-  { href: "/ndybits", label: "NDYBITS", icon: Boxes },
-  { href: "/platforms", label: "Connected Platforms", icon: Link2 },
-  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
-  { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/security", label: "Security", icon: ShieldCheck },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
-  { href: "/support", label: "Support", icon: LifeBuoy },
-];
+import { NAV_ITEMS, isNavItemActive } from "@/lib/nav-items";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -44,7 +17,7 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 px-3 space-y-0.5">
         {NAV_ITEMS.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const active = isNavItemActive(item.href, pathname);
           const Icon = item.icon;
           return (
             <Link

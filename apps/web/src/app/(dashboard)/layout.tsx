@@ -1,6 +1,8 @@
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { DashboardGate } from "@/components/dashboard-gate";
+import { MobileNavDrawer } from "@/components/mobile-nav-drawer";
+import { MobileNavProvider } from "@/lib/mobile-nav-context";
 
 export default function DashboardLayout({
   children,
@@ -9,13 +11,16 @@ export default function DashboardLayout({
 }) {
   return (
     <DashboardGate>
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <div className="flex flex-1 flex-col">
-          <Topbar />
-          <main className="flex-1 p-6">{children}</main>
+      <MobileNavProvider>
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <MobileNavDrawer />
+          <div className="flex flex-1 flex-col">
+            <Topbar />
+            <main className="flex-1 p-6">{children}</main>
+          </div>
         </div>
-      </div>
+      </MobileNavProvider>
     </DashboardGate>
   );
 }

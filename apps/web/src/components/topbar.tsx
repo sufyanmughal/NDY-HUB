@@ -1,21 +1,30 @@
 "use client";
 
-import { Search, Bell } from "lucide-react";
+import { Search, Bell, Menu } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { usePassport } from "@/lib/use-passport";
+import { useMobileNav } from "@/lib/mobile-nav-context";
 import { Avatar } from "@/components/avatar";
 
 export function Topbar() {
   const { auth, logout } = useAuth();
   const passport = usePassport();
+  const { toggle } = useMobileNav();
 
   if (auth.status !== "authenticated") return null;
 
   const displayName = passport?.fullName ?? auth.ndyId;
 
   return (
-    <header className="flex items-center justify-between border-b border-border bg-surface px-6 py-4">
-      <div className="relative w-full max-w-xs">
+    <header className="flex items-center gap-3 border-b border-border bg-surface px-4 py-4 md:justify-between md:px-6">
+      <button
+        onClick={toggle}
+        aria-label="Open menu"
+        className="shrink-0 rounded-md p-1.5 text-foreground-muted hover:bg-surface-2 hover:text-foreground md:hidden"
+      >
+        <Menu size={20} strokeWidth={2} />
+      </button>
+      <div className="relative hidden w-full max-w-xs md:block">
         <Search
           size={16}
           strokeWidth={2}
@@ -28,8 +37,8 @@ export function Topbar() {
           className="w-full rounded-md border border-border bg-background py-1.5 pl-9 pr-3 text-sm text-foreground-muted placeholder:text-foreground-muted disabled:cursor-not-allowed"
         />
       </div>
-      <div className="flex items-center gap-4 text-sm text-foreground-muted">
-        <span className="font-mono text-xs tracking-wide">{auth.ndyId}</span>
+      <div className="ml-auto flex items-center gap-4 text-sm text-foreground-muted md:ml-0">
+        <span className="hidden font-mono text-xs tracking-wide sm:inline">{auth.ndyId}</span>
         <button
           type="button"
           title="Notifications — not built yet"
