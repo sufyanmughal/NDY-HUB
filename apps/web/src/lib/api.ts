@@ -170,6 +170,64 @@ export function cancelMembership(accessToken: string, membershipId: string): Pro
   return authedFetch<void>(`/memberships/${membershipId}/cancel`, accessToken, { method: "POST" });
 }
 
+// --- CRYNDY (M5) ---
+
+export type CryndyPurchaseStatus =
+  | "PAYMENT_PENDING"
+  | "PAYMENT_CONFIRMED"
+  | "UNDER_REVIEW"
+  | "VERIFIED"
+  | "ALLOCATED"
+  | "LOCKED"
+  | "AVAILABLE"
+  | "DISTRIBUTED_ON_CHAIN"
+  | "CANCELLED"
+  | "REFUNDED";
+
+export interface CryndyPurchase {
+  id: string;
+  reference: string;
+  amountPaid: number;
+  currency: string;
+  cryndyAmount: number;
+  bonusAmount: number;
+  packageName: string | null;
+  paymentMethod: string;
+  status: CryndyPurchaseStatus;
+  createdAt: string;
+  updatedAt: string;
+  verifiedAt: string | null;
+  allocatedAt: string | null;
+}
+
+export interface CryndySummary {
+  availableBalance: number;
+  breakdown: Record<CryndyPurchaseStatus, { count: number; cryndyAmount: number }>;
+  purchases: CryndyPurchase[];
+}
+
+export function getMyCryndy(accessToken: string): Promise<CryndySummary> {
+  return authedFetch<CryndySummary>("/cryndy/me", accessToken);
+}
+
+// --- NDYBITS (M5) ---
+
+export interface NdybitsLedgerEntry {
+  id: string;
+  amount: number;
+  reason: string;
+  createdAt: string;
+}
+
+export interface NdybitsSummary {
+  balance: number;
+  recentEntries: NdybitsLedgerEntry[];
+}
+
+export function getMyNdybits(accessToken: string): Promise<NdybitsSummary> {
+  return authedFetch<NdybitsSummary>("/ndybits/me", accessToken);
+}
+
 /**
  * What the QR code actually encodes — a deep link NDYAPPS registers itself
  * to open. The web-only fallback query param lets a browser that scans this

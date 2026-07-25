@@ -1,10 +1,9 @@
+"use client";
+
 import { StatTile } from "@/components/stat-tile";
-import {
-  mockCryndyAvailableBalance,
-  mockCryndyBreakdown,
-  mockCryndyPurchases,
-  type CryndyPurchaseStatus,
-} from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth-context";
+import { useCryndySummary } from "@/lib/use-cryndy";
+import type { CryndyPurchaseStatus } from "@/lib/api";
 
 // How each pipeline stage should read to a user glancing at their balance:
 // spendable now, owned-but-not-yet, still moving through intake/review, or
@@ -35,9 +34,16 @@ const toneClasses: Record<string, string> = {
 };
 
 export default function CryndyPage() {
-  const activeBreakdown = (Object.keys(mockCryndyBreakdown) as CryndyPurchaseStatus[])
-    .map((status) => ({ status, ...mockCryndyBreakdown[status] }))
-    .filter((entry) => entry.count > 0);
+  const { auth } = useAuth();
+  const summary = useCryndySummary();
+
+  if (auth.status !== "authenticated") return null;
+
+  const activeBreakdown = summary
+    ? (Object.keys(summary.breakdown) as CryndyPurchaseStatus[])
+        .map((status) => ({ status, ...summary.breakdown[status] }))
+        .filter((entry) => entry.count > 0)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -61,7 +67,7 @@ export default function CryndyPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
           label="Available Balance"
-          value={`${mockCryndyAvailableBalance.toLocaleString()} CRYNDY`}
+          value={`${(summary?.availableBalance ?? 0).toLocaleString()} CRYNDY`}
           badge={{ text: "Spendable", tone: "good" }}
         />
         {activeBreakdown.map(({ status, count, cryndyAmount }) => (
@@ -76,54 +82,58 @@ export default function CryndyPage() {
 
       <div className="rounded-lg border border-border bg-surface p-5">
         <h2 className="text-sm font-medium text-foreground-muted">Purchase History</h2>
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-border text-xs uppercase tracking-wide text-foreground-muted">
-                <th className="py-2 pr-4 font-medium">Reference</th>
-                <th className="py-2 pr-4 font-medium">Package</th>
-                <th className="py-2 pr-4 font-medium">Paid</th>
-                <th className="py-2 pr-4 font-medium">CRYNDY</th>
-                <th className="py-2 pr-4 font-medium">Status</th>
-                <th className="py-2 pr-4 font-medium">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {mockCryndyPurchases.map((purchase) => {
-                const meta = STATUS_META[purchase.status];
-                return (
-                  <tr key={purchase.id}>
-                    <td className="py-3 pr-4 font-mono text-xs">{purchase.reference}</td>
-                    <td className="py-3 pr-4 text-foreground-muted">
-                      {purchase.packageName ?? "—"}
-                    </td>
-                    <td className="py-3 pr-4 tabular-nums">
-                      {purchase.amountPaid.toLocaleString()} {purchase.currency}
-                    </td>
-                    <td className="py-3 pr-4 tabular-nums">
-                      {purchase.cryndyAmount.toLocaleString()}
-                      {purchase.bonusAmount > 0 && (
-                        <span className="ml-1 text-xs text-good">
-                          +{purchase.bonusAmount.toLocaleString()} bonus
+        {summary && summary.purchases.length === 0 ? (
+          <p className="mt-3 text-sm text-foreground-muted">
+            No purchases yet — they&apos;ll show up here once the presale site sends one through.
+          </p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-border text-xs uppercase tracking-wide text-foreground-muted">
+                  <th className="py-2 pr-4 font-medium">Reference</th>
+                  <th className="py-2 pr-4 font-medium">Package</th>
+                  <th className="py-2 pr-4 font-medium">Paid</th>
+                  <th className="py-2 pr-4 font-medium">CRYNDY</th>
+                  <th className="py-2 pr-4 font-medium">Status</th>
+                  <th className="py-2 pr-4 font-medium">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {summary?.purchases.map((purchase) => {
+                  const meta = STATUS_META[purchase.status];
+                  return (
+                    <tr key={purchase.id}>
+                      <td className="py-3 pr-4 font-mono text-xs">{purchase.reference}</td>
+                      <td className="py-3 pr-4 text-foreground-muted">{purchase.packageName ?? "—"}</td>
+                      <td className="py-3 pr-4 tabular-nums">
+                        {purchase.amountPaid.toLocaleString()} {purchase.currency}
+                      </td>
+                      <td className="py-3 pr-4 tabular-nums">
+                        {purchase.cryndyAmount.toLocaleString()}
+                        {purchase.bonusAmount > 0 && (
+                          <span className="ml-1 text-xs text-good">
+                            +{purchase.bonusAmount.toLocaleString()} bonus
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${toneClasses[meta.tone]}`}
+                        >
+                          {meta.label}
                         </span>
-                      )}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${toneClasses[meta.tone]}`}
-                      >
-                        {meta.label}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4 text-foreground-muted">
-                      {new Date(purchase.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="py-3 pr-4 text-foreground-muted">
+                        {new Date(purchase.createdAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <p className="text-xs text-foreground-muted">

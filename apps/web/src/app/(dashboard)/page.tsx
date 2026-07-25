@@ -4,17 +4,17 @@ import Link from "next/link";
 import { StatTile } from "@/components/stat-tile";
 import { useAuth } from "@/lib/auth-context";
 import { usePassport } from "@/lib/use-passport";
-import {
-  mockUser,
-  mockTransactions,
-  mockCryndyAvailableBalance,
-  mockNdybitsBalance,
-  mockConnectedPlatformsCount,
-} from "@/lib/mock-data";
+import { useCryndySummary } from "@/lib/use-cryndy";
+import { useNdybitsSummary } from "@/lib/use-ndybits";
+import { useMembershipSummary } from "@/lib/use-membership";
+import { mockUser, mockTransactions, mockConnectedPlatformsCount } from "@/lib/mock-data";
 
 export default function DashboardPage() {
   const { auth } = useAuth();
   const passport = usePassport();
+  const cryndy = useCryndySummary();
+  const ndybits = useNdybitsSummary();
+  const membership = useMembershipSummary();
   if (auth.status !== "authenticated") return null;
 
   const firstName = (passport?.fullName ?? auth.ndyId).split(" ")[0];
@@ -30,8 +30,15 @@ export default function DashboardPage() {
           value={passport ? "Verified" : "…"}
           badge={passport ? { text: `Level ${passport.verificationLevel.replace("LEVEL_", "")}`, tone: "good" } : undefined}
         />
-        {/* Membership is still mock data — the billing module (M4) hasn't landed yet. */}
-        <StatTile label="Membership" value={mockUser.membership} />
+        <StatTile
+          label="Membership"
+          value={membership?.current?.tierLabel ?? "None"}
+          badge={
+            membership?.current
+              ? { text: membership.current.status, tone: "good" }
+              : { text: "Not subscribed", tone: "neutral" }
+          }
+        />
         <StatTile
           label="NDYAPPS"
           value={passport?.ndyappsConnected ? "Connected" : "Not connected"}
@@ -42,12 +49,11 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* CRYNDY and NDYBITS here are the same mock data the /cryndy and
-          /ndybits pages show — not yet a live fetch, but no longer a second,
-          independently-hardcoded number either. */}
+      {/* Connected Platforms and Recent Activity are still mock data — no
+          platforms or activity-log backend exists yet. */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="CRYNDY Balance" value={mockCryndyAvailableBalance.toLocaleString()} />
-        <StatTile label="NDYBITS Balance" value={mockNdybitsBalance.toLocaleString()} />
+        <StatTile label="CRYNDY Balance" value={(cryndy?.availableBalance ?? 0).toLocaleString()} />
+        <StatTile label="NDYBITS Balance" value={(ndybits?.balance ?? 0).toLocaleString()} />
         <StatTile label="Connected Platforms" value={String(mockConnectedPlatformsCount)} />
         <StatTile label="Recent Activity" value={`${mockUser.recentActivityCount} new`} />
       </div>

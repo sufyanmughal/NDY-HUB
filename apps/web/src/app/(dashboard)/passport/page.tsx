@@ -2,16 +2,17 @@
 
 import { useAuth } from "@/lib/auth-context";
 import { usePassport } from "@/lib/use-passport";
-import {
-  mockUser,
-  mockCryndyAvailableBalance,
-  mockNdybitsBalance,
-  mockConnectedPlatformsCount,
-} from "@/lib/mock-data";
+import { useCryndySummary } from "@/lib/use-cryndy";
+import { useNdybitsSummary } from "@/lib/use-ndybits";
+import { useMembershipSummary } from "@/lib/use-membership";
+import { mockConnectedPlatformsCount } from "@/lib/mock-data";
 
 export default function PassportPage() {
   const { auth } = useAuth();
   const passport = usePassport();
+  const cryndy = useCryndySummary();
+  const ndybits = useNdybitsSummary();
+  const membership = useMembershipSummary();
   if (auth.status !== "authenticated") return null;
 
   const displayName = passport?.fullName ?? "Name not set yet";
@@ -38,13 +39,11 @@ export default function PassportPage() {
         </div>
 
         <dl className="divide-y divide-border text-sm">
-          {/* Membership is still mock data until the billing module (M4)
-              lands. CRYNDY/NDYBITS/Connected Platforms are the same mock
-              data the /cryndy, /ndybits, and /platforms pages use — not a
-              live fetch yet, but a single source instead of a duplicate. */}
-          <Row label="Membership" value={mockUser.membership} />
-          <Row label="CRYNDY Holdings" value={`${mockCryndyAvailableBalance.toLocaleString()} CRYNDY`} />
-          <Row label="NDYBITS" value={`${mockNdybitsBalance.toLocaleString()} NDYBITS`} />
+          {/* Connected Platforms is still mock data — no platforms backend
+              exists yet. Membership, CRYNDY, and NDYBITS are real now. */}
+          <Row label="Membership" value={membership?.current?.tierLabel ?? "No active membership"} />
+          <Row label="CRYNDY Holdings" value={`${(cryndy?.availableBalance ?? 0).toLocaleString()} CRYNDY`} />
+          <Row label="NDYBITS" value={`${(ndybits?.balance ?? 0).toLocaleString()} NDYBITS`} />
           <Row label="Connected Platforms" value={`${mockConnectedPlatformsCount} Platforms`} />
           <Row
             label="Verification Level"
