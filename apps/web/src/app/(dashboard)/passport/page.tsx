@@ -106,25 +106,30 @@ export default function PassportPage() {
         </p>
       )}
 
-      <div className="mt-6 grid gap-6 md:grid-cols-[280px_1fr]">
+      <div className="mt-6 grid gap-6 md:grid-cols-[320px_1fr]">
         <div className="overflow-hidden rounded-xl border border-border bg-surface p-6 text-center">
           <div className="text-xs font-semibold uppercase tracking-widest text-foreground-muted">
             NDY Passport
           </div>
 
-          <div className="mx-auto mt-5">
-            <Avatar photoUrl={passport?.profilePhotoUrl} name={displayName} size={64} className="mx-auto text-xl" />
+          <div className="mx-auto mt-6">
+            <Avatar
+              photoUrl={passport?.profilePhotoUrl}
+              name={displayName}
+              size={128}
+              className="mx-auto text-4xl ring-4 ring-surface-2 shadow-lg"
+            />
           </div>
 
-          <div className="mt-3 text-lg font-semibold">{displayName}</div>
+          <div className="mt-4 text-lg font-semibold">{displayName}</div>
 
           <div className="mt-3 text-[10px] uppercase tracking-widest text-foreground-muted">NDY ID</div>
           <div className="font-mono text-sm">{auth.ndyId}</div>
 
-          <div className="mx-auto mt-4 flex h-[160px] w-[160px] items-center justify-center rounded-lg bg-white p-2">
+          <div className="mx-auto mt-4 flex h-[180px] w-[180px] items-center justify-center rounded-lg bg-white p-2">
             {qrDataUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={qrDataUrl} alt="NDY Passport verification QR code" width={144} height={144} />
+              <img src={qrDataUrl} alt="NDY Passport verification QR code" width={164} height={164} />
             ) : (
               <span className="text-xs text-black/40">Generating…</span>
             )}
