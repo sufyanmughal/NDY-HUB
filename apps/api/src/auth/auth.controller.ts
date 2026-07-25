@@ -19,6 +19,7 @@ import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
+import { TotpService } from './totp.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { CreateLoginRequestDto } from './dto/create-login-request.dto';
@@ -28,6 +29,9 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { ConfirmEmailDto } from './dto/confirm-email.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ConfirmTotpDto } from './dto/confirm-totp.dto';
+import { DisableTotpDto } from './dto/disable-totp.dto';
+import { Verify2faDto } from './dto/verify-2fa.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthenticatedRequestUser } from './guards/jwt-auth.guard';
@@ -48,7 +52,10 @@ const ALLOWED_PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly totp: TotpService,
+  ) {}
 
   @Throttle(BRUTE_FORCE_GUARD)
   @Post('register')
@@ -204,6 +211,39 @@ export class AuthController {
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.auth.resetPassword(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/setup')
+  begin2faSetup(@CurrentUser() user: AuthenticatedRequestUser) {
+    return this.totp.beginSetup(user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/enable')
+  confirm2faSetup(
+    @Body() dto: ConfirmTotpDto,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.totp.confirmSetup(user.sub, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/disable')
+  disable2fa(
+    @Body() dto: DisableTotpDto,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.totp.disable(user.sub, dto);
+  }
+
+  // Public: step 2 of a 2FA login. The challenge token (issued by
+  // AuthService.login once the password already checked out) is the
+  // proof of factor 1 — there's no session yet for a guard to check.
+  @Throttle(BRUTE_FORCE_GUARD)
+  @Post('2fa/verify')
+  verify2fa(@Body() dto: Verify2faDto, @Req() req: Request) {
+    return this.totp.verifyChallenge(dto, sessionMeta(req));
   }
 }
 

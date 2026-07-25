@@ -20,6 +20,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { PROFILE_PHOTOS_DIR } from '../common/upload-dir.util';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
+import { TotpService } from './totp.service';
 import { LoginRequestGateway } from './login-request.gateway';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -47,6 +48,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly identity: IdentityService,
     private readonly sessions: SessionService,
+    private readonly totp: TotpService,
     private readonly gateway: LoginRequestGateway,
     private readonly config: ConfigService,
   ) {}
@@ -62,7 +64,17 @@ export class AuthService {
     return this.sessions.issueSession(user.id, user.ndyId, meta);
   }
 
-  async login(dto: LoginDto, meta: SessionMeta): Promise<IssuedSession> {
+  /**
+   * Returns a real session directly for accounts without 2FA — unchanged
+   * from before. For a 2FA-enabled account, password success alone isn't
+   * enough: this returns a short-lived challenge token instead, and the
+   * caller has to complete TotpService.verifyChallenge with a TOTP or
+   * backup code before a session actually gets issued.
+   */
+  async login(
+    dto: LoginDto,
+    meta: SessionMeta,
+  ): Promise<IssuedSession | { requires2fa: true; challengeToken: string }> {
     const user = await this.identity.findByEmail(dto.email);
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Incorrect email or password.');
@@ -73,6 +85,10 @@ export class AuthService {
     }
     if (user.suspended) {
       throw new UnauthorizedException('This account has been suspended.');
+    }
+    if (user.totpEnabledAt) {
+      const challengeToken = await this.totp.issueChallenge(user.id);
+      return { requires2fa: true, challengeToken };
     }
     return this.sessions.issueSession(user.id, user.ndyId, meta);
   }

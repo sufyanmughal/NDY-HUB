@@ -66,6 +66,29 @@ model User {
   passwordResetTokenHash String?   @unique
   passwordResetExpiresAt DateTime?
 
+  // TOTP 2FA. Unlike every other secret on this model, this one can't be a
+  // one-way hash — the server has to recompute the current code to check
+  // against it, so it's encrypted (AES-256-GCM, see
+  // common/totp-crypto.util.ts) rather than hashed. `totpEnabledAt` null
+  // means either 2FA was never set up, or setup is pending confirmation —
+  // issueTotpSecret writes the encrypted secret immediately but only
+  // confirmTotpSetup sets totpEnabledAt, so a half-finished setup (secret
+  // generated, never confirmed with a real code from the app) never starts
+  // gating login.
+  totpSecretEncrypted String?
+  totpEnabledAt        DateTime?
+  totpBackupCodes      TotpBackupCode[]
+
+  // Same single-use-token shape as the others, but proving factor 1
+  // (password) passed rather than proving identity outright — login()
+  // issues this instead of a session when 2FA is enabled, and
+  // TotpService.verifyChallenge trades it for a real session once factor 2
+  // (TOTP code or backup code) checks out. Very short TTL (5 min) since
+  // it's meant to be redeemed within the same login attempt, not carried
+  // around.
+  twoFactorChallengeTokenHash String?   @unique
+  twoFactorChallengeExpiresAt DateTime?
+
   role              Role              @default(USER)
   suspended         Boolean           @default(false)
   suspendedAt       DateTime?
@@ -94,6 +117,22 @@ model User {
   oauthRefreshTokens      OAuthRefreshToken[]
 
   @@index([ndyId])
+}
+
+// Issued once, in a batch, when 2FA is confirmed enabled — shown to the
+// user exactly once (same "plaintext exists only at creation" pattern as
+// OAuthClient.clientSecretHash), for the "I lost my phone" recovery path
+// TOTP alone can't cover. Each code is single-use (usedAt), same as every
+// other one-time credential in this schema.
+model TotpBackupCode {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String    @unique
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 // NOTE: there was an AuthIdentity model here (one row per external login
