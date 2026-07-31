@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname, "..", ".."),
   },
+  // Traces the minimal set of files/node_modules the server actually needs
+  // into .next/standalone — the production Docker image copies just that
+  // instead of the full workspace node_modules.
+  output: "standalone",
 };
 
 export default nextConfig;

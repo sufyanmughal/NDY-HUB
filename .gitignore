@@ -2,6 +2,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.prod.example
 *.log
 .DS_Store
 .claude/worktrees/
@@ -9,3 +10,6 @@ node_modules/
 # User-uploaded files (profile photos, etc.) — local-disk dev storage,
 # see apps/api/src/common/upload-dir.util.ts. Not source, not committed.
 apps/api/uploads/
+
+# Deploy SSH keys — generated locally, never committed.
+.deploy/
