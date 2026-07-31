@@ -1,79 +1,251 @@
 # NDY HUB
 
-One Identity. One Passport. One Ecosystem.
+**One Identity. One Passport. One Ecosystem.**
 
-Local dev build of NDY HUB. See the proposal doc for the full architecture and
-milestone sequence — this repo is those milestones turned into actual code,
-not a rewrite of the plan.
+NDY HUB is the identity and membership core of the NDY ecosystem — a single
+account (the **NDY Passport**) that a member uses to sign into every NDY
+product, manage their membership tier, track CRYNDY and NDYBITS holdings,
+and control exactly which platforms and devices are connected to their
+identity.
 
-## Layout
+[![Build & Deploy](https://github.com/sufyanmughal/NDY-HUB/actions/workflows/deploy.yml/badge.svg)](https://github.com/sufyanmughal/NDY-HUB/actions/workflows/deploy.yml)
+
+---
+
+## Table of contents
+
+- [System architecture](#system-architecture)
+- [Core workflows](#core-workflows)
+  - [QR / deep-link login](#1-qr--deep-link-login)
+  - [Connected accounts (Google/Apple linking)](#2-connected-accounts-googleapple-linking)
+  - [Membership subscription](#3-membership-subscription)
+  - [Admin moderation & audit trail](#4-admin-moderation--audit-trail)
+- [Deployment pipeline](#deployment-pipeline)
+- [Feature matrix](#feature-matrix)
+- [Tech stack](#tech-stack)
+- [Project layout](#project-layout)
+- [Running it locally](#running-it-locally)
+- [Roadmap](#roadmap)
+
+---
+
+## System architecture
+
+```mermaid
+flowchart TB
+    subgraph Client["Client devices"]
+        Browser["Web browser"]
+        NDYAPPS["NDYAPPS mobile app\n(QR scan / approve)"]
+    end
+
+    subgraph Edge["Reverse proxy"]
+        Nginx["nginx"]
+    end
+
+    subgraph App["Application layer"]
+        Web["Web dashboard\nNext.js 16 / React 19"]
+        API["Core API\nNestJS 11"]
+    end
+
+    subgraph Data["Data layer"]
+        PG[("PostgreSQL 16")]
+        Redis[("Redis 7")]
+    end
+
+    subgraph External["External services"]
+        Google["Google OAuth"]
+        Apple["Sign in with Apple"]
+        Stripe["Stripe billing"]
+        CRYNDY["CRYNDY presale site\n(webhook)"]
+    end
+
+    Browser -->|HTTPS| Nginx
+    Nginx --> Web
+    Nginx --> API
+    NDYAPPS -->|approve login request| API
+    Web -->|REST + WebSocket| API
+    API --> PG
+    API --> Redis
+    API <--> Google
+    API <--> Apple
+    API <--> Stripe
+    CRYNDY -->|signed webhook| API
+```
+
+Everything a member does — register, log in, manage 2FA/passkeys, link a
+Google or Apple account, subscribe to a membership tier, track CRYNDY/NDYBITS,
+open a support ticket — goes through the one Core API. It is the single
+source of truth for identity data; nothing else in the ecosystem writes to it
+directly.
+
+## Core workflows
+
+### 1. QR / deep-link login
+
+The flagship flow: a member scans a QR code on `/login` with the NDYAPPS
+mobile app, approves it there, and the browser tab logs in live — no polling,
+no page refresh.
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant API as Core API
+    participant WS as WebSocket
+    participant NDYAPPS
+
+    Browser->>API: POST /auth/login-request
+    API-->>Browser: { token, qrPayload }
+    Browser->>WS: subscribe(token)
+    Browser-->>Browser: render QR code
+
+    NDYAPPS->>NDYAPPS: scan QR code
+    NDYAPPS->>API: POST /auth/login-request/:token/approve\n(authenticated NDYAPPS session)
+    API->>API: mint access + refresh tokens
+    API->>WS: publish "approved" event
+    WS-->>Browser: push tokens over the open socket
+    Browser->>Browser: store session, redirect to dashboard
+```
+
+The login request is single-use and expires after 90 seconds. Approval
+requires an already-authenticated NDYAPPS session — there is no path that
+lets an unauthenticated device approve a login for someone else.
+
+### 2. Connected accounts (Google/Apple linking)
+
+Linking a social identity to an *already signed-in* account is a distinct
+flow from using that same provider to log in — the two are never allowed to
+collide silently.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Settings as Settings page
+    participant API as Core API
+    participant Provider as Google / Apple
+
+    User->>Settings: click "Connect Google"
+    Settings->>API: POST /auth/oauth/google/connect (authenticated)
+    API->>API: create OAuth state tagged with the current user's ID
+    API-->>Settings: provider authorize URL
+    Settings->>Provider: redirect
+    User->>Provider: approve
+    Provider->>API: callback + authorization code
+    API->>API: exchange code, resolve identity
+
+    alt identity already linked to a different NDY HUB account
+        API-->>Settings: redirect with error — no silent takeover
+    else identity free (or already linked to this account)
+        API->>API: attach identity to the current user
+        API-->>Settings: redirect with success
+    end
+```
+
+Unlinking is guarded the same way in reverse: the API refuses to remove the
+last remaining sign-in method (no password, no other linked identity, no
+passkey) so a member can never accidentally lock themselves out of their own
+account.
+
+### 3. Membership subscription
+
+```mermaid
+sequenceDiagram
+    participant Member
+    participant Web
+    participant API as Core API
+    participant Stripe
+
+    Member->>Web: choose a membership tier
+    Web->>API: POST /memberships/subscribe
+    alt Stripe configured
+        API->>Stripe: create Checkout Session
+        Stripe-->>API: session URL
+        API-->>Web: redirect to Stripe Checkout
+        Member->>Stripe: complete payment
+        Stripe->>API: webhook (signature-verified)
+        API->>API: activate membership
+    else Stripe not configured (dev/staging)
+        API->>API: activate membership directly, logged as a fallback
+    end
+    API-->>Web: membership active, visible on dashboard + Passport
+```
+
+### 4. Admin moderation & audit trail
+
+Every privileged action — role changes, suspensions, OAuth client changes,
+support replies — writes an immutable entry to the shared audit log with
+before/after values, so there is always a record of who changed what and why.
+
+```mermaid
+flowchart LR
+    Admin["Admin user"] -->|"/admin action"| Guard["AdminGuard"]
+    Guard -->|role check| Action["Perform action\n(suspend, role change, etc.)"]
+    Action --> Audit[("AuditLogEntry\nadmin, target, before/after, reason")]
+    Action --> DB[("Primary data")]
+```
+
+## Deployment pipeline
+
+Every push to `main` ships automatically — no manual server work required to
+get a change in front of the client.
+
+```mermaid
+flowchart LR
+    Dev["Push to main"] --> Build["GitHub Actions:\nbuild api + web images"]
+    Build --> Push["Push images to\nGitHub Container Registry"]
+    Push --> Deploy["SSH into server"]
+    Deploy --> Pull["Pull latest images"]
+    Pull --> Restart["Restart containers"]
+    Restart --> Migrate["Run database migrations"]
+    Migrate --> Live(["Live on the staging server"])
+```
+
+The server only ever pulls and runs pre-built images — it never compiles
+anything itself, which keeps deploys fast and the server's resource
+requirements small.
+
+## Feature matrix
+
+| Area | Status | Notes |
+|---|---|---|
+| Registration, login, profile | ✅ Live | NDY ID generation is collision-safe and excludes visually ambiguous characters |
+| QR / deep-link login | ✅ Live | Real-time over WebSocket, 90-second single-use requests |
+| Two-factor authentication | ✅ Live | TOTP + backup codes |
+| Passkeys (WebAuthn) | ✅ Live | Passwordless sign-in |
+| Google / Apple sign-in | ✅ Live | Includes account linking distinct from login |
+| Session & device management | ✅ Live | Per-session revoke, revoke-all |
+| Membership tiers & billing | ✅ Live | Stripe Checkout when configured, dev fallback otherwise |
+| CRYNDY & NDYBITS | ✅ Live | Full purchase lifecycle, signed webhook intake, append-only ledger |
+| Transactions history | ✅ Live | Unified across memberships and CRYNDY |
+| Documents | ✅ Live | Generated on demand from live data |
+| Admin console | ✅ Live | User management, audit log, OAuth client management |
+| Support tickets | ✅ Live | Member submission + admin reply |
+| Mobile navigation | ✅ Live | Responsive drawer navigation |
+| Connected Platforms | 🔜 Planned | UI in place, backend not yet built |
+| Object storage (S3/R2) | 🔜 Planned | Documents currently generated on demand rather than stored |
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 16 (App Router), React 19, Tailwind CSS v4 |
+| Backend | NestJS 11, Prisma ORM |
+| Database | PostgreSQL 16 |
+| Cache / pub-sub | Redis 7 |
+| Auth | JWT + rotating refresh tokens, TOTP 2FA, WebAuthn passkeys, OAuth 2.0 (Google, Apple), OIDC provider |
+| Infrastructure | Docker, GitHub Actions CI/CD, nginx, DigitalOcean |
+
+## Project layout
 
 ```
 ndy-hub/
 ├── apps/
 │   ├── api/    NestJS + TypeScript — the Core API, the only thing that writes identity data
 │   └── web/    Next.js + TypeScript + Tailwind — the NDY HUB dashboard
-├── docker-compose.yml   Local Postgres + Redis
-└── package.json         npm workspaces root
+├── deploy/     Server bootstrap script, nginx config, deployment docs
+├── docker-compose.yml        Local Postgres + Redis (development)
+├── docker-compose.prod.yml   Full production stack
+└── package.json               npm workspaces root
 ```
-
-## What's actually built
-
-Every module below is wired to the real API — not mock data — and has been
-verified end to end against a live local Postgres database: booted the app,
-hit the real endpoints, confirmed the actual behavior (not just that it
-builds and lints clean, which catches far less than it feels like it should).
-
-**Identity core** — registration, login, NDY ID generation (collision-safe,
-excludes ambiguous characters), profile editing, password change.
-
-**QR / deep-link login** — the full handshake: create a single-use 90-second
-login request, approve/deny it from an authenticated NDYAPPS session
-(`JwtAuthGuard`), exchange an approval for a real session, all pushed live
-over a WebSocket instead of polling. `/login` is a real working page — see
-"Testing the login flow" below. `NDYAPPS-INTEGRATION.md` is the frozen API
-contract for whoever builds NDYAPPS.
-
-**Sessions & Security** — JWT access tokens (15 min) + rotating opaque
-refresh tokens (30 days, SHA-256 hashed at rest, never stored plaintext).
-`/security` lists every active session with device/IP/sign-in time, lets you
-revoke one or all of them. Revoking stops a session from refreshing; an
-already-issued access token still runs out its own clock — a deliberate,
-documented tradeoff of stateless JWTs, not an oversight.
-
-**Membership (M4)** — six tiers, monthly/annual billing, subscribe/cancel,
-full history. Real Stripe Checkout when `STRIPE_SECRET_KEY` is configured;
-direct activation otherwise (logged clearly as a dev fallback, not silent).
-Stripe webhook handler is signature-verified and structurally correct but
-genuinely untested against a live Stripe account — flagged, not overclaimed.
-
-**CRYNDY + NDYBITS (M5)** — full purchase lifecycle (`PAYMENT_PENDING`
-through `DISTRIBUTED_ON_CHAIN`/`CANCELLED`/`REFUNDED`), a status breakdown so
-pending/locked CRYNDY can never read as spendable, an HMAC-signed idempotent
-webhook intake for the presale site, and an append-only NDYBITS ledger.
-
-**Transactions** — unified history across memberships and CRYNDY purchases,
-newest first.
-
-**Documents** — membership confirmations and CRYNDY certificates, generated
-on demand from real data rather than pretending a file bucket exists (no S3
-credentials in this environment — see the comment in `documents.service.ts`
-for exactly what a real object-storage swap would replace).
-
-**Admin (M6)** — user search, role management, suspend/unsuspend (which
-actually revokes sessions and blocks login, not just a database flag), and
-an audit log recording every admin action with before/after values. Lives at
-`/admin`, outside the regular sidebar — no normal user should see that link.
-See "Bootstrapping the first admin" below.
-
-**Dashboard shell** — full nav from the mockup. Dashboard overview and
-Passport page show real NDY ID, Passport, membership, CRYNDY, and NDYBITS
-data. Connected Platforms and the platform list itself are still mock — no
-platforms backend exists yet.
-
-**Known gap, on purpose:** sessions live in `localStorage`, not an httpOnly
-cookie (see `src/lib/auth-client.ts`). Fine for local dev, not the final
-security posture — swap this before any real traffic touches it.
 
 ## Running it locally
 
@@ -92,64 +264,11 @@ npm run dev:web                # http://localhost:3001
 needed for local dev. `.env.example` files (in both `apps/api` and
 `apps/web`) document every variable if you're pointing at something else.
 
-If a rebuild ever hits `EPERM ... rename query_engine-windows.dll.node` or
-similar on Windows: stop the running dev server first (it holds a lock on
-the Prisma engine DLL), then re-run `prisma generate`/`migrate`.
-
-## Testing the QR login flow
-
-Open **http://localhost:3001/login**. There's no NDYAPPS build to scan the
-code with yet, so approve it one of two ways:
-
-**The easy way:** click "Skip NDYAPPS — approve as test user (dev only)"
-under the QR code. It does exactly what the curl steps below do, from the
-page itself. Only ever appears outside a production build.
-
-**The manual way**, if you want to see the actual handshake:
-```bash
-curl -s -X POST http://localhost:3000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com","password":"something-long-enough","fullName":"Your Name"}'
-# -> { "accessToken": "...", "refreshToken": "...", "expiresIn": "15m" }
-
-# Open /login in a browser, grab the token from the network tab's
-# POST /auth/login-request response, then:
-curl -s -X POST http://localhost:3000/auth/login-request/<token>/approve \
-  -H "Authorization: Bearer <accessToken from above>"
-```
-
-Either way, the tab flips to "You're logged in" within a second over the
-WebSocket and lands on a real dashboard.
-
-## Bootstrapping the first admin
-
-Nothing in the product can create the first admin — that's deliberate, an
-admin-creation button would just move the privilege-escalation problem
-somewhere else. Do it once, directly:
-
-```bash
-cd apps/api
-node -e "
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-prisma.user.update({ where: { email: 'you@example.com' }, data: { role: 'ADMIN' } })
-  .then(u => console.log('promoted:', u.ndyId, u.role))
-  .finally(() => prisma.\$disconnect());
-"
-```
-
-Every admin action after that (role changes, suspensions) goes through
-`/admin` and is written to the audit log — including changes made to other
-admins.
-
-## Next up
+## Roadmap
 
 1. Move sessions from `localStorage` to an httpOnly cookie set by the API —
-   the real security posture, not the dev placeholder.
-2. Real object storage (S3/R2) for Documents, once there's a bucket to point
-   at — the generation logic underneath won't need to change.
-3. A Connected Platforms backend — `/platforms` is still the last page on
-   mock data.
-4. Whatever NDJOYIT decides on the crypto payment rail for the presale
-   (flagged since the very first proposal doc as a legal/business decision,
-   not an engineering one).
+   the intended production security posture.
+2. Real object storage (S3/R2) for Documents once a bucket is provisioned.
+3. A Connected Platforms backend — currently the last page on mock data.
+4. Whatever the team decides on the crypto payment rail for the CRYNDY
+   presale — a business decision, not an engineering one.

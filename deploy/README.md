@@ -14,10 +14,10 @@ build` alone needs more than that to run comfortably.
 
 ## One-time setup
 
-1. **Droplet**: Ubuntu 24.04, created with the `claude-ndyhub-deploy` SSH
-   key added during creation (see `.deploy/ssh/`).
+1. **Droplet**: Ubuntu 24.04, created with the deploy SSH key added during
+   creation (see `.deploy/ssh/`).
 2. **Bootstrap it**: `ssh root@<droplet-ip>` then run
-   `bash deploy/server-setup.sh <git-repo-url>` (or I run this over SSH).
+   `bash deploy/server-setup.sh <git-repo-url>`.
 3. **Fill in `~/ndy-hub/.env.prod`** on the server (copied from
    `.env.prod.example`) — real secrets, `WEB_APP_URL`/`API_URL` set to the
    Droplet's IP, and `IMAGE_API`/`IMAGE_WEB` set to
@@ -44,7 +44,7 @@ build` alone needs more than that to run comfortably.
 Nothing — push to `main` and the pipeline handles the rest. Watch it run
 under the repo's **Actions** tab.
 
-## Manual operations (things I do over SSH when needed)
+## Manual operations (over SSH, when needed)
 
 - Check logs: `docker compose -f docker-compose.prod.yml logs -f api`
 - Roll back: change `IMAGE_API`/`IMAGE_WEB` in `.env.prod` to a specific
