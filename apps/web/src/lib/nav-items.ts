@@ -16,7 +16,7 @@ import {
 // Shared between the desktop Sidebar and the mobile nav drawer — one list,
 // so a new destination only ever needs adding here.
 export const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/passport", label: "NDY Passport", icon: IdCard },
   { href: "/memberships", label: "Memberships", icon: Users },
   { href: "/cryndy", label: "CRYNDY", icon: Coins },
@@ -30,5 +30,5 @@ export const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
 ];
 
 export function isNavItemActive(href: string, pathname: string): boolean {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  return pathname === href || pathname.startsWith(`${href}/`);
 }

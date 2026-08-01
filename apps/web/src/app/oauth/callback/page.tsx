@@ -11,7 +11,7 @@ import { TwoFactorChallengeForm } from "@/components/two-factor-challenge-form";
 // this one came back through a redirect chain this app's own API built,
 // but it's still untrusted input by the time it reaches client JS.
 function sanitizeNext(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
   return raw;
 }
 

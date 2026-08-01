@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "./auth-context";
 import { getEcosystemOverview, type EcosystemOverview } from "./api";
 
+/** Public endpoint — fetches regardless of auth state, so both the
+ * pre-login landing page and the authenticated dashboard home can show
+ * the same real numbers. */
 export function useEcosystemOverview(): EcosystemOverview | null {
-  const { auth } = useAuth();
   const [overview, setOverview] = useState<EcosystemOverview | null>(null);
 
   useEffect(() => {
-    if (auth.status !== "authenticated") return;
     let cancelled = false;
-    getEcosystemOverview(auth.accessToken)
+    getEcosystemOverview()
       .then((result) => {
         if (!cancelled) setOverview(result);
       })
@@ -21,7 +21,7 @@ export function useEcosystemOverview(): EcosystemOverview | null {
     return () => {
       cancelled = true;
     };
-  }, [auth]);
+  }, []);
 
   return overview;
 }

@@ -1,10 +1,10 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { EcosystemService } from './ecosystem.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-// Any signed-in user, not admin/founder-gated — these are aggregate,
-// non-sensitive counts (no per-user data), shown on the homepage.
-@UseGuards(JwtAuthGuard)
+// Fully public, no auth — aggregate, non-sensitive counts (no per-user
+// data), shown on both the public landing page and the authenticated
+// dashboard home. The landing page in particular needs these numbers
+// before anyone has signed in.
 @Controller('ecosystem')
 export class EcosystemController {
   constructor(private readonly ecosystem: EcosystemService) {}

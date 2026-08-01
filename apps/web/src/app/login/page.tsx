@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/auth-context";
  * to the dashboard root instead. Same "never redirect on unvalidated input"
  * rule the /oauth/authorize endpoint follows. */
 function sanitizeNext(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
   return raw;
 }
 

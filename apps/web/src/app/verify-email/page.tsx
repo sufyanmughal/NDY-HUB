@@ -53,7 +53,7 @@ function VerifyEmailPageInner() {
             </div>
             <p className="mt-3 text-sm font-medium">Your email is verified.</p>
             <Link
-              href="/"
+              href="/dashboard"
               className="mt-4 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
             >
               Go to dashboard

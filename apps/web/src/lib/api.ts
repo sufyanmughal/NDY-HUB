@@ -859,8 +859,10 @@ export function getFounderEcosystemOverview(accessToken: string): Promise<Founde
   return authedFetch("/founder/overview", accessToken);
 }
 
-// --- Ecosystem overview: real, non-sensitive aggregate stats shown on the
-// homepage. Any signed-in user can call this (unlike /founder/overview).
+// --- Ecosystem overview: real, non-sensitive aggregate stats shown on both
+// the public landing page and the authenticated dashboard home. Fully
+// public endpoint — no token needed, since the landing page needs it
+// before anyone has signed in.
 
 export interface EcosystemOverview {
   totalUsers: number;
@@ -873,6 +875,6 @@ export interface EcosystemOverview {
   generatedAt: string;
 }
 
-export function getEcosystemOverview(accessToken: string): Promise<EcosystemOverview> {
-  return authedFetch("/ecosystem/overview", accessToken);
+export function getEcosystemOverview(): Promise<EcosystemOverview> {
+  return apiFetch("/ecosystem/overview");
 }
