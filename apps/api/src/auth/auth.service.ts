@@ -116,6 +116,7 @@ export class AuthService {
       verificationLevel: user.verificationLevel,
       ndyappsConnected: user.ndyappsConnected,
       twoFactorEnabled: Boolean(user.totpEnabledAt),
+      role: user.role,
       createdAt: user.createdAt,
     };
   }

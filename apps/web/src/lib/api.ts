@@ -303,6 +303,7 @@ export interface MeProfile {
   verificationLevel: string;
   ndyappsConnected: boolean;
   twoFactorEnabled: boolean;
+  role: UserRole;
   createdAt: string;
 }
 
@@ -856,4 +857,22 @@ export interface FounderEcosystemOverview {
 
 export function getFounderEcosystemOverview(accessToken: string): Promise<FounderEcosystemOverview> {
   return authedFetch("/founder/overview", accessToken);
+}
+
+// --- Ecosystem overview: real, non-sensitive aggregate stats shown on the
+// homepage. Any signed-in user can call this (unlike /founder/overview).
+
+export interface EcosystemOverview {
+  totalUsers: number;
+  newUsersToday: number;
+  connectedPlatforms: number;
+  transactions24h: number;
+  cryndy: { totalSold: number; dailySeries: number[] };
+  bitcoin: { priceUsd: number; change24hPct: number; sparkline7d: number[] } | null;
+  systemStatus: "ok" | "down";
+  generatedAt: string;
+}
+
+export function getEcosystemOverview(accessToken: string): Promise<EcosystemOverview> {
+  return authedFetch("/ecosystem/overview", accessToken);
 }

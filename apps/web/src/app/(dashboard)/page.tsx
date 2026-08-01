@@ -1,117 +1,300 @@
 "use client";
 
 import Link from "next/link";
-import { IdCard, ShieldCheck, Users, Smartphone, Coins, Boxes, Link2, Activity } from "lucide-react";
-import { StatTile } from "@/components/stat-tile";
+import {
+  Lock,
+  IdCard,
+  Rocket,
+  Shield,
+  Code,
+  Terminal,
+  Users,
+  UserPlus,
+  Link2,
+  Activity,
+  Coins,
+  Bitcoin,
+  TrendingUp,
+  TrendingDown,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { usePassport } from "@/lib/use-passport";
-import { useCryndySummary } from "@/lib/use-cryndy";
-import { useNdybitsSummary } from "@/lib/use-ndybits";
-import { useMembershipSummary } from "@/lib/use-membership";
-import { useTransactions } from "@/lib/use-transactions";
-import { mockUser, mockConnectedPlatformsCount } from "@/lib/mock-data";
+import { useEcosystemOverview } from "@/lib/use-ecosystem-overview";
+import { useMe } from "@/lib/use-me";
+import { Sparkline } from "@/components/sparkline";
+import { API_BASE_URL } from "@/lib/api";
+
+interface LauncherCard {
+  href: string;
+  external?: boolean;
+  icon: typeof Lock;
+  color: string; // tailwind color name used for ring/icon/button
+  title: string;
+  description: string;
+  comingSoon?: boolean;
+}
 
 export default function DashboardPage() {
   const { auth } = useAuth();
-  const passport = usePassport();
-  const cryndy = useCryndySummary();
-  const ndybits = useNdybitsSummary();
-  const membership = useMembershipSummary();
-  const transactions = useTransactions();
+  const me = useMe();
+  const overview = useEcosystemOverview();
   if (auth.status !== "authenticated") return null;
 
-  const firstName = (passport?.fullName ?? auth.ndyId).split(" ")[0];
+  const cards: LauncherCard[] = [
+    {
+      href: "/security",
+      icon: Lock,
+      color: "violet",
+      title: "Security",
+      description: "Manage access and active sessions on your account.",
+    },
+    {
+      href: "/passport",
+      icon: IdCard,
+      color: "blue",
+      title: "NDY Passport",
+      description: "View and manage your digital identity.",
+    },
+    ...(me?.role === "FOUNDER"
+      ? [
+          {
+            href: "/founder",
+            icon: Rocket,
+            color: "emerald",
+            title: "Founder Mission Control",
+            description: "Exclusive command center for founders.",
+          },
+        ]
+      : []),
+    ...(me?.role === "ADMIN" || me?.role === "FOUNDER"
+      ? [
+          {
+            href: "/admin",
+            icon: Shield,
+            color: "amber",
+            title: "Admin Center",
+            description: "Manage users, roles, and the platform.",
+          },
+        ]
+      : []),
+    {
+      href: `${API_BASE_URL}/.well-known/openid-configuration`,
+      external: true,
+      icon: Code,
+      color: "cyan",
+      title: "API",
+      description: "Live OIDC/OAuth discovery document and endpoints.",
+    },
+    {
+      href: "#",
+      icon: Terminal,
+      color: "pink",
+      title: "Developer Portal",
+      description: "Docs, SDKs, and developer tools.",
+      comingSoon: true,
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Welcome back, {firstName}</h1>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="NDY ID" value={auth.ndyId} icon={IdCard} />
-        <StatTile
-          label="Passport"
-          value={passport ? "Verified" : "…"}
-          badge={passport ? { text: `Level ${passport.verificationLevel.replace("LEVEL_", "")}`, tone: "good" } : undefined}
-          icon={ShieldCheck}
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-8 text-center">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-accent-2/20 blur-3xl"
         />
-        <StatTile
-          label="Membership"
-          value={membership?.current?.tierLabel ?? "None"}
-          badge={
-            membership?.current
-              ? { text: membership.current.status, tone: "good" }
-              : { text: "Not subscribed", tone: "neutral" }
-          }
-          icon={Users}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-accent/20 blur-3xl"
         />
-        <StatTile
-          label="NDYAPPS"
-          value={passport?.ndyappsConnected ? "Connected" : "Not connected"}
-          badge={{
-            text: passport?.ndyappsConnected ? "Active" : "Action needed",
-            tone: passport?.ndyappsConnected ? "good" : "warn",
-          }}
-          icon={Smartphone}
-        />
+        <p className="relative text-xs font-semibold uppercase tracking-widest text-accent-2">
+          Welcome to NDY HUB
+        </p>
+        <h1 className="relative mt-2 text-3xl font-semibold sm:text-4xl">
+          One Identity. One Passport.{" "}
+          <span className="bg-gradient-to-r from-accent to-accent-2 bg-clip-text text-transparent">
+            One Ecosystem.
+          </span>
+        </h1>
+        <p className="relative mx-auto mt-3 max-w-2xl text-sm text-foreground-muted">
+          NDY HUB is your central gateway to everything in the NDJOYIT ecosystem — manage your
+          identity, connect platforms, and help build a global ecosystem.
+        </p>
       </div>
 
-      {/* Connected Platforms and Recent Activity are still mock data — no
-          platforms or activity-log backend exists yet. */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="CRYNDY Balance" value={(cryndy?.availableBalance ?? 0).toLocaleString()} icon={Coins} />
-        <StatTile label="NDYBITS Balance" value={(ndybits?.balance ?? 0).toLocaleString()} icon={Boxes} />
-        <StatTile label="Connected Platforms" value={String(mockConnectedPlatformsCount)} icon={Link2} />
-        <StatTile label="Recent Activity" value={`${mockUser.recentActivityCount} new`} icon={Activity} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {cards.map((card) => (
+          <LauncherCardView key={card.title} card={card} />
+        ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-border bg-surface p-5">
-          <h2 className="text-sm font-medium text-foreground-muted">Recent Transactions</h2>
-          {transactions && transactions.length === 0 ? (
-            <p className="mt-3 text-sm text-foreground-muted">No transactions yet.</p>
-          ) : (
-            <ul className="mt-3 divide-y divide-border">
-              {transactions?.slice(0, 4).map((tx) => (
-                <li key={tx.id} className="flex items-center justify-between py-3 text-sm">
-                  <div>
-                    <div className="font-medium">{tx.label}</div>
-                    <div className="text-foreground-muted">{tx.detail}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="rounded-full bg-good/15 px-2 py-0.5 text-[11px] font-medium text-good">
-                      {tx.status}
-                    </div>
-                    <div className="mt-1 text-xs text-foreground-muted">
-                      {new Date(tx.date).toLocaleDateString()}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Total Users" value={overview?.totalUsers} icon={Users} />
+        <StatCard label="New Today" value={overview?.newUsersToday} icon={UserPlus} />
+        <StatCard label="Connected Platforms" value={overview?.connectedPlatforms} icon={Link2} />
+        <StatCard label="Transactions (24h)" value={overview?.transactions24h} icon={Activity} />
+      </div>
 
-        <div className="rounded-lg border border-border bg-surface p-5">
-          <h2 className="text-sm font-medium text-foreground-muted">Security Status</h2>
-          <div className="mt-3 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-good/15 text-good">
-              <ShieldCheck size={20} strokeWidth={2} />
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/15 text-violet-400">
+              <Coins size={18} strokeWidth={2} />
             </div>
             <div>
-              <div className="text-sm font-medium">All systems secure</div>
+              <div className="font-medium">CRYNDY</div>
               <div className="text-xs text-foreground-muted">
-                Signed in as {auth.ndyId}
+                {overview ? `${overview.cryndy.totalSold.toLocaleString()} sold` : "…"}
               </div>
             </div>
           </div>
-          <Link
-            href="/security"
-            className="mt-4 inline-block rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
-          >
-            View Security
-          </Link>
+          {overview && overview.cryndy.dailySeries.some((v) => v > 0) ? (
+            <Sparkline values={overview.cryndy.dailySeries} color="#8b5cf6" />
+          ) : (
+            <span className="text-xs text-foreground-muted">No sales yet</span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/15 text-orange-400">
+              <Bitcoin size={18} strokeWidth={2} />
+            </div>
+            <div>
+              <div className="font-medium">Bitcoin</div>
+              <div className="text-xs text-foreground-muted">Live market reference</div>
+            </div>
+          </div>
+          {overview?.bitcoin ? (
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <div className="font-mono text-sm font-semibold">
+                  {overview.bitcoin.priceUsd.toLocaleString(undefined, { style: "currency", currency: "USD" })}
+                </div>
+                <div
+                  className={`flex items-center justify-end gap-1 text-xs ${
+                    overview.bitcoin.change24hPct >= 0 ? "text-good" : "text-critical"
+                  }`}
+                >
+                  {overview.bitcoin.change24hPct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                  {overview.bitcoin.change24hPct.toFixed(2)}%
+                </div>
+              </div>
+              <Sparkline values={overview.bitcoin.sparkline7d} color="#f97316" />
+            </div>
+          ) : (
+            <span className="text-xs text-foreground-muted">Unavailable</span>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-center text-xs font-semibold uppercase tracking-widest text-accent-2">
+          NDJOYIT Ecosystem
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+          <EcosystemBadge label="NDJOYIT" sub="Lifestyle Platform" color="bg-emerald-500/15 text-emerald-400" />
+          <EcosystemBadge label="NDYAPPS" sub="Smart Messaging" color="bg-blue-500/15 text-blue-400" comingSoon />
+          <EcosystemBadge label="NDYSTAYS" sub="Travel & Stays" color="bg-pink-500/15 text-pink-400" comingSoon />
+          <EcosystemBadge label="NDYXTRA" sub="AI Marketplace" color="bg-orange-500/15 text-orange-400" comingSoon />
+          <EcosystemBadge label="NDYQUIZ" sub="Learn · Play · Earn" color="bg-violet-500/15 text-violet-400" comingSoon />
+          <EcosystemBadge label="CRYNDY" sub="Community Token" color="bg-purple-500/15 text-purple-400" href="/cryndy" />
+          <EcosystemBadge label="NDYNEX" sub="Crypto & Bitcoin" color="bg-amber-500/15 text-amber-400" comingSoon />
+          <EcosystemBadge label="NDYCOLLECT" sub="Collectibles" color="bg-cyan-500/15 text-cyan-400" comingSoon />
         </div>
       </div>
     </div>
   );
+}
+
+const CARD_COLOR_CLASSES: Record<string, { ring: string; icon: string; button: string }> = {
+  violet: { ring: "ring-violet-500/30", icon: "bg-violet-500/15 text-violet-400", button: "text-violet-400 hover:text-violet-300" },
+  blue: { ring: "ring-blue-500/30", icon: "bg-blue-500/15 text-blue-400", button: "text-blue-400 hover:text-blue-300" },
+  emerald: { ring: "ring-emerald-500/30", icon: "bg-emerald-500/15 text-emerald-400", button: "text-emerald-400 hover:text-emerald-300" },
+  amber: { ring: "ring-amber-500/30", icon: "bg-amber-500/15 text-amber-400", button: "text-amber-400 hover:text-amber-300" },
+  cyan: { ring: "ring-cyan-500/30", icon: "bg-cyan-500/15 text-cyan-400", button: "text-cyan-400 hover:text-cyan-300" },
+  pink: { ring: "ring-pink-500/30", icon: "bg-pink-500/15 text-pink-400", button: "text-pink-400 hover:text-pink-300" },
+};
+
+function LauncherCardView({ card }: { card: LauncherCard }) {
+  const colors = CARD_COLOR_CLASSES[card.color];
+  const Icon = card.icon;
+
+  const inner = (
+    <div
+      className={`h-full rounded-lg border border-border bg-surface p-5 text-center transition ${
+        card.comingSoon ? "opacity-60" : `hover:ring-1 ${colors.ring}`
+      }`}
+    >
+      <div className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full ${colors.icon}`}>
+        <Icon size={22} strokeWidth={2} />
+      </div>
+      <div className="mt-3 font-medium">{card.title}</div>
+      <p className="mt-1 text-xs text-foreground-muted">{card.description}</p>
+      <div className={`mt-3 inline-flex items-center gap-1 text-xs font-medium ${card.comingSoon ? "text-foreground-muted" : colors.button}`}>
+        {card.comingSoon ? "Coming soon" : "Go to →"}
+      </div>
+    </div>
+  );
+
+  if (card.comingSoon) return inner;
+  if (card.external) {
+    return (
+      <a href={card.href} target="_blank" rel="noreferrer">
+        {inner}
+      </a>
+    );
+  }
+  return <Link href={card.href}>{inner}</Link>;
+}
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: number | undefined;
+  icon: typeof Users;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-surface p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-wide text-foreground-muted">{label}</div>
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent">
+          <Icon size={14} strokeWidth={2} />
+        </div>
+      </div>
+      <div className="mt-2 font-mono text-lg font-semibold tabular-nums">
+        {value === undefined ? "…" : value.toLocaleString()}
+      </div>
+    </div>
+  );
+}
+
+function EcosystemBadge({
+  label,
+  sub,
+  color,
+  href,
+  comingSoon,
+}: {
+  label: string;
+  sub: string;
+  color: string;
+  href?: string;
+  comingSoon?: boolean;
+}) {
+  const content = (
+    <div className={`flex items-center gap-2 rounded-lg border border-border bg-surface p-3 ${comingSoon ? "opacity-50" : "hover:bg-surface-2"}`}>
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${color}`}>
+        {label[0]}
+      </div>
+      <div className="min-w-0">
+        <div className="truncate text-xs font-medium">{label}</div>
+        <div className="truncate text-[11px] text-foreground-muted">{sub}</div>
+      </div>
+    </div>
+  );
+
+  if (href && !comingSoon) return <Link href={href}>{content}</Link>;
+  return content;
 }
