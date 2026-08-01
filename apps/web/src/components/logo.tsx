@@ -1,28 +1,36 @@
-/** The concentric-ring mark used in the header, matching the brand mockup
- * exactly (radar/target rings in a purple-to-blue gradient) — built as SVG
- * rather than a cropped image so it's crisp at any size and has no
- * background-removal artifacts. */
-function LogoMark({ size = 32 }: { size?: number }) {
+/** Transcribed exactly from the reference build: a radial-gradient circle
+ * badge (not a flat icon) with a simple 3-ring mark on top, "NDY" + "HUB"
+ * (accent-colored) beside it. Self-contained (inline styles, not a CSS
+ * class) since it's used both inside the scoped .ndy-homepage sections and
+ * in the dashboard sidebar/mobile-nav chrome outside that scope. */
+export function BrandMark({ size = 38 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden>
-      <defs>
-        <linearGradient id="ndy-logo-grad" x1="0" y1="0" x2="32" y2="32">
-          <stop offset="0%" stopColor="#8b5cf6" />
-          <stop offset="100%" stopColor="#4f7cff" />
-        </linearGradient>
-      </defs>
-      <circle cx="16" cy="16" r="14.5" stroke="url(#ndy-logo-grad)" strokeWidth="1.5" />
-      <circle cx="16" cy="16" r="10" stroke="url(#ndy-logo-grad)" strokeWidth="1.5" />
-      <circle cx="16" cy="16" r="5.5" stroke="url(#ndy-logo-grad)" strokeWidth="1.5" />
-      <circle cx="16" cy="16" r="1.75" fill="url(#ndy-logo-grad)" />
-    </svg>
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: "radial-gradient(circle at 35% 30%, #6d8cff, #4f7cff 45%, #8b5cf6 100%)",
+        boxShadow: "0 0 18px rgba(79, 124, 255, 0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={1.6} width={size * 0.53} height={size * 0.53}>
+        <circle cx="12" cy="12" r="9.5" />
+        <circle cx="12" cy="12" r="6" />
+        <circle cx="12" cy="12" r="2.2" fill="#fff" stroke="none" />
+      </svg>
+    </div>
   );
 }
 
 export function Logo({ size = 32 }: { size?: number }) {
   return (
     <span className="flex items-center gap-2.5">
-      <LogoMark size={size} />
+      <BrandMark size={size} />
       <span className="font-semibold tracking-tight text-lg">
         NDY{" "}
         <span className="bg-gradient-to-r from-accent-2 to-accent bg-clip-text text-transparent">
