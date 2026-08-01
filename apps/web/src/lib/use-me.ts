@@ -11,7 +11,7 @@ export function useMe(): MeProfile | null {
   useEffect(() => {
     if (auth.status !== "authenticated") return;
     let cancelled = false;
-    getMe(auth.accessToken)
+    getMe()
       .then((result) => {
         if (!cancelled) setMe(result);
       })

@@ -74,7 +74,11 @@ export function MobileNavDrawer() {
                     : "text-foreground-muted hover:bg-surface-2 hover:text-foreground"
                 }`}
               >
-                <Icon size={17} strokeWidth={2} className={active ? "text-accent" : "text-foreground-muted"} />
+                <Icon
+                  size={17}
+                  strokeWidth={2}
+                  className={active ? "text-accent" : "text-foreground-muted"}
+                />
                 {item.label}
               </Link>
             );

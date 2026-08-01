@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { loginWithPassword, registerWithPassword, getOAuthProviders, buildOAuthStartUrl } from "@/lib/api";
+import {
+  loginWithPassword,
+  registerWithPassword,
+  getOAuthProviders,
+  buildOAuthStartUrl,
+} from "@/lib/api";
 import { loginWithPasskey, browserSupportsWebAuthn } from "@/lib/passkey";
 import { useAuth } from "@/lib/auth-context";
 import { TwoFactorChallengeForm } from "./two-factor-challenge-form";
@@ -22,7 +27,10 @@ export function PasswordAuthForm() {
   const [error, setError] = useState<string | null>(null);
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
-  const [oauthProviders, setOauthProviders] = useState<{ google: boolean; apple: boolean } | null>(null);
+  const [oauthProviders, setOauthProviders] = useState<{
+    google: boolean;
+    apple: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,8 +50,8 @@ export function PasswordAuthForm() {
     setPasskeyBusy(true);
     setError(null);
     try {
-      const session = await loginWithPasskey();
-      login(session);
+      await loginWithPasskey();
+      await login();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -65,7 +73,7 @@ export function PasswordAuthForm() {
         setBusy(false);
         return;
       }
-      login(result);
+      await login();
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
@@ -74,7 +82,10 @@ export function PasswordAuthForm() {
 
   if (challengeToken) {
     return (
-      <TwoFactorChallengeForm challengeToken={challengeToken} onCancel={() => setChallengeToken(null)} />
+      <TwoFactorChallengeForm
+        challengeToken={challengeToken}
+        onCancel={() => setChallengeToken(null)}
+      />
     );
   }
 
@@ -85,7 +96,9 @@ export function PasswordAuthForm() {
           type="button"
           onClick={() => setMode("signin")}
           className={`flex-1 rounded px-3 py-1.5 font-medium ${
-            mode === "signin" ? "bg-accent text-white" : "text-foreground-muted hover:text-foreground"
+            mode === "signin"
+              ? "bg-accent text-white"
+              : "text-foreground-muted hover:text-foreground"
           }`}
         >
           Sign in
@@ -94,7 +107,9 @@ export function PasswordAuthForm() {
           type="button"
           onClick={() => setMode("register")}
           className={`flex-1 rounded px-3 py-1.5 font-medium ${
-            mode === "register" ? "bg-accent text-white" : "text-foreground-muted hover:text-foreground"
+            mode === "register"
+              ? "bg-accent text-white"
+              : "text-foreground-muted hover:text-foreground"
           }`}
         >
           Create account
@@ -116,7 +131,9 @@ export function PasswordAuthForm() {
         )}
 
         <div>
-          <label className="block text-xs uppercase tracking-wide text-foreground-muted">Email</label>
+          <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+            Email
+          </label>
           <input
             type="email"
             value={email}
@@ -127,7 +144,9 @@ export function PasswordAuthForm() {
         </div>
 
         <div>
-          <label className="block text-xs uppercase tracking-wide text-foreground-muted">Password</label>
+          <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+            Password
+          </label>
           <input
             type="password"
             value={password}
@@ -140,7 +159,10 @@ export function PasswordAuthForm() {
 
         {mode === "signin" && (
           <div className="text-right">
-            <Link href="/forgot-password" className="text-xs text-accent hover:underline">
+            <Link
+              href="/forgot-password"
+              className="text-xs text-accent hover:underline"
+            >
               Forgot password?
             </Link>
           </div>
@@ -153,7 +175,11 @@ export function PasswordAuthForm() {
           disabled={busy}
           className="w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+          {busy
+            ? "Please wait…"
+            : mode === "signin"
+              ? "Sign in"
+              : "Create account"}
         </button>
       </form>
 
@@ -175,7 +201,9 @@ export function PasswordAuthForm() {
                   disabled={passkeyBusy}
                   className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {passkeyBusy ? "Waiting for passkey…" : "Sign in with a passkey"}
+                  {passkeyBusy
+                    ? "Waiting for passkey…"
+                    : "Sign in with a passkey"}
                 </button>
               )}
               {oauthProviders?.google && (

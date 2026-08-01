@@ -16,7 +16,10 @@ import {
 // mockup's per-tile badges — these are placeholder brand marks (no real
 // logo assets exist for the not-yet-built NDJOYIT sub-products), not
 // literal logo reproductions.
-export const PLATFORM_ICONS: Record<string, { icon: LucideIcon; color: string }> = {
+export const PLATFORM_ICONS: Record<
+  string,
+  { icon: LucideIcon; color: string }
+> = {
   NDJOYIT: { icon: Sparkles, color: "#22C55E" },
   CRYNDY: { icon: Coins, color: "#D946EF" },
   "CRYNDY Presale": { icon: Rocket, color: "#F59E0B" },

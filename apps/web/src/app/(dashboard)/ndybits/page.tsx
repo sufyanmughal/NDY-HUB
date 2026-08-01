@@ -26,7 +26,8 @@ export default function NdybitsPage() {
       <div>
         <h1 className="text-2xl font-semibold">NDYBITS</h1>
         <p className="mt-1 text-sm text-foreground-muted">
-          Your points balance and recent earning activity across the NDJOYIT ecosystem.
+          Your points balance and recent earning activity across the NDJOYIT
+          ecosystem.
         </p>
       </div>
 
@@ -36,19 +37,28 @@ export default function NdybitsPage() {
           value={(summary?.balance ?? 0).toLocaleString()}
           badge={{ text: "Available", tone: "good" }}
         />
-        <StatTile label="Ledger Entries" value={String(summary?.recentEntries.length ?? 0)} />
+        <StatTile
+          label="Ledger Entries"
+          value={String(summary?.recentEntries.length ?? 0)}
+        />
       </div>
 
       <div className="rounded-lg border border-border bg-surface p-5">
-        <h2 className="text-sm font-medium text-foreground-muted">Recent Activity</h2>
+        <h2 className="text-sm font-medium text-foreground-muted">
+          Recent Activity
+        </h2>
         {summary && summary.recentEntries.length === 0 ? (
           <p className="mt-3 text-sm text-foreground-muted">
-            No NDYBITS activity yet — rewards show up here as they&apos;re earned.
+            No NDYBITS activity yet — rewards show up here as they&apos;re
+            earned.
           </p>
         ) : (
           <ul className="mt-3 divide-y divide-border">
             {summary?.recentEntries.map((entry) => (
-              <li key={entry.id} className="flex items-center justify-between py-3 text-sm">
+              <li
+                key={entry.id}
+                className="flex items-center justify-between py-3 text-sm"
+              >
                 <div>
                   <div className="font-medium">{reasonLabel(entry.reason)}</div>
                   <div className="text-xs text-foreground-muted">

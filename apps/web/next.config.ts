@@ -20,6 +20,18 @@ const nextConfig: NextConfig = {
   // Vercel's build environment, so this only turns standalone mode on for
   // the Docker build path, never on Vercel.
   output: process.env.VERCEL ? undefined : "standalone",
+  // Proxies every /api/* browser request to the real API server-side, so
+  // the browser only ever talks to this app's own origin. That's what
+  // lets the API's session cookies be SameSite=Lax: the frontend and API
+  // sit on different vercel.app subdomains, which browsers treat as
+  // genuinely different *sites*, and a cookie set directly by the API
+  // would need SameSite=None — exactly what Safari/Firefox's cross-site
+  // tracking protections are increasingly aggressive about blocking or
+  // partitioning. See src/lib/api.ts's PROXIED_API_PATH.
+  async rewrites() {
+    const apiOrigin = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+    return [{ source: "/api/:path*", destination: `${apiOrigin}/:path*` }];
+  },
 };
 
 export default nextConfig;

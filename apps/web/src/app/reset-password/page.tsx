@@ -34,8 +34,13 @@ function ResetPasswordPageInner() {
   if (!token) {
     return (
       <Shell>
-        <p className="text-sm text-critical">This reset link is missing its token.</p>
-        <Link href="/forgot-password" className="mt-4 inline-block text-xs text-accent hover:underline">
+        <p className="text-sm text-critical">
+          This reset link is missing its token.
+        </p>
+        <Link
+          href="/forgot-password"
+          className="mt-4 inline-block text-xs text-accent hover:underline"
+        >
           Request a new link
         </Link>
       </Shell>
@@ -46,8 +51,8 @@ function ResetPasswordPageInner() {
     return (
       <Shell>
         <p className="text-sm text-foreground-muted">
-          Your password has been reset. Every device is now signed out — sign in again with your new
-          password.
+          Your password has been reset. Every device is now signed out — sign in
+          again with your new password.
         </p>
         <Link
           href="/login"
@@ -80,7 +85,9 @@ function ResetPasswordPageInner() {
   return (
     <Shell>
       <form onSubmit={handleSubmit} className="space-y-3 text-left">
-        <h1 className="text-center text-lg font-semibold">Set a new password</h1>
+        <h1 className="text-center text-lg font-semibold">
+          Set a new password
+        </h1>
 
         <div>
           <label className="block text-xs uppercase tracking-wide text-foreground-muted">

@@ -48,10 +48,8 @@ const ROLE_BADGE_CLASS: Record<UserRole, string> = {
  * this is UX, not the security boundary.
  */
 export function UserManagementPanel({
-  accessToken,
   onRoleChangeRequested,
 }: {
-  accessToken: string;
   /** Called after a role change request is successfully created — lets the
    * parent page refresh a sibling RoleChangeRequestPanel, which has its own
    * independent fetch state and wouldn't otherwise know a new request just
@@ -66,17 +64,14 @@ export function UserManagementPanel({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const refresh = useCallback(
-    (q?: string) => {
-      searchAdminUsers(accessToken, q)
-        .then(({ users, total }) => {
-          setUsers(users);
-          setTotal(total);
-        })
-        .catch((err) => setError((err as Error).message));
-    },
-    [accessToken],
-  );
+  const refresh = useCallback((q?: string) => {
+    searchAdminUsers(q)
+      .then(({ users, total }) => {
+        setUsers(users);
+        setTotal(total);
+      })
+      .catch((err) => setError((err as Error).message));
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -95,8 +90,10 @@ export function UserManagementPanel({
     setError(null);
     setNotice(null);
     try {
-      await createRoleChangeRequest(accessToken, user.id, nextRole, reason || undefined);
-      setNotice(`Role change requested for ${user.ndyId} — waiting on a different admin to approve it.`);
+      await createRoleChangeRequest(user.id, nextRole, reason || undefined);
+      setNotice(
+        `Role change requested for ${user.ndyId} — waiting on a different admin to approve it.`,
+      );
       onRoleChangeRequested?.();
     } catch (err) {
       setError((err as Error).message);
@@ -114,7 +111,7 @@ export function UserManagementPanel({
     setBusyUserId(user.id);
     setError(null);
     try {
-      await adminSetSuspended(accessToken, user.id, nextSuspended, reason || undefined);
+      await adminSetSuspended(user.id, nextSuspended, reason || undefined);
       refresh(query);
     } catch (err) {
       setError((err as Error).message);
@@ -126,7 +123,9 @@ export function UserManagementPanel({
   return (
     <div className="rounded-lg border border-border bg-surface p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-foreground-muted">User Management</h2>
+        <h2 className="text-sm font-medium text-foreground-muted">
+          User Management
+        </h2>
       </div>
 
       {error && (
@@ -185,12 +184,16 @@ export function UserManagementPanel({
                   <td className="py-3 pr-4">{u.email}</td>
                   <td className="py-3 pr-4">
                     <div className="flex items-center gap-2">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${ROLE_BADGE_CLASS[u.role]}`}>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${ROLE_BADGE_CLASS[u.role]}`}
+                      >
                         {u.role}
                       </span>
                       <select
                         value={u.role}
-                        onChange={(e) => handleRoleChange(u, e.target.value as UserRole)}
+                        onChange={(e) =>
+                          handleRoleChange(u, e.target.value as UserRole)
+                        }
                         disabled={busyUserId === u.id}
                         className="rounded-md border border-border bg-background px-1.5 py-1 text-xs disabled:opacity-50"
                         aria-label={`Change role for ${u.ndyId}`}
@@ -206,7 +209,9 @@ export function UserManagementPanel({
                   <td className="py-3 pr-4">
                     <span
                       className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                        u.suspended ? "bg-critical/15 text-critical" : "bg-good/15 text-good"
+                        u.suspended
+                          ? "bg-critical/15 text-critical"
+                          : "bg-good/15 text-good"
                       }`}
                     >
                       {u.suspended ? "Suspended" : "Active"}
@@ -230,7 +235,9 @@ export function UserManagementPanel({
           </tbody>
         </table>
       </div>
-      <p className="mt-3 text-xs text-foreground-muted">{total} total user(s).</p>
+      <p className="mt-3 text-xs text-foreground-muted">
+        {total} total user(s).
+      </p>
     </div>
   );
 }

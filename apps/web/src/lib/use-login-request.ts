@@ -73,7 +73,11 @@ export function useLoginRequest() {
     cleanup();
     return createLoginRequest()
       .then((loginRequest) => {
-        setState({ phase: "pending", token: loginRequest.token, expiresAt: loginRequest.expiresAt });
+        setState({
+          phase: "pending",
+          token: loginRequest.token,
+          expiresAt: loginRequest.expiresAt,
+        });
 
         const socket = io(API_BASE_URL, { transports: ["websocket"] });
         socketRef.current = socket;

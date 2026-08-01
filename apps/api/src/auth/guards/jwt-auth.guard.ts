@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
+import { ACCESS_TOKEN_COOKIE, readSessionCookie } from '../session-cookie.util';
 
 export interface AuthenticatedRequestUser {
   sub: string; // User.id
@@ -26,7 +27,12 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const token = extractBearerToken(request);
+    // A browser carries the access token in its httpOnly cookie; NDYAPPS
+    // and other API clients (with no cookie jar) send it as a Bearer
+    // header instead — either is accepted.
+    const token =
+      readSessionCookie(request, ACCESS_TOKEN_COOKIE) ??
+      extractBearerToken(request);
     if (!token) {
       throw new UnauthorizedException('Missing bearer token.');
     }

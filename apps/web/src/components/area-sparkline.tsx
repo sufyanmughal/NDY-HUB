@@ -19,13 +19,22 @@ export function AreaSparkline({
   const range = max - min || 1;
   const step = width / (values.length - 1);
 
-  const points = values.map((v, i) => [i * step, height - ((v - min) / range) * height]);
-  const linePath = points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`).join(" ");
+  const points = values.map((v, i) => [
+    i * step,
+    height - ((v - min) / range) * height,
+  ]);
+  const linePath = points
+    .map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`)
+    .join(" ");
   const areaPath = `${linePath} L${width},${height} L0,${height} Z`;
   const gradId = `hp-grad-${color.replace("#", "")}`;
 
   return (
-    <svg className="hp-token-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+    <svg
+      className="hp-token-chart"
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+    >
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={color} stopOpacity="0.35" />
@@ -33,7 +42,14 @@ export function AreaSparkline({
         </linearGradient>
       </defs>
       <path d={areaPath} fill={`url(#${gradId})`} />
-      <path d={linePath} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      <path
+        d={linePath}
+        fill="none"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

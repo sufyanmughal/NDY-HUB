@@ -1,5 +1,13 @@
-import { createHmac, randomBytes as nodeRandomBytes, timingSafeEqual } from 'crypto';
-import type { Base32EncodeOptions, Base32Plugin, CryptoPlugin } from '@otplib/core';
+import {
+  createHmac,
+  randomBytes as nodeRandomBytes,
+  timingSafeEqual,
+} from 'crypto';
+import type {
+  Base32EncodeOptions,
+  Base32Plugin,
+  CryptoPlugin,
+} from '@otplib/core';
 
 /**
  * otplib's own recommended crypto/base32 plugins (NobleCryptoPlugin,
@@ -14,7 +22,11 @@ import type { Base32EncodeOptions, Base32Plugin, CryptoPlugin } from '@otplib/co
 export class NodeCryptoPlugin implements CryptoPlugin {
   readonly name = 'node';
 
-  hmac(algorithm: 'sha1' | 'sha256' | 'sha512', key: Uint8Array, data: Uint8Array): Uint8Array {
+  hmac(
+    algorithm: 'sha1' | 'sha256' | 'sha512',
+    key: Uint8Array,
+    data: Uint8Array,
+  ): Uint8Array {
     return new Uint8Array(createHmac(algorithm, key).update(data).digest());
   }
 

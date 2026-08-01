@@ -11,7 +11,7 @@ export function useTransactions(): Transaction[] | null {
   useEffect(() => {
     if (auth.status !== "authenticated") return;
     let cancelled = false;
-    getMyTransactions(auth.accessToken)
+    getMyTransactions()
       .then((result) => {
         if (!cancelled) setTransactions(result);
       })

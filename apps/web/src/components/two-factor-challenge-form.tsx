@@ -27,8 +27,8 @@ export function TwoFactorChallengeForm({
     setBusy(true);
     setError(null);
     try {
-      const session = await verify2fa(challengeToken, code);
-      login(session);
+      await verify2fa(challengeToken, code);
+      await login();
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
@@ -37,9 +37,12 @@ export function TwoFactorChallengeForm({
 
   return (
     <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6">
-      <h2 className="text-sm font-medium text-foreground">Two-factor authentication</h2>
+      <h2 className="text-sm font-medium text-foreground">
+        Two-factor authentication
+      </h2>
       <p className="mt-1 text-xs text-foreground-muted">
-        Enter the 6-digit code from your authenticator app, or one of your backup codes.
+        Enter the 6-digit code from your authenticator app, or one of your
+        backup codes.
       </p>
       <form onSubmit={handleSubmit} className="mt-4 space-y-3">
         <input

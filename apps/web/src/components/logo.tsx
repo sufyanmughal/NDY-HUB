@@ -10,7 +10,8 @@ export function BrandMark({ size = 38 }: { size?: number }) {
         width: size,
         height: size,
         borderRadius: "50%",
-        background: "radial-gradient(circle at 35% 30%, #6d8cff, #4f7cff 45%, #8b5cf6 100%)",
+        background:
+          "radial-gradient(circle at 35% 30%, #6d8cff, #4f7cff 45%, #8b5cf6 100%)",
         boxShadow: "0 0 18px rgba(79, 124, 255, 0.55)",
         display: "flex",
         alignItems: "center",
@@ -18,7 +19,14 @@ export function BrandMark({ size = 38 }: { size?: number }) {
         flexShrink: 0,
       }}
     >
-      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={1.6} width={size * 0.53} height={size * 0.53}>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#fff"
+        strokeWidth={1.6}
+        width={size * 0.53}
+        height={size * 0.53}
+      >
         <circle cx="12" cy="12" r="9.5" />
         <circle cx="12" cy="12" r="6" />
         <circle cx="12" cy="12" r="2.2" fill="#fff" stroke="none" />

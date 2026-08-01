@@ -19,8 +19,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   access_denied: "Sign-in was cancelled.",
   invalid_request: "This sign-in link is invalid or has expired — try again.",
   account_suspended: "This account has been suspended.",
-  google_sign_in_failed: "Something went wrong signing in with Google — try again.",
-  apple_sign_in_failed: "Something went wrong signing in with Apple — try again.",
+  google_sign_in_failed:
+    "Something went wrong signing in with Google — try again.",
+  apple_sign_in_failed:
+    "Something went wrong signing in with Apple — try again.",
 };
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -72,8 +74,13 @@ function OAuthCallbackInner() {
   if (error) {
     return (
       <Shell>
-        <p className="text-sm text-critical">{ERROR_MESSAGES[error] ?? "Sign-in failed."}</p>
-        <Link href="/login" className="mt-4 inline-block text-xs text-accent hover:underline">
+        <p className="text-sm text-critical">
+          {ERROR_MESSAGES[error] ?? "Sign-in failed."}
+        </p>
+        <Link
+          href="/login"
+          className="mt-4 inline-block text-xs text-accent hover:underline"
+        >
           Back to sign in
         </Link>
       </Shell>
@@ -84,7 +91,10 @@ function OAuthCallbackInner() {
     return (
       <Shell>
         <p className="text-sm text-critical">{exchangeError}</p>
-        <Link href="/login" className="mt-4 inline-block text-xs text-accent hover:underline">
+        <Link
+          href="/login"
+          className="mt-4 inline-block text-xs text-accent hover:underline"
+        >
           Back to sign in
         </Link>
       </Shell>
@@ -101,8 +111,13 @@ function OAuthCallbackInner() {
 
   return (
     <Shell>
-      <p className="text-sm text-critical">This sign-in link is missing what it needs — try again.</p>
-      <Link href="/login" className="mt-4 inline-block text-xs text-accent hover:underline">
+      <p className="text-sm text-critical">
+        This sign-in link is missing what it needs — try again.
+      </p>
+      <Link
+        href="/login"
+        className="mt-4 inline-block text-xs text-accent hover:underline"
+      >
         Back to sign in
       </Link>
     </Shell>

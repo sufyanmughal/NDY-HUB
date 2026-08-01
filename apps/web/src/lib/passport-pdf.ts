@@ -129,7 +129,12 @@ export function buildPassportPdf(data: PassportPdfData): jsPDF {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
   doc.setTextColor(COLORS.foreground);
-  centerText(doc, truncateToWidth(doc, data.fullName, CONTENT_WIDTH - 32), CENTER_X, cardTop + NAME_Y);
+  centerText(
+    doc,
+    truncateToWidth(doc, data.fullName, CONTENT_WIDTH - 32),
+    CENTER_X,
+    cardTop + NAME_Y,
+  );
 
   // NDY ID label + value
   doc.setFont("helvetica", "normal");
@@ -143,7 +148,14 @@ export function buildPassportPdf(data: PassportPdfData): jsPDF {
   centerText(doc, data.ndyId, CENTER_X, cardTop + ID_Y);
 
   // QR code
-  doc.addImage(data.qrDataUrl, "PNG", CENTER_X - QR_SIZE / 2, cardTop + QR_TOP, QR_SIZE, QR_SIZE);
+  doc.addImage(
+    data.qrDataUrl,
+    "PNG",
+    CENTER_X - QR_SIZE / 2,
+    cardTop + QR_TOP,
+    QR_SIZE,
+    QR_SIZE,
+  );
 
   // Status pill — filled at low opacity behind the text, the same visual
   // idea as the app's `bg-good/15 text-good` badges, done with jsPDF's
@@ -160,7 +172,15 @@ export function buildPassportPdf(data: PassportPdfData): jsPDF {
   doc.saveGraphicsState();
   doc.setGState(new GState({ opacity: 0.15 }));
   doc.setFillColor(statusColor);
-  doc.roundedRect(pillX, pillY, pillWidth, PILL_HEIGHT, PILL_HEIGHT / 2, PILL_HEIGHT / 2, "F");
+  doc.roundedRect(
+    pillX,
+    pillY,
+    pillWidth,
+    PILL_HEIGHT,
+    PILL_HEIGHT / 2,
+    PILL_HEIGHT / 2,
+    "F",
+  );
   doc.restoreGraphicsState();
 
   doc.setTextColor(statusColor);
@@ -227,7 +247,9 @@ export async function downloadPassportPdf(
   data: Omit<PassportPdfData, "photoDataUrl"> & { photoUrl?: string | null },
 ): Promise<void> {
   const { photoUrl, ...rest } = data;
-  const photoDataUrl = photoUrl ? await loadSquarePhotoDataUrl(photoUrl, 256).catch(() => null) : null;
+  const photoDataUrl = photoUrl
+    ? await loadSquarePhotoDataUrl(photoUrl, 256).catch(() => null)
+    : null;
   const doc = buildPassportPdf({ ...rest, photoDataUrl });
   doc.save(`ndy-passport-${data.ndyId}.pdf`);
 }
@@ -242,7 +264,10 @@ export async function downloadPassportPdf(
  * non-square upload doesn't get squashed into an oval by the PDF's
  * circular clip.
  */
-async function loadSquarePhotoDataUrl(photoUrl: string, size: number): Promise<string> {
+async function loadSquarePhotoDataUrl(
+  photoUrl: string,
+  size: number,
+): Promise<string> {
   const res = await fetch(photoUrl);
   if (!res.ok) throw new Error(`Failed to fetch photo: ${res.status}`);
   const blob = await res.blob();
@@ -255,11 +280,22 @@ async function loadSquarePhotoDataUrl(photoUrl: string, size: number): Promise<s
   const scale = Math.max(size / bitmap.width, size / bitmap.height);
   const drawWidth = bitmap.width * scale;
   const drawHeight = bitmap.height * scale;
-  ctx.drawImage(bitmap, (size - drawWidth) / 2, (size - drawHeight) / 2, drawWidth, drawHeight);
+  ctx.drawImage(
+    bitmap,
+    (size - drawWidth) / 2,
+    (size - drawHeight) / 2,
+    drawWidth,
+    drawHeight,
+  );
   return canvas.toDataURL("image/png");
 }
 
-function centerText(doc: jsPDF, text: string, centerX: number, y: number): void {
+function centerText(
+  doc: jsPDF,
+  text: string,
+  centerX: number,
+  y: number,
+): void {
   const width = doc.getTextWidth(text);
   doc.text(text, centerX - width / 2, y);
 }

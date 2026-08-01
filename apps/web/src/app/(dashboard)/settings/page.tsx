@@ -37,7 +37,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (auth.status !== "authenticated") return;
-    getMe(auth.accessToken)
+    getMe()
       .then(setProfile)
       .catch((err) => setLoadError((err as Error).message));
   }, [auth]);
@@ -49,8 +49,8 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-semibold">Settings</h1>
         <p className="mt-1 text-sm text-foreground-muted">
-          Profile details and account security. Notification preferences and recovery methods
-          land in a later milestone.
+          Profile details and account security. Notification preferences and
+          recovery methods land in a later milestone.
         </p>
       </div>
 
@@ -61,37 +61,34 @@ export default function SettingsPage() {
       )}
 
       {profile && profile.verificationLevel === "LEVEL_0" && (
-        <EmailVerificationBanner accessToken={auth.accessToken} />
+        <EmailVerificationBanner />
       )}
 
-      {profile && <ProfileForm accessToken={auth.accessToken} profile={profile} onSaved={setProfile} />}
-      <PasswordForm accessToken={auth.accessToken} />
-      {profile && <TwoFactorSection accessToken={auth.accessToken} profile={profile} onChanged={setProfile} />}
-      <PasskeysSection accessToken={auth.accessToken} />
-      <ConnectedAccountsSection accessToken={auth.accessToken} />
+      {profile && <ProfileForm profile={profile} onSaved={setProfile} />}
+      <PasswordForm />
+      {profile && <TwoFactorSection profile={profile} onChanged={setProfile} />}
+      <PasskeysSection />
+      <ConnectedAccountsSection />
       {profile && (
-        <DataPrivacySection
-          accessToken={auth.accessToken}
-          ndyId={profile.ndyId}
-          onAccountDeleted={logout}
-        />
+        <DataPrivacySection ndyId={profile.ndyId} onAccountDeleted={logout} />
       )}
     </div>
   );
 }
 
 function ProfileForm({
-  accessToken,
   profile,
   onSaved,
 }: {
-  accessToken: string;
   profile: MeProfile;
   onSaved: (profile: MeProfile) => void;
 }) {
   const [fullName, setFullName] = useState(profile.fullName ?? "");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ kind: "good" | "critical"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    kind: "good" | "critical";
+    text: string;
+  } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -102,7 +99,7 @@ function ProfileForm({
     setBusy(true);
     setMessage(null);
     try {
-      const updated = await updateProfile(accessToken, { fullName });
+      const updated = await updateProfile({ fullName });
       onSaved({ ...profile, ...updated });
       setMessage({ kind: "good", text: "Profile updated." });
     } catch (err) {
@@ -129,7 +126,7 @@ function ProfileForm({
     setPhotoError(null);
     setPhotoBusy(true);
     try {
-      const { profilePhotoUrl } = await uploadProfilePhoto(accessToken, file);
+      const { profilePhotoUrl } = await uploadProfilePhoto(file);
       onSaved({ ...profile, profilePhotoUrl });
     } catch (err) {
       setPhotoError((err as Error).message);
@@ -139,11 +136,18 @@ function ProfileForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-surface p-5">
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-lg border border-border bg-surface p-5"
+    >
       <h2 className="text-sm font-medium text-foreground-muted">Profile</h2>
 
       <div className="mt-4 flex items-center gap-4">
-        <Avatar photoUrl={profile.profilePhotoUrl} name={profile.fullName ?? profile.ndyId} size={56} />
+        <Avatar
+          photoUrl={profile.profilePhotoUrl}
+          name={profile.fullName ?? profile.ndyId}
+          size={56}
+        />
         <div>
           <input
             ref={fileInputRef}
@@ -160,19 +164,25 @@ function ProfileForm({
           >
             {photoBusy ? "Uploading…" : "Change photo"}
           </button>
-          <p className="mt-1 text-xs text-foreground-muted">JPEG, PNG, or WebP. Up to 5MB.</p>
+          <p className="mt-1 text-xs text-foreground-muted">
+            JPEG, PNG, or WebP. Up to 5MB.
+          </p>
         </div>
       </div>
       {photoError && <p className="mt-2 text-sm text-critical">{photoError}</p>}
 
-      <label className="mt-4 block text-xs uppercase tracking-wide text-foreground-muted">Email</label>
+      <label className="mt-4 block text-xs uppercase tracking-wide text-foreground-muted">
+        Email
+      </label>
       <input
         value={profile.email}
         disabled
         className="mt-1 w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-foreground-muted"
       />
 
-      <label className="mt-4 block text-xs uppercase tracking-wide text-foreground-muted">Full name</label>
+      <label className="mt-4 block text-xs uppercase tracking-wide text-foreground-muted">
+        Full name
+      </label>
       <input
         value={fullName}
         onChange={(e) => setFullName(e.target.value)}
@@ -180,7 +190,9 @@ function ProfileForm({
       />
 
       {message && (
-        <p className={`mt-3 text-sm ${message.kind === "good" ? "text-good" : "text-critical"}`}>
+        <p
+          className={`mt-3 text-sm ${message.kind === "good" ? "text-good" : "text-critical"}`}
+        >
           {message.text}
         </p>
       )}
@@ -196,16 +208,22 @@ function ProfileForm({
   );
 }
 
-function EmailVerificationBanner({ accessToken }: { accessToken: string }) {
+function EmailVerificationBanner() {
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ kind: "good" | "critical"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    kind: "good" | "critical";
+    text: string;
+  } | null>(null);
 
   async function handleResend() {
     setBusy(true);
     setMessage(null);
     try {
-      await resendEmailVerification(accessToken);
-      setMessage({ kind: "good", text: "Verification email sent — check your inbox." });
+      await resendEmailVerification();
+      setMessage({
+        kind: "good",
+        text: "Verification email sent — check your inbox.",
+      });
     } catch (err) {
       setMessage({ kind: "critical", text: (err as Error).message });
     } finally {
@@ -216,7 +234,9 @@ function EmailVerificationBanner({ accessToken }: { accessToken: string }) {
   return (
     <div className="rounded-lg border border-accent/30 bg-accent/10 p-4">
       <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-foreground">Your email address isn&apos;t verified yet.</p>
+        <p className="text-sm text-foreground">
+          Your email address isn&apos;t verified yet.
+        </p>
         <button
           onClick={handleResend}
           disabled={busy}
@@ -226,7 +246,9 @@ function EmailVerificationBanner({ accessToken }: { accessToken: string }) {
         </button>
       </div>
       {message && (
-        <p className={`mt-2 text-xs ${message.kind === "good" ? "text-good" : "text-critical"}`}>
+        <p
+          className={`mt-2 text-xs ${message.kind === "good" ? "text-good" : "text-critical"}`}
+        >
           {message.text}
         </p>
       )}
@@ -234,18 +256,21 @@ function EmailVerificationBanner({ accessToken }: { accessToken: string }) {
   );
 }
 
-function PasswordForm({ accessToken }: { accessToken: string }) {
+function PasswordForm() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ kind: "good" | "critical"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    kind: "good" | "critical";
+    text: string;
+  } | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setMessage(null);
     try {
-      await changePassword(accessToken, currentPassword, newPassword);
+      await changePassword(currentPassword, newPassword);
       setMessage({ kind: "good", text: "Password changed." });
       setCurrentPassword("");
       setNewPassword("");
@@ -257,7 +282,10 @@ function PasswordForm({ accessToken }: { accessToken: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-surface p-5">
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-lg border border-border bg-surface p-5"
+    >
       <h2 className="text-sm font-medium text-foreground-muted">Password</h2>
 
       <label className="mt-4 block text-xs uppercase tracking-wide text-foreground-muted">
@@ -282,7 +310,9 @@ function PasswordForm({ accessToken }: { accessToken: string }) {
       />
 
       {message && (
-        <p className={`mt-3 text-sm ${message.kind === "good" ? "text-good" : "text-critical"}`}>
+        <p
+          className={`mt-3 text-sm ${message.kind === "good" ? "text-good" : "text-critical"}`}
+        >
           {message.text}
         </p>
       )}
@@ -306,15 +336,15 @@ function PasswordForm({ accessToken }: { accessToken: string }) {
  * reasoning as the server-side check in TotpService.disable).
  */
 function TwoFactorSection({
-  accessToken,
   profile,
   onChanged,
 }: {
-  accessToken: string;
   profile: MeProfile;
   onChanged: (profile: MeProfile) => void;
 }) {
-  const [setupStep, setSetupStep] = useState<"idle" | "confirm" | "backup-codes">("idle");
+  const [setupStep, setSetupStep] = useState<
+    "idle" | "confirm" | "backup-codes"
+  >("idle");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [confirmCode, setConfirmCode] = useState("");
@@ -332,9 +362,11 @@ function TwoFactorSection({
     setBusy(true);
     setError(null);
     try {
-      const { secret, otpauthUri } = await begin2faSetup(accessToken);
+      const { secret, otpauthUri } = await begin2faSetup();
       setSecret(secret);
-      setQrDataUrl(await QRCode.toDataURL(otpauthUri, { margin: 1, width: 200 }));
+      setQrDataUrl(
+        await QRCode.toDataURL(otpauthUri, { margin: 1, width: 200 }),
+      );
       setSetupStep("confirm");
     } catch (err) {
       setError((err as Error).message);
@@ -348,7 +380,7 @@ function TwoFactorSection({
     setBusy(true);
     setError(null);
     try {
-      const { backupCodes } = await confirm2faSetup(accessToken, confirmCode);
+      const { backupCodes } = await confirm2faSetup(confirmCode);
       setBackupCodes(backupCodes);
       setSetupStep("backup-codes");
     } catch (err) {
@@ -372,7 +404,7 @@ function TwoFactorSection({
     setDisableBusy(true);
     setDisableError(null);
     try {
-      await disable2fa(accessToken, disablePassword, disableCode);
+      await disable2fa(disablePassword, disableCode);
       setDisableOpen(false);
       setDisablePassword("");
       setDisableCode("");
@@ -386,12 +418,15 @@ function TwoFactorSection({
 
   return (
     <div className="rounded-lg border border-border bg-surface p-5">
-      <h2 className="text-sm font-medium text-foreground-muted">Two-factor authentication</h2>
+      <h2 className="text-sm font-medium text-foreground-muted">
+        Two-factor authentication
+      </h2>
 
       {profile.twoFactorEnabled && setupStep === "idle" && (
         <div className="mt-3">
           <p className="text-sm text-foreground-muted">
-            Enabled — signing in requires a code from your authenticator app or a backup code.
+            Enabled — signing in requires a code from your authenticator app or
+            a backup code.
           </p>
           {!disableOpen ? (
             <button
@@ -423,7 +458,9 @@ function TwoFactorSection({
                   className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
                 />
               </div>
-              {disableError && <p className="text-sm text-critical">{disableError}</p>}
+              {disableError && (
+                <p className="text-sm text-critical">{disableError}</p>
+              )}
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -448,8 +485,8 @@ function TwoFactorSection({
       {!profile.twoFactorEnabled && setupStep === "idle" && (
         <div className="mt-3">
           <p className="text-sm text-foreground-muted">
-            Not enabled. Add an authenticator app (Google Authenticator, 1Password, Authy…) as a
-            second step when signing in.
+            Not enabled. Add an authenticator app (Google Authenticator,
+            1Password, Authy…) as a second step when signing in.
           </p>
           {error && <p className="mt-2 text-sm text-critical">{error}</p>}
           <button
@@ -465,11 +502,18 @@ function TwoFactorSection({
       {setupStep === "confirm" && (
         <div className="mt-3 space-y-3">
           <p className="text-sm text-foreground-muted">
-            Scan this QR code with your authenticator app, then enter the 6-digit code it shows.
+            Scan this QR code with your authenticator app, then enter the
+            6-digit code it shows.
           </p>
           {qrDataUrl && (
             /* eslint-disable-next-line @next/next/no-img-element -- a data: URL, not a remote image */
-            <img src={qrDataUrl} alt="2FA setup QR code" width={200} height={200} className="rounded-md" />
+            <img
+              src={qrDataUrl}
+              alt="2FA setup QR code"
+              width={200}
+              height={200}
+              className="rounded-md"
+            />
           )}
           {secret && (
             <p className="text-xs text-foreground-muted">
@@ -515,10 +559,13 @@ function TwoFactorSection({
 
       {setupStep === "backup-codes" && (
         <div className="mt-3 space-y-3">
-          <p className="text-sm font-medium text-good">Two-factor authentication is now enabled.</p>
+          <p className="text-sm font-medium text-good">
+            Two-factor authentication is now enabled.
+          </p>
           <p className="text-sm text-foreground-muted">
-            Save these backup codes somewhere safe — each works once, as a way back in if you lose
-            your authenticator app. They won&apos;t be shown again.
+            Save these backup codes somewhere safe — each works once, as a way
+            back in if you lose your authenticator app. They won&apos;t be shown
+            again.
           </p>
           <div className="grid grid-cols-2 gap-2 rounded-md border border-border bg-surface-2 p-3 font-mono text-sm">
             {backupCodes.map((c) => (
@@ -537,7 +584,7 @@ function TwoFactorSection({
   );
 }
 
-function PasskeysSection({ accessToken }: { accessToken: string }) {
+function PasskeysSection() {
   const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -551,7 +598,7 @@ function PasskeysSection({ accessToken }: { accessToken: string }) {
     // after a later add/remove would clobber the up-to-date list — same
     // "cancelled" pattern QrLoginCard uses for its QR data URL fetch.
     let cancelled = false;
-    getMyPasskeys(accessToken)
+    getMyPasskeys()
       .then((result) => {
         if (!cancelled) setPasskeys(result);
       })
@@ -561,7 +608,7 @@ function PasskeysSection({ accessToken }: { accessToken: string }) {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, []);
 
   async function handleAdd() {
     setBusy(true);
@@ -571,8 +618,10 @@ function PasskeysSection({ accessToken }: { accessToken: string }) {
       // rename it later without deleting and re-adding, but most people
       // never touch this beyond "does this list make sense to me."
       const label =
-        typeof navigator !== "undefined" ? guessDeviceLabel(navigator.userAgent) : undefined;
-      const created = await registerPasskey(accessToken, label);
+        typeof navigator !== "undefined"
+          ? guessDeviceLabel(navigator.userAgent)
+          : undefined;
+      const created = await registerPasskey(label);
       setPasskeys((prev) => [...(prev ?? []), created]);
     } catch (err) {
       setError((err as Error).message);
@@ -585,7 +634,7 @@ function PasskeysSection({ accessToken }: { accessToken: string }) {
     setRemovingId(id);
     setError(null);
     try {
-      await removeMyPasskey(accessToken, id);
+      await removeMyPasskey(id);
       setPasskeys((prev) => (prev ?? []).filter((p) => p.id !== id));
     } catch (err) {
       setError((err as Error).message);
@@ -598,12 +647,14 @@ function PasskeysSection({ accessToken }: { accessToken: string }) {
     <div className="rounded-lg border border-border bg-surface p-5">
       <h2 className="text-sm font-medium text-foreground-muted">Passkeys</h2>
       <p className="mt-2 text-sm text-foreground-muted">
-        Sign in with your fingerprint, face, or device PIN instead of a password — phishing
-        resistant, and nothing to remember.
+        Sign in with your fingerprint, face, or device PIN instead of a password
+        — phishing resistant, and nothing to remember.
       </p>
 
       {!supported && (
-        <p className="mt-3 text-sm text-critical">This browser doesn&apos;t support passkeys.</p>
+        <p className="mt-3 text-sm text-critical">
+          This browser doesn&apos;t support passkeys.
+        </p>
       )}
       {loadError && <p className="mt-3 text-sm text-critical">{loadError}</p>}
 
@@ -615,10 +666,14 @@ function PasskeysSection({ accessToken }: { accessToken: string }) {
               className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
             >
               <div>
-                <p className="font-medium">{p.deviceLabel ?? "Unnamed passkey"}</p>
+                <p className="font-medium">
+                  {p.deviceLabel ?? "Unnamed passkey"}
+                </p>
                 <p className="text-xs text-foreground-muted">
                   Added {new Date(p.createdAt).toLocaleDateString()}
-                  {p.lastUsedAt ? ` · last used ${new Date(p.lastUsedAt).toLocaleDateString()}` : ""}
+                  {p.lastUsedAt
+                    ? ` · last used ${new Date(p.lastUsedAt).toLocaleDateString()}`
+                    : ""}
                 </p>
               </div>
               <button
@@ -681,11 +736,16 @@ const PROVIDER_LABELS: Record<ConnectedAccount["provider"], string> = {
  * redirect via linkUserId server-side, so that case doesn't depend on
  * email matching to know which account to attach to.
  */
-function ConnectedAccountsSection({ accessToken }: { accessToken: string }) {
+function ConnectedAccountsSection() {
   const [accounts, setAccounts] = useState<ConnectedAccount[] | null>(null);
-  const [providers, setProviders] = useState<{ google: boolean; apple: boolean } | null>(null);
+  const [providers, setProviders] = useState<{
+    google: boolean;
+    apple: boolean;
+  } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [connectBusy, setConnectBusy] = useState<"GOOGLE" | "APPLE" | null>(null);
+  const [connectBusy, setConnectBusy] = useState<"GOOGLE" | "APPLE" | null>(
+    null,
+  );
   const [unlinkBusy, setUnlinkBusy] = useState<string | null>(null);
   // The connect flow lands back here via a real browser redirect (Settings'
   // "Connect" button navigates the whole page, same as Google/Apple sign-in
@@ -694,7 +754,9 @@ function ConnectedAccountsSection({ accessToken }: { accessToken: string }) {
   // state rather than set from an effect.
   const [actionError, setActionError] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
-    const linkError = new URLSearchParams(window.location.search).get("linkError");
+    const linkError = new URLSearchParams(window.location.search).get(
+      "linkError",
+    );
     if (!linkError) return null;
     return linkError === "already_linked_elsewhere"
       ? "That account is already connected to a different NDY HUB account."
@@ -710,7 +772,7 @@ function ConnectedAccountsSection({ accessToken }: { accessToken: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getConnectedAccounts(accessToken), getOAuthProviders()])
+    Promise.all([getConnectedAccounts(), getOAuthProviders()])
       .then(([accountsResult, providersResult]) => {
         if (cancelled) return;
         setAccounts(accountsResult);
@@ -722,13 +784,14 @@ function ConnectedAccountsSection({ accessToken }: { accessToken: string }) {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, []);
 
   // Purely clearing the URL, no state to set — a refresh shouldn't re-show
   // the notice/error above.
   useEffect(() => {
     const url = new URL(window.location.href);
-    if (!url.searchParams.has("linked") && !url.searchParams.has("linkError")) return;
+    if (!url.searchParams.has("linked") && !url.searchParams.has("linkError"))
+      return;
     url.searchParams.delete("linked");
     url.searchParams.delete("linkError");
     window.history.replaceState({}, "", url.toString());
@@ -738,7 +801,9 @@ function ConnectedAccountsSection({ accessToken }: { accessToken: string }) {
     setConnectBusy(provider);
     setActionError(null);
     try {
-      const url = await beginConnectOAuthProvider(accessToken, provider.toLowerCase() as "google" | "apple");
+      const url = await beginConnectOAuthProvider(
+        provider.toLowerCase() as "google" | "apple",
+      );
       window.location.href = url;
     } catch (err) {
       setActionError((err as Error).message);
@@ -750,7 +815,7 @@ function ConnectedAccountsSection({ accessToken }: { accessToken: string }) {
     setUnlinkBusy(id);
     setActionError(null);
     try {
-      await unlinkConnectedAccount(accessToken, id);
+      await unlinkConnectedAccount(id);
       setAccounts((prev) => (prev ?? []).filter((a) => a.id !== id));
     } catch (err) {
       setActionError((err as Error).message);
@@ -763,14 +828,19 @@ function ConnectedAccountsSection({ accessToken }: { accessToken: string }) {
 
   return (
     <div className="rounded-lg border border-border bg-surface p-5">
-      <h2 className="text-sm font-medium text-foreground-muted">Connected accounts</h2>
+      <h2 className="text-sm font-medium text-foreground-muted">
+        Connected accounts
+      </h2>
       <p className="mt-2 text-sm text-foreground-muted">
-        Sign in faster with Google or Apple, or attach one to this account for a backup way in.
+        Sign in faster with Google or Apple, or attach one to this account for a
+        backup way in.
       </p>
 
       {notice && <p className="mt-3 text-sm text-good">{notice}</p>}
       {loadError && <p className="mt-3 text-sm text-critical">{loadError}</p>}
-      {actionError && <p className="mt-3 text-sm text-critical">{actionError}</p>}
+      {actionError && (
+        <p className="mt-3 text-sm text-critical">{actionError}</p>
+      )}
 
       {accounts && accounts.length > 0 && (
         <ul className="mt-4 space-y-2">
@@ -782,7 +852,8 @@ function ConnectedAccountsSection({ accessToken }: { accessToken: string }) {
               <div>
                 <p className="font-medium">{PROVIDER_LABELS[a.provider]}</p>
                 <p className="text-xs text-foreground-muted">
-                  {a.email ?? "No email on file"} · connected {new Date(a.createdAt).toLocaleDateString()}
+                  {a.email ?? "No email on file"} · connected{" "}
+                  {new Date(a.createdAt).toLocaleDateString()}
                 </p>
               </div>
               <button
@@ -816,22 +887,24 @@ function ConnectedAccountsSection({ accessToken }: { accessToken: string }) {
             {connectBusy === "APPLE" ? "Redirecting…" : "Connect Apple"}
           </button>
         )}
-        {providers && !providers.google && !providers.apple && accounts?.length === 0 && (
-          <p className="text-xs text-foreground-muted">
-            Google and Apple sign-in aren&apos;t configured on this server yet.
-          </p>
-        )}
+        {providers &&
+          !providers.google &&
+          !providers.apple &&
+          accounts?.length === 0 && (
+            <p className="text-xs text-foreground-muted">
+              Google and Apple sign-in aren&apos;t configured on this server
+              yet.
+            </p>
+          )}
       </div>
     </div>
   );
 }
 
 function DataPrivacySection({
-  accessToken,
   ndyId,
   onAccountDeleted,
 }: {
-  accessToken: string;
   ndyId: string;
   onAccountDeleted: () => void;
 }) {
@@ -847,7 +920,7 @@ function DataPrivacySection({
     setExportBusy(true);
     setExportError(null);
     try {
-      await downloadDataExport(accessToken, ndyId);
+      await downloadDataExport(ndyId);
     } catch (err) {
       setExportError((err as Error).message);
     } finally {
@@ -860,7 +933,7 @@ function DataPrivacySection({
     setDeleteBusy(true);
     setDeleteError(null);
     try {
-      await deleteAccount(accessToken, password);
+      await deleteAccount(password);
       // The account is anonymized and every session/connection revoked
       // server-side the moment this resolves — clear the local session too
       // so DashboardGate sends this tab back to /login immediately.
@@ -873,9 +946,12 @@ function DataPrivacySection({
 
   return (
     <div className="rounded-lg border border-border bg-surface p-5">
-      <h2 className="text-sm font-medium text-foreground-muted">Data &amp; Privacy</h2>
+      <h2 className="text-sm font-medium text-foreground-muted">
+        Data &amp; Privacy
+      </h2>
       <p className="mt-2 text-sm text-foreground-muted">
-        Download a copy of everything tied to your account, or permanently delete it.
+        Download a copy of everything tied to your account, or permanently
+        delete it.
       </p>
 
       <button
@@ -885,14 +961,17 @@ function DataPrivacySection({
       >
         {exportBusy ? "Preparing…" : "Export my data"}
       </button>
-      {exportError && <p className="mt-2 text-sm text-critical">{exportError}</p>}
+      {exportError && (
+        <p className="mt-2 text-sm text-critical">{exportError}</p>
+      )}
 
       <div className="mt-6 border-t border-critical/20 pt-5">
         <h3 className="text-sm font-medium text-critical">Delete account</h3>
         <p className="mt-1 text-xs text-foreground-muted">
-          Your profile, email, and password are permanently wiped, and every device and
-          connected website is signed out. Purchase and membership history is retained for
-          legal/financial record-keeping, no longer linked to identifying information.
+          Your profile, email, and password are permanently wiped, and every
+          device and connected website is signed out. Purchase and membership
+          history is retained for legal/financial record-keeping, no longer
+          linked to identifying information.
         </p>
 
         {!confirmOpen ? (
@@ -926,7 +1005,9 @@ function DataPrivacySection({
               />
             </div>
 
-            {deleteError && <p className="text-sm text-critical">{deleteError}</p>}
+            {deleteError && (
+              <p className="text-sm text-critical">{deleteError}</p>
+            )}
 
             <div className="flex gap-3">
               <button

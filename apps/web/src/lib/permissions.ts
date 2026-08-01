@@ -25,7 +25,13 @@ const ALL_PERMISSIONS: Permission[] = [
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   USER: [],
   FOUNDER: ALL_PERMISSIONS,
-  SUPER_ADMIN: ["MANAGE_USERS", "MANAGE_ROLES", "MANAGE_OAUTH_CLIENTS", "MANAGE_SUPPORT_TICKETS", "VIEW_AUDIT_LOG"],
+  SUPER_ADMIN: [
+    "MANAGE_USERS",
+    "MANAGE_ROLES",
+    "MANAGE_OAUTH_CLIENTS",
+    "MANAGE_SUPPORT_TICKETS",
+    "VIEW_AUDIT_LOG",
+  ],
   DEVELOPER: ["MANAGE_OAUTH_CLIENTS"],
   FINANCE: ["VIEW_FINANCIALS"],
   SUPPORT: ["MANAGE_SUPPORT_TICKETS"],
@@ -34,11 +40,17 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   AUDITOR: ["VIEW_AUDIT_LOG"],
 };
 
-export function roleHasPermission(role: UserRole | undefined, permission: Permission): boolean {
+export function roleHasPermission(
+  role: UserRole | undefined,
+  permission: Permission,
+): boolean {
   if (!role) return false;
   return ROLE_PERMISSIONS[role].includes(permission);
 }
 
-export function roleHasAnyPermission(role: UserRole | undefined, permissions: Permission[]): boolean {
+export function roleHasAnyPermission(
+  role: UserRole | undefined,
+  permissions: Permission[],
+): boolean {
   return permissions.some((p) => roleHasPermission(role, p));
 }

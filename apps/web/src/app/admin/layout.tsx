@@ -10,7 +10,11 @@ import { useAuth } from "@/lib/auth-context";
 // actually an admin is enforced by the server (JwtAuthGuard + AdminGuard on
 // every /admin/* endpoint) and surfaced as a 403 in the page itself, not
 // hidden client-side.
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { auth } = useAuth();
   const router = useRouter();
 
@@ -21,7 +25,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (auth.status !== "authenticated") {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-foreground-muted">
-        {auth.status === "loading" ? "Checking your session…" : "Redirecting to login…"}
+        {auth.status === "loading"
+          ? "Checking your session…"
+          : "Redirecting to login…"}
       </div>
     );
   }

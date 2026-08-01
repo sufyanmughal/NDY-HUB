@@ -9,7 +9,15 @@ import { useTransactions } from "@/lib/use-transactions";
 // where the precise state machine lives.
 function toneFor(status: string): "good" | "warn" | "critical" | "neutral" {
   if (["CANCELLED", "REFUNDED", "EXPIRED"].includes(status)) return "critical";
-  if (["ACTIVE", "AVAILABLE", "DISTRIBUTED_ON_CHAIN", "VERIFIED", "PAYMENT_CONFIRMED"].includes(status))
+  if (
+    [
+      "ACTIVE",
+      "AVAILABLE",
+      "DISTRIBUTED_ON_CHAIN",
+      "VERIFIED",
+      "PAYMENT_CONFIRMED",
+    ].includes(status)
+  )
     return "good";
   if (["ALLOCATED", "LOCKED", "UNDER_REVIEW"].includes(status)) return "warn";
   return "neutral";
@@ -40,19 +48,28 @@ export default function TransactionsPage() {
       <div className="rounded-lg border border-border bg-surface p-5">
         {transactions && transactions.length === 0 ? (
           <p className="text-sm text-foreground-muted">
-            No transactions yet — memberships and CRYNDY purchases will show up here.
+            No transactions yet — memberships and CRYNDY purchases will show up
+            here.
           </p>
         ) : (
           <ul className="divide-y divide-border">
             {transactions?.map((txn) => (
-              <li key={txn.id} className="flex items-center justify-between py-3 text-sm">
+              <li
+                key={txn.id}
+                className="flex items-center justify-between py-3 text-sm"
+              >
                 <div>
                   <div className="font-medium">{txn.label}</div>
-                  <div className="text-xs text-foreground-muted">{txn.detail}</div>
+                  <div className="text-xs text-foreground-muted">
+                    {txn.detail}
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="font-mono tabular-nums">
-                    {txn.amount.toLocaleString(undefined, { style: "currency", currency: txn.currency })}
+                    {txn.amount.toLocaleString(undefined, {
+                      style: "currency",
+                      currency: txn.currency,
+                    })}
                   </div>
                   <div className="mt-1 flex items-center justify-end gap-2">
                     <span

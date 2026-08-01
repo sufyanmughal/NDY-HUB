@@ -13,7 +13,12 @@ import { AreaSparkline } from "./area-sparkline";
 // ---------- CTA arrow (used on every feature card) ----------
 function CtaArrow() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.4}
+    >
       <path d="M5 12h14M13 6l6 6-6 6" />
     </svg>
   );
@@ -22,45 +27,80 @@ function CtaArrow() {
 // ---------- feature card icons (exact paths from the reference) ----------
 const CARD_ICONS = {
   login: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <rect x="4.5" y="10.5" width="15" height="10" rx="2" />
       <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
     </svg>
   ),
   passport: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <rect x="3.5" y="5" width="17" height="14" rx="2.2" />
       <circle cx="9.3" cy="11" r="1.9" />
       <path d="M6 16c.7-1.7 2-2.5 3.3-2.5s2.6.8 3.3 2.5M14.5 9.5h4M14.5 12.5h4" />
     </svg>
   ),
   founder: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <path d="M12 2.5c2.8 1.6 4.6 4.6 4.6 9 0 3-1.2 5.6-2.3 7l-2.3 3-2.3-3c-1.1-1.4-2.3-4-2.3-7 0-4.4 1.8-7.4 4.6-9Z" />
       <circle cx="12" cy="10.5" r="1.8" />
       <path d="M8 17.5c-1.8.6-3 1.6-3 2.7 0 1.5 3.1 2.3 7 2.3s7-.8 7-2.3c0-1.1-1.2-2.1-3-2.7" />
     </svg>
   ),
   admin: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <path d="M12 2.5 19 5.5v5.5c0 5-3 8.2-7 9.5-4-1.3-7-4.5-7-9.5V5.5Z" />
       <circle cx="12" cy="11" r="2.6" />
       <path d="M12 13.2v1.6M12 6.4V8M15.8 11h1.6M6.6 11h1.6" />
     </svg>
   ),
   api: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <path d="m9 8-4.5 4L9 16M15 8l4.5 4L15 16" />
     </svg>
   ),
   developer: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <rect x="3.5" y="5" width="17" height="11.5" rx="1.6" />
       <path d="M2 20h20M9.5 10.2l-1.7 1.7 1.7 1.7M14.5 10.2l1.7 1.7-1.7 1.7" />
     </svg>
   ),
   finance: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <circle cx="12" cy="12" r="8.5" />
       <path d="M12 7.5v9M14.8 9.8c0-1.3-1.3-2.3-2.8-2.3s-2.8.9-2.8 2.1c0 3 5.6 1.5 5.6 4.4 0 1.2-1.3 2.1-2.8 2.1s-2.8-1-2.8-2.3" />
     </svg>
@@ -106,7 +146,13 @@ export function LauncherCardView({ card }: { card: LauncherCard }) {
   }
   if (card.external) {
     return (
-      <a className="hp-card" style={style} href={card.href} target="_blank" rel="noreferrer">
+      <a
+        className="hp-card"
+        style={style}
+        href={card.href}
+        target="_blank"
+        rel="noreferrer"
+      >
         {inner}
       </a>
     );
@@ -131,7 +177,12 @@ export function FeatureCardGrid({ cards }: { cards: LauncherCard[] }) {
 // ---------- stats bar ----------
 const STAT_ICONS = {
   users: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <circle cx="9" cy="9" r="3.2" />
       <path d="M3.5 19c1-3 3-4.5 5.5-4.5s4.5 1.5 5.5 4.5" />
       <circle cx="17" cy="9.5" r="2.6" />
@@ -139,32 +190,57 @@ const STAT_ICONS = {
     </svg>
   ),
   layers: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <path d="M12 3 3 8l9 5 9-5-9-5Z" />
       <path d="m3 13 9 5 9-5" />
     </svg>
   ),
   shieldCheck: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <path d="M12 2.5 19 5.5v5.5c0 5-3 8.2-7 9.5-4-1.3-7-4.5-7-9.5V5.5Z" />
       <path d="m9 11.5 2 2 4-4.2" />
     </svg>
   ),
   coins: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <circle cx="9" cy="9" r="5.2" />
       <path d="M9.5 15.8a5.2 5.2 0 1 0 0-10.6" />
       <circle cx="15" cy="15" r="5.2" />
     </svg>
   ),
   boxes: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <path d="M12 3 4 7v10l8 4 8-4V7Z" />
       <path d="M4 7l8 4 8-4M12 11v10" />
     </svg>
   ),
   activity: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
       <path d="M5 20V10M12 20V4M19 20v-7" />
     </svg>
   ),
@@ -183,10 +259,16 @@ export function StatsBar({ items }: { items: StatItem[] }) {
   return (
     <section className="hp-stats">
       {items.map((item) => (
-        <div key={item.label} className="hp-stat" style={{ "--stat-c": item.color } as CSSProperties}>
+        <div
+          key={item.label}
+          className="hp-stat"
+          style={{ "--stat-c": item.color } as CSSProperties}
+        >
           <div className="hp-stat-icon">{STAT_ICONS[item.icon]}</div>
           <div>
-            <div className="hp-stat-value">{item.value === undefined ? "…" : item.value.toLocaleString()}</div>
+            <div className="hp-stat-value">
+              {item.value === undefined ? "…" : item.value.toLocaleString()}
+            </div>
             <div className="hp-stat-label">{item.label}</div>
           </div>
         </div>
@@ -215,7 +297,10 @@ export function TokenCard({
 }) {
   return (
     <div className="hp-token-card">
-      <div className="hp-token-icon" style={{ "--tok-c": color } as CSSProperties}>
+      <div
+        className="hp-token-icon"
+        style={{ "--tok-c": color } as CSSProperties}
+      >
         {icon}
       </div>
       <div>
@@ -225,13 +310,17 @@ export function TokenCard({
       <div className="hp-token-price-block">
         <div className="hp-token-price">{price}</div>
         {changePct !== null && (
-          <div className={`hp-token-change ${changePct >= 0 ? "hp-up" : "hp-down"}`}>
+          <div
+            className={`hp-token-change ${changePct >= 0 ? "hp-up" : "hp-down"}`}
+          >
             <svg
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth={3}
-              style={{ transform: changePct >= 0 ? undefined : "rotate(180deg)" }}
+              style={{
+                transform: changePct >= 0 ? undefined : "rotate(180deg)",
+              }}
             >
               <path d="m6 15 6-6 6 6" />
             </svg>
@@ -242,7 +331,9 @@ export function TokenCard({
       {chartValues && chartValues.length >= 2 ? (
         <AreaSparkline values={chartValues} color={color} />
       ) : (
-        <span style={{ fontSize: 11, color: "var(--hp-fg-muted)" }}>No data yet</span>
+        <span style={{ fontSize: 11, color: "var(--hp-fg-muted)" }}>
+          No data yet
+        </span>
       )}
     </div>
   );
@@ -251,41 +342,76 @@ export function TokenCard({
 // ---------- ecosystem directory ----------
 const ECO_ICONS: Record<string, ReactNode> = {
   ndjoyit: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.4}
+    >
       <path d="M6 6l12 12M18 6 6 18" />
     </svg>
   ),
   ndyapps: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+    >
       <path d="M4 5h16v11H8l-4 4V5Z" />
     </svg>
   ),
   ndystays: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+    >
       <path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9" />
     </svg>
   ),
   ndyxtra: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+    >
       <path d="M4 21V9l8-6 8 6v12" />
       <path d="M9 21v-6h6v6" />
     </svg>
   ),
   ndyquiz: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+    >
       <path d="M6 3h12l3 5-9 12L3 8Z" />
       <path d="M3 8h18M9 3l1 5-3 0M15 3l-1 5 3 0" />
     </svg>
   ),
   cryndy: <span style={{ fontWeight: 800, fontSize: 15 }}>C</span>,
   ndynex: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+    >
       <path d="M12 2.5 19 5.5v5.5c0 5-3 8.2-7 9.5-4-1.3-7-4.5-7-9.5V5.5Z" />
       <path d="m9 11.5 2 2 4-4.2" />
     </svg>
   ),
   ndycollect: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+    >
       <rect x="4" y="4" width="7" height="7" rx="1.3" />
       <rect x="13" y="4" width="7" height="7" rx="1.3" />
       <rect x="4" y="13" width="7" height="7" rx="1.3" />
@@ -302,14 +428,61 @@ const ECOSYSTEM_ITEMS: {
   href?: string;
   comingSoon?: boolean;
 }[] = [
-  { key: "ndjoyit", label: "NDJOYIT", sub: "Lifestyle Platform", color: "#22c55e" },
-  { key: "ndyapps", label: "NDYAPPS", sub: "Smart Messaging", color: "#4f7cff", comingSoon: true },
-  { key: "ndystays", label: "NDYSTAYS", sub: "Travel & Stays", color: "#ec4899", comingSoon: true },
-  { key: "ndyxtra", label: "NDYXTRA", sub: "AI Marketplace", color: "#f97316", comingSoon: true },
-  { key: "ndyquiz", label: "NDYQUIZ", sub: "Learn · Play · Earn", color: "#8b5cf6", comingSoon: true },
-  { key: "cryndy", label: "CRYNDY", sub: "Community Token", color: "#8b5cf6", href: "/cryndy" },
-  { key: "ndynex", label: "NDYNEX", sub: "Crypto & Bitcoin", color: "#f97316", comingSoon: true },
-  { key: "ndycollect", label: "NDYCOLLECT", sub: "Collectibles", color: "#4f7cff", comingSoon: true },
+  {
+    key: "ndjoyit",
+    label: "NDJOYIT",
+    sub: "Lifestyle Platform",
+    color: "#22c55e",
+  },
+  {
+    key: "ndyapps",
+    label: "NDYAPPS",
+    sub: "Smart Messaging",
+    color: "#4f7cff",
+    comingSoon: true,
+  },
+  {
+    key: "ndystays",
+    label: "NDYSTAYS",
+    sub: "Travel & Stays",
+    color: "#ec4899",
+    comingSoon: true,
+  },
+  {
+    key: "ndyxtra",
+    label: "NDYXTRA",
+    sub: "AI Marketplace",
+    color: "#f97316",
+    comingSoon: true,
+  },
+  {
+    key: "ndyquiz",
+    label: "NDYQUIZ",
+    sub: "Learn · Play · Earn",
+    color: "#8b5cf6",
+    comingSoon: true,
+  },
+  {
+    key: "cryndy",
+    label: "CRYNDY",
+    sub: "Community Token",
+    color: "#8b5cf6",
+    href: "/cryndy",
+  },
+  {
+    key: "ndynex",
+    label: "NDYNEX",
+    sub: "Crypto & Bitcoin",
+    color: "#f97316",
+    comingSoon: true,
+  },
+  {
+    key: "ndycollect",
+    label: "NDYCOLLECT",
+    sub: "Collectibles",
+    color: "#4f7cff",
+    comingSoon: true,
+  },
 ];
 
 export function EcosystemDirectory() {
@@ -320,7 +493,10 @@ export function EcosystemDirectory() {
         {ECOSYSTEM_ITEMS.map((item) => {
           const content = (
             <>
-              <div className="hp-eco-icon" style={{ "--eco-c": item.color } as CSSProperties}>
+              <div
+                className="hp-eco-icon"
+                style={{ "--eco-c": item.color } as CSSProperties}
+              >
                 {ECO_ICONS[item.key]}
               </div>
               <div>
@@ -337,7 +513,10 @@ export function EcosystemDirectory() {
             );
           }
           return (
-            <div key={item.key} className={`hp-eco-item ${item.comingSoon ? "hp-eco-disabled" : ""}`}>
+            <div
+              key={item.key}
+              className={`hp-eco-item ${item.comingSoon ? "hp-eco-disabled" : ""}`}
+            >
               {content}
             </div>
           );
@@ -348,18 +527,24 @@ export function EcosystemDirectory() {
 }
 
 // ---------- hero ----------
-export function EcosystemHero({ eyebrow = "Welcome to NDY HUB" }: { eyebrow?: string }) {
+export function EcosystemHero({
+  eyebrow = "Welcome to NDY HUB",
+}: {
+  eyebrow?: string;
+}) {
   return (
     <section className="hp-hero">
       <div className="hp-earth" />
       <div className="hp-stars" />
       <p className="hp-eyebrow">{eyebrow}</p>
       <h1>
-        One Identity. One Passport. <span className="hp-grad">One Ecosystem.</span>
+        One Identity. One Passport.{" "}
+        <span className="hp-grad">One Ecosystem.</span>
       </h1>
       <p>
-        NDY HUB is your central gateway to everything in the NDJOYIT ecosystem — manage your
-        identity, connect platforms, and help build a global ecosystem.
+        NDY HUB is your central gateway to everything in the NDJOYIT ecosystem —
+        manage your identity, connect platforms, and help build a global
+        ecosystem.
       </p>
     </section>
   );
@@ -385,9 +570,16 @@ export function HomepageFooter() {
         <span>Status</span>
       </nav>
       <div className="hp-footer-right">
-        <span className="hp-footer-copy">&copy; {new Date().getFullYear()} NDJOYIT. All rights reserved.</span>
+        <span className="hp-footer-copy">
+          &copy; {new Date().getFullYear()} NDJOYIT. All rights reserved.
+        </span>
         <a href="#top" aria-label="Scroll to top" className="hp-to-top">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.2}
+          >
             <path d="M12 19V5M5 12l7-7 7 7" />
           </svg>
         </a>
@@ -403,14 +595,22 @@ function BrandMarkSmall() {
         width: 30,
         height: 30,
         borderRadius: "50%",
-        background: "radial-gradient(circle at 35% 30%, #6d8cff, #4f7cff 45%, #8b5cf6 100%)",
+        background:
+          "radial-gradient(circle at 35% 30%, #6d8cff, #4f7cff 45%, #8b5cf6 100%)",
         boxShadow: "0 0 18px rgba(79, 124, 255, 0.55)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={1.6} width={16} height={16}>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#fff"
+        strokeWidth={1.6}
+        width={16}
+        height={16}
+      >
         <circle cx="12" cy="12" r="9.5" />
         <circle cx="12" cy="12" r="6" />
         <circle cx="12" cy="12" r="2.2" fill="#fff" stroke="none" />

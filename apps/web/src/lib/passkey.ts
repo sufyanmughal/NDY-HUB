@@ -1,4 +1,7 @@
-import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
+import {
+  startRegistration,
+  startAuthentication,
+} from "@simplewebauthn/browser";
 import {
   beginPasskeyRegistration,
   verifyPasskeyRegistration,
@@ -16,12 +19,11 @@ import {
  * the user cancels the prompt — callers show that message as-is.
  */
 export async function registerPasskey(
-  accessToken: string,
   deviceLabel?: string,
 ): Promise<PasskeySummary> {
-  const { options, challengeId } = await beginPasskeyRegistration(accessToken);
+  const { options, challengeId } = await beginPasskeyRegistration();
   const response = await startRegistration({ optionsJSON: options });
-  return verifyPasskeyRegistration(accessToken, challengeId, response, deviceLabel);
+  return verifyPasskeyRegistration(challengeId, response, deviceLabel);
 }
 
 /**

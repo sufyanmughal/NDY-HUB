@@ -13,7 +13,10 @@ import * as bcrypt from 'bcrypt';
 // pulls them in and crashes under Vercel's per-file CJS transpilation.
 // @otplib/totp has no such fallback logic and no plugin dependencies at all.
 import { TOTP } from '@otplib/totp';
-import { NodeCryptoPlugin, NodeBase32Plugin } from '../common/otplib-node-plugins';
+import {
+  NodeCryptoPlugin,
+  NodeBase32Plugin,
+} from '../common/otplib-node-plugins';
 import { customAlphabet } from 'nanoid';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';

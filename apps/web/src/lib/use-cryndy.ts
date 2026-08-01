@@ -14,7 +14,7 @@ export function useCryndySummary(): CryndySummary | null {
   useEffect(() => {
     if (auth.status !== "authenticated") return;
     let cancelled = false;
-    getMyCryndy(auth.accessToken)
+    getMyCryndy()
       .then((result) => {
         if (!cancelled) setSummary(result);
       })

@@ -38,7 +38,9 @@ export function Topbar() {
         />
       </div>
       <div className="ml-auto flex items-center gap-4 text-sm text-foreground-muted md:ml-0">
-        <span className="hidden font-mono text-xs tracking-wide sm:inline">{auth.ndyId}</span>
+        <span className="hidden font-mono text-xs tracking-wide sm:inline">
+          {auth.ndyId}
+        </span>
         <button
           type="button"
           title="Notifications — not built yet"
@@ -52,7 +54,11 @@ export function Topbar() {
         >
           Log out
         </button>
-        <Avatar photoUrl={passport?.profilePhotoUrl} name={displayName} size={32} />
+        <Avatar
+          photoUrl={passport?.profilePhotoUrl}
+          name={displayName}
+          size={32}
+        />
       </div>
     </header>
   );

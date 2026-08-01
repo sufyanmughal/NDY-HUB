@@ -6,7 +6,10 @@ import { Check, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { confirmEmailVerification } from "@/lib/api";
 
-type ConfirmPhase = { phase: "loading" } | { phase: "success" } | { phase: "error"; message: string };
+type ConfirmPhase =
+  | { phase: "loading" }
+  | { phase: "success" }
+  | { phase: "error"; message: string };
 
 function VerifyEmailPageInner() {
   const searchParams = useSearchParams();
@@ -30,7 +33,10 @@ function VerifyEmailPageInner() {
 
   const effective: ConfirmPhase = token
     ? state
-    : { phase: "error", message: "This verification link is missing its token." };
+    : {
+        phase: "error",
+        message: "This verification link is missing its token.",
+      };
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 p-6">
@@ -68,8 +74,8 @@ function VerifyEmailPageInner() {
             </div>
             <p className="mt-3 text-sm">{effective.message}</p>
             <p className="mt-3 text-xs text-foreground-muted">
-              Verification links expire after 24 hours or after one use — request a new one from
-              Settings once you&apos;re signed in.
+              Verification links expire after 24 hours or after one use —
+              request a new one from Settings once you&apos;re signed in.
             </p>
           </div>
         )}

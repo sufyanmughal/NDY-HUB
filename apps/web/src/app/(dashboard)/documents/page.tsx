@@ -17,19 +17,17 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     if (auth.status !== "authenticated") return;
-    getMyDocuments(auth.accessToken)
+    getMyDocuments()
       .then(setDocuments)
       .catch((err) => setError((err as Error).message));
   }, [auth]);
 
   if (auth.status !== "authenticated") return null;
-  const accessToken = auth.accessToken;
-
   async function handleDownload(doc: DocumentStub) {
     setBusyId(doc.id);
     setError(null);
     try {
-      await downloadDocument(accessToken, doc.id, `${doc.id}.txt`);
+      await downloadDocument(doc.id, `${doc.id}.txt`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -42,7 +40,8 @@ export default function DocumentsPage() {
       <div>
         <h1 className="text-2xl font-semibold">Documents</h1>
         <p className="mt-1 text-sm text-foreground-muted">
-          Membership confirmations and CRYNDY certificates, generated from your account.
+          Membership confirmations and CRYNDY certificates, generated from your
+          account.
         </p>
       </div>
 
@@ -55,17 +54,21 @@ export default function DocumentsPage() {
       <div className="rounded-lg border border-border bg-surface p-5">
         {documents && documents.length === 0 ? (
           <p className="text-sm text-foreground-muted">
-            No documents yet — a membership confirmation or CRYNDY certificate shows up here once
-            you have one.
+            No documents yet — a membership confirmation or CRYNDY certificate
+            shows up here once you have one.
           </p>
         ) : (
           <ul className="divide-y divide-border">
             {documents?.map((doc) => (
-              <li key={doc.id} className="flex items-center justify-between py-3 text-sm">
+              <li
+                key={doc.id}
+                className="flex items-center justify-between py-3 text-sm"
+              >
                 <div>
                   <div className="font-medium">{doc.title}</div>
                   <div className="text-xs text-foreground-muted">
-                    {TYPE_LABELS[doc.type]} · {new Date(doc.date).toLocaleDateString()}
+                    {TYPE_LABELS[doc.type]} ·{" "}
+                    {new Date(doc.date).toLocaleDateString()}
                   </div>
                 </div>
                 <button
@@ -82,8 +85,8 @@ export default function DocumentsPage() {
       </div>
 
       <p className="text-xs text-foreground-muted">
-        Documents are generated as plain-text receipts for now — branded PDF invoices and
-        certificates are a later milestone.
+        Documents are generated as plain-text receipts for now — branded PDF
+        invoices and certificates are a later milestone.
       </p>
     </div>
   );

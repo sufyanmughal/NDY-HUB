@@ -3,11 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { CreditCard, Coins, Boxes } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { getFinancialSummary, ApiError, type FinancialSummary } from "@/lib/api";
+import {
+  getFinancialSummary,
+  ApiError,
+  type FinancialSummary,
+} from "@/lib/api";
 import { StatTile } from "@/components/stat-tile";
 
 function formatCents(cents: number): string {
-  return (cents / 100).toLocaleString(undefined, { style: "currency", currency: "USD" });
+  return (cents / 100).toLocaleString(undefined, {
+    style: "currency",
+    currency: "USD",
+  });
 }
 
 export default function FinancialsPage() {
@@ -18,7 +25,7 @@ export default function FinancialsPage() {
 
   const refresh = useCallback(() => {
     if (auth.status !== "authenticated") return;
-    getFinancialSummary(auth.accessToken)
+    getFinancialSummary()
       .then(setSummary)
       .catch((err) => {
         if (err instanceof ApiError && err.status === 403) {
@@ -38,9 +45,12 @@ export default function FinancialsPage() {
   if (accessDenied) {
     return (
       <div className="rounded-lg border border-critical/30 bg-critical/10 p-6 text-center">
-        <p className="text-sm font-medium text-critical">Finance access required.</p>
+        <p className="text-sm font-medium text-critical">
+          Finance access required.
+        </p>
         <p className="mt-1 text-xs text-foreground-muted">
-          {auth.ndyId} is signed in but doesn&apos;t have financial visibility on this server.
+          {auth.ndyId} is signed in but doesn&apos;t have financial visibility
+          on this server.
         </p>
       </div>
     );
@@ -92,7 +102,9 @@ export default function FinancialsPage() {
         />
       </div>
 
-      {summary && <p className="text-xs text-foreground-muted">{summary.revenue.note}</p>}
+      {summary && (
+        <p className="text-xs text-foreground-muted">{summary.revenue.note}</p>
+      )}
     </div>
   );
 }

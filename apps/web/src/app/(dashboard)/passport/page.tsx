@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { Download, Users, Coins, Boxes, Link2, ShieldCheck, type LucideIcon } from "lucide-react";
+import {
+  Download,
+  Users,
+  Coins,
+  Boxes,
+  Link2,
+  ShieldCheck,
+  type LucideIcon,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { usePassport } from "@/lib/use-passport";
 import { useCryndySummary } from "@/lib/use-cryndy";
@@ -33,9 +41,11 @@ export default function PassportPage() {
     if (!ndyId) return;
     let cancelled = false;
     const publicPassportUrl = `${API_BASE_URL}/passport/${ndyId}`;
-    QRCode.toDataURL(publicPassportUrl, { margin: 1, width: 240 }).then((url) => {
-      if (!cancelled) setQrDataUrl(url);
-    });
+    QRCode.toDataURL(publicPassportUrl, { margin: 1, width: 240 }).then(
+      (url) => {
+        if (!cancelled) setQrDataUrl(url);
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -51,7 +61,8 @@ export default function PassportPage() {
   const verificationLevelLabel = passport
     ? `Level ${passport.verificationLevel.replace("LEVEL_", "")}`
     : "…";
-  const membershipLabel = membership?.current?.tierLabel ?? "No active membership";
+  const membershipLabel =
+    membership?.current?.tierLabel ?? "No active membership";
   const cryndyLabel = `${(cryndy?.availableBalance ?? 0).toLocaleString()} CRYNDY`;
   const ndybitsLabel = `${(ndybits?.balance ?? 0).toLocaleString()} NDYBITS`;
   const connectedPlatformsLabel = `${mockConnectedPlatformsCount} Platforms`;
@@ -88,7 +99,8 @@ export default function PassportPage() {
         <div>
           <h1 className="text-2xl font-semibold">NDY Passport</h1>
           <p className="mt-1 text-sm text-foreground-muted">
-            Your identity, membership, and ownership record across the NDJOYIT ecosystem.
+            Your identity, membership, and ownership record across the NDJOYIT
+            ecosystem.
           </p>
         </div>
         <button
@@ -124,13 +136,20 @@ export default function PassportPage() {
 
           <div className="mt-4 text-lg font-semibold">{displayName}</div>
 
-          <div className="mt-3 text-[10px] uppercase tracking-widest text-foreground-muted">NDY ID</div>
+          <div className="mt-3 text-[10px] uppercase tracking-widest text-foreground-muted">
+            NDY ID
+          </div>
           <div className="font-mono text-sm">{auth.ndyId}</div>
 
           <div className="mx-auto mt-4 flex h-[180px] w-[180px] items-center justify-center rounded-lg bg-white p-2">
             {qrDataUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={qrDataUrl} alt="NDY Passport verification QR code" width={164} height={164} />
+              <img
+                src={qrDataUrl}
+                alt="NDY Passport verification QR code"
+                width={164}
+                height={164}
+              />
             ) : (
               <span className="text-xs text-black/40">Generating…</span>
             )}
@@ -139,7 +158,9 @@ export default function PassportPage() {
           <div className="mt-4">
             <span
               className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
-                verified ? "bg-good/15 text-good" : "bg-critical/15 text-critical"
+                verified
+                  ? "bg-good/15 text-good"
+                  : "bg-critical/15 text-critical"
               }`}
             >
               {verified ? "Verified" : "Not Verified"}
@@ -155,22 +176,38 @@ export default function PassportPage() {
             <Row icon={Users} label="Membership" value={membershipLabel} />
             <Row icon={Coins} label="CRYNDY Holdings" value={cryndyLabel} />
             <Row icon={Boxes} label="NDYBITS" value={ndybitsLabel} />
-            <Row icon={Link2} label="Connected Platforms" value={connectedPlatformsLabel} />
-            <Row icon={ShieldCheck} label="Verification Level" value={verificationLevelLabel} />
+            <Row
+              icon={Link2}
+              label="Connected Platforms"
+              value={connectedPlatformsLabel}
+            />
+            <Row
+              icon={ShieldCheck}
+              label="Verification Level"
+              value={verificationLevelLabel}
+            />
           </dl>
         </div>
       </div>
 
       <p className="mt-4 text-xs text-foreground-muted">
-        Full Passport editing and privacy controls over what connected platforms can see land in
-        a later milestone. Connected Platforms above is still mock data — no platforms backend
-        exists yet.
+        Full Passport editing and privacy controls over what connected platforms
+        can see land in a later milestone. Connected Platforms above is still
+        mock data — no platforms backend exists yet.
       </p>
     </div>
   );
 }
 
-function Row({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+function Row({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="flex items-center justify-between gap-4 px-5 py-3">
       <dt className="flex items-center gap-3 text-foreground-muted">

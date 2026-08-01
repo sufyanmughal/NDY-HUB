@@ -10,6 +10,7 @@ import {
   Query,
   Redirect,
   Req,
+  Res,
   UnsupportedMediaTypeException,
   UploadedFile,
   UseGuards,
@@ -20,7 +21,13 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
+import { SessionCookieInterceptor } from './session-cookie.interceptor';
+import {
+  ACCESS_TOKEN_COOKIE,
+  REFRESH_TOKEN_COOKIE,
+  readSessionCookie,
+} from './session-cookie.util';
 import { AuthService } from './auth.service';
 import { TotpService } from './totp.service';
 import { PasskeyService } from './passkey.service';
@@ -59,6 +66,10 @@ const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 // without sanitization. JPEG/PNG/WebP can't do that.
 const ALLOWED_PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+// Sets the httpOnly session cookies on every route below that ends in a
+// freshly issued session (login, register, refresh, QR exchange, 2FA
+// verify, passkey login, OAuth exchange) — see SessionCookieInterceptor.
+@UseInterceptors(SessionCookieInterceptor)
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -82,12 +93,29 @@ export class AuthController {
 
   @Post('refresh')
   refresh(@Body() dto: RefreshDto, @Req() req: Request) {
-    return this.auth.refresh(dto.refreshToken, sessionMeta(req));
+    const refreshToken =
+      readSessionCookie(req, REFRESH_TOKEN_COOKIE) ?? dto.refreshToken;
+    if (!refreshToken) {
+      throw new BadRequestException('Missing refresh token.');
+    }
+    return this.auth.refresh(refreshToken, sessionMeta(req));
   }
 
   @Post('logout')
-  logout(@Body() dto: RefreshDto) {
-    return this.auth.logout(dto.refreshToken);
+  async logout(
+    @Body() dto: RefreshDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken =
+      readSessionCookie(req, REFRESH_TOKEN_COOKIE) ?? dto.refreshToken;
+    // Clearing cookies that were never set is harmless — always clear on
+    // logout regardless of which auth mechanism the caller actually used.
+    res.clearCookie(ACCESS_TOKEN_COOKIE, { path: '/' });
+    res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/' });
+    if (refreshToken) {
+      await this.auth.logout(refreshToken);
+    }
   }
 
   @Post('login-request')

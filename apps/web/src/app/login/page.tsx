@@ -38,7 +38,9 @@ function LoginPageInner() {
           NDY <span className="text-accent">HUB</span>
           <sup className="text-[10px] align-super text-foreground-muted">™</sup>
         </span>
-        <p className="mt-1 text-sm text-foreground-muted">One Identity. One Passport. One Ecosystem.</p>
+        <p className="mt-1 text-sm text-foreground-muted">
+          One Identity. One Passport. One Ecosystem.
+        </p>
       </div>
       <QrLoginCard redirectTo={next} />
 

@@ -1,4 +1,20 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+// The real API origin — used only for links that must be absolute and
+// externally reachable regardless of which origin the browser is on right
+// now: the QR/deep-link fallback URL (opened by whatever device scans it),
+// the WebSocket connection (no cookie involved, token-based instead), the
+// OAuth provider start redirect, and the public passport share link.
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+
+// Every actual fetch() in this file goes through this same-origin path
+// instead, which apps/web/next.config.ts rewrites/proxies to API_BASE_URL
+// server-side. The browser only ever talks to its own origin, which is
+// what lets the API's httpOnly session cookies be SameSite=Lax instead of
+// SameSite=None — the frontend and API sit on different vercel.app
+// subdomains, which browsers treat as genuinely different *sites*, and
+// SameSite=None cookies are exactly what Safari/Firefox's cross-site
+// tracking protections are increasingly aggressive about dropping.
+const PROXIED_API_PATH = "/api";
 
 export type LoginRequestStatus = "PENDING" | "APPROVED" | "DENIED" | "EXPIRED";
 
@@ -29,13 +45,20 @@ export class ApiError extends Error {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await fetch(`${PROXIED_API_PATH}${path}`, {
     ...init,
+    // Sends the httpOnly session cookies on every call, same-origin or
+    // not — without this, fetch() drops cookies by default and every
+    // authenticated request would silently look logged-out.
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(body.message ?? `Request failed with status ${res.status}`, res.status);
+    throw new ApiError(
+      body.message ?? `Request failed with status ${res.status}`,
+      res.status,
+    );
   }
   // A `void`-returning endpoint (logout, disable-2fa, remove-passkey...)
   // sends a 200/201 with an empty body — res.json() throws on that ("Unexpected
@@ -45,14 +68,42 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
-/** Same as apiFetch, but for the guarded endpoints — every real dashboard
- * fetch (memberships, and soon CRYNDY/NDYBITS) needs the caller's session
- * attached, not just a JSON body. */
-function authedFetch<T>(path: string, accessToken: string, init?: RequestInit): Promise<T> {
-  return apiFetch<T>(path, {
-    ...init,
-    headers: { Authorization: `Bearer ${accessToken}`, ...init?.headers },
-  });
+// De-duplicates concurrent refresh attempts: a page that fires several
+// authedFetch calls in parallel right as the 15-minute access token goes
+// stale would otherwise each independently race to refresh, and since
+// refreshing rotates (and revokes) the refresh token, only the first of
+// several concurrent attempts can actually succeed — the rest would fail
+// having read the now-already-revoked cookie value. Sharing one in-flight
+// promise means every caller waits on and benefits from the same refresh.
+let refreshInFlight: Promise<void> | null = null;
+
+function refreshOnce(): Promise<void> {
+  if (!refreshInFlight) {
+    refreshInFlight = refreshSession()
+      .then(() => undefined)
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
+
+/** Same as apiFetch, plus one reactive refresh-and-retry on a 401 — the
+ * access token cookie is httpOnly, so unlike the old localStorage design,
+ * the client can't check its own expiry and refresh proactively before it
+ * goes stale. This is what makes an expired-but-refreshable session
+ * recover transparently mid-visit instead of forcing a re-login every 15
+ * minutes. */
+async function authedFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  try {
+    return await apiFetch<T>(path, init);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      await refreshOnce();
+      return apiFetch<T>(path, init);
+    }
+    throw err;
+  }
 }
 
 export function createLoginRequest(): Promise<LoginRequest> {
@@ -60,7 +111,8 @@ export function createLoginRequest(): Promise<LoginRequest> {
     method: "POST",
     body: JSON.stringify({
       method: "QR",
-      browser: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      browser:
+        typeof navigator !== "undefined" ? navigator.userAgent : undefined,
     }),
   });
 }
@@ -75,18 +127,12 @@ export function exchangeLoginRequest(token: string): Promise<IssuedSession> {
   });
 }
 
-export function refreshSession(refreshToken: string): Promise<IssuedSession> {
-  return apiFetch<IssuedSession>("/auth/refresh", {
-    method: "POST",
-    body: JSON.stringify({ refreshToken }),
-  });
+function refreshSession(): Promise<IssuedSession> {
+  return apiFetch<IssuedSession>("/auth/refresh", { method: "POST" });
 }
 
-export function logoutSession(refreshToken: string): Promise<void> {
-  return apiFetch<void>("/auth/logout", {
-    method: "POST",
-    body: JSON.stringify({ refreshToken }),
-  });
+export function logoutSession(): Promise<void> {
+  return apiFetch<void>("/auth/logout", { method: "POST" });
 }
 
 export interface PublicPassport {
@@ -109,9 +155,13 @@ export function getPublicPassport(ndyId: string): Promise<PublicPassport> {
 // on the server enforces that); the dev shortcut just gets one the same way
 // NDYAPPS would, without a phone in the loop, for local testing.
 
-export type LoginResult = IssuedSession | { requires2fa: true; challengeToken: string };
+export type LoginResult =
+  IssuedSession | { requires2fa: true; challengeToken: string };
 
-export function loginWithPassword(email: string, password: string): Promise<LoginResult> {
+export function loginWithPassword(
+  email: string,
+  password: string,
+): Promise<LoginResult> {
   return apiFetch<LoginResult>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
@@ -136,18 +186,31 @@ export function forgotPassword(email: string): Promise<void> {
   });
 }
 
-export function resetPassword(token: string, newPassword: string): Promise<void> {
+export function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<void> {
   return apiFetch<void>("/auth/reset-password", {
     method: "POST",
     body: JSON.stringify({ token, newPassword }),
   });
 }
 
-export async function approveLoginRequestAs(token: string, accessToken: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/auth/login-request/${token}/approve`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+// Deliberately bearer-based, not cookie-based: this simulates NDYAPPS
+// approving on behalf of whichever test account just logged in via the
+// dev shortcut, which has nothing to do with — and shouldn't touch — the
+// current browser's own (probably logged-out) session cookie.
+export async function approveLoginRequestAs(
+  token: string,
+  bearerToken: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE_URL}/auth/login-request/${token}/approve`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${bearerToken}` },
+    },
+  );
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.message ?? `Approve failed with status ${res.status}`);
@@ -156,7 +219,8 @@ export async function approveLoginRequestAs(token: string, accessToken: string):
 
 // --- Membership (M4) ---
 
-export type MembershipTier = "RISE" | "FLOW" | "PULSE" | "VAULT" | "MODE" | "LEGACY";
+export type MembershipTier =
+  "RISE" | "FLOW" | "PULSE" | "VAULT" | "MODE" | "LEGACY";
 export type BillingCycle = "MONTHLY" | "ANNUAL";
 export type MembershipStatus = "ACTIVE" | "CANCELLED" | "EXPIRED";
 
@@ -187,27 +251,30 @@ export type SubscribeResult =
   | { mode: "checkout"; checkoutUrl: string }
   | { mode: "dev-activated"; membershipId: string };
 
-export function getMembershipTiers(): Promise<Record<MembershipTier, TierInfo>> {
+export function getMembershipTiers(): Promise<
+  Record<MembershipTier, TierInfo>
+> {
   return apiFetch<Record<MembershipTier, TierInfo>>("/memberships/tiers");
 }
 
-export function getMyMembership(accessToken: string): Promise<MembershipSummary> {
-  return authedFetch<MembershipSummary>("/memberships/me", accessToken);
+export function getMyMembership(): Promise<MembershipSummary> {
+  return authedFetch<MembershipSummary>("/memberships/me");
 }
 
 export function subscribeToTier(
-  accessToken: string,
   tier: MembershipTier,
   billingCycle: BillingCycle,
 ): Promise<SubscribeResult> {
-  return authedFetch<SubscribeResult>("/memberships/subscribe", accessToken, {
+  return authedFetch<SubscribeResult>("/memberships/subscribe", {
     method: "POST",
     body: JSON.stringify({ tier, billingCycle }),
   });
 }
 
-export function cancelMembership(accessToken: string, membershipId: string): Promise<void> {
-  return authedFetch<void>(`/memberships/${membershipId}/cancel`, accessToken, { method: "POST" });
+export function cancelMembership(membershipId: string): Promise<void> {
+  return authedFetch<void>(`/memberships/${membershipId}/cancel`, {
+    method: "POST",
+  });
 }
 
 // --- CRYNDY (M5) ---
@@ -242,12 +309,15 @@ export interface CryndyPurchase {
 
 export interface CryndySummary {
   availableBalance: number;
-  breakdown: Record<CryndyPurchaseStatus, { count: number; cryndyAmount: number }>;
+  breakdown: Record<
+    CryndyPurchaseStatus,
+    { count: number; cryndyAmount: number }
+  >;
   purchases: CryndyPurchase[];
 }
 
-export function getMyCryndy(accessToken: string): Promise<CryndySummary> {
-  return authedFetch<CryndySummary>("/cryndy/me", accessToken);
+export function getMyCryndy(): Promise<CryndySummary> {
+  return authedFetch<CryndySummary>("/cryndy/me");
 }
 
 // --- NDYBITS (M5) ---
@@ -264,8 +334,8 @@ export interface NdybitsSummary {
   recentEntries: NdybitsLedgerEntry[];
 }
 
-export function getMyNdybits(accessToken: string): Promise<NdybitsSummary> {
-  return authedFetch<NdybitsSummary>("/ndybits/me", accessToken);
+export function getMyNdybits(): Promise<NdybitsSummary> {
+  return authedFetch<NdybitsSummary>("/ndybits/me");
 }
 
 // --- Security ---
@@ -279,23 +349,29 @@ export interface SecuritySession {
   isCurrent: boolean;
 }
 
-export function getMySessions(accessToken: string): Promise<SecuritySession[]> {
-  return authedFetch<SecuritySession[]>("/security/sessions", accessToken);
+export function getMySessions(): Promise<SecuritySession[]> {
+  return authedFetch<SecuritySession[]>("/security/sessions");
 }
 
-export function revokeSessionById(accessToken: string, sessionId: string): Promise<void> {
-  return authedFetch<void>(`/security/sessions/${sessionId}`, accessToken, { method: "DELETE" });
-}
-
-export function revokeAllSessions(accessToken: string): Promise<{ revokedCount: number }> {
-  return authedFetch<{ revokedCount: number }>("/security/sessions/revoke-all", accessToken, {
-    method: "POST",
+export function revokeSessionById(sessionId: string): Promise<void> {
+  return authedFetch<void>(`/security/sessions/${sessionId}`, {
+    method: "DELETE",
   });
+}
+
+export function revokeAllSessions(): Promise<{ revokedCount: number }> {
+  return authedFetch<{ revokedCount: number }>(
+    "/security/sessions/revoke-all",
+    {
+      method: "POST",
+    },
+  );
 }
 
 // --- Settings ---
 
 export interface MeProfile {
+  id: string;
   ndyId: string;
   email: string;
   fullName: string | null;
@@ -307,44 +383,50 @@ export interface MeProfile {
   createdAt: string;
 }
 
-export function getMe(accessToken: string): Promise<MeProfile> {
-  return authedFetch<MeProfile>("/auth/me", accessToken);
+export function getMe(): Promise<MeProfile> {
+  return authedFetch<MeProfile>("/auth/me");
 }
 
-export function updateProfile(
-  accessToken: string,
-  updates: { fullName?: string; profilePhotoUrl?: string },
-): Promise<Pick<MeProfile, "ndyId" | "email" | "fullName" | "profilePhotoUrl">> {
-  return authedFetch("/auth/me", accessToken, { method: "PATCH", body: JSON.stringify(updates) });
+export function updateProfile(updates: {
+  fullName?: string;
+  profilePhotoUrl?: string;
+}): Promise<
+  Pick<MeProfile, "ndyId" | "email" | "fullName" | "profilePhotoUrl">
+> {
+  return authedFetch("/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
 }
 
 /** Multipart upload, not JSON — can't use authedFetch (it always sets
  * Content-Type: application/json). Letting fetch set the multipart
  * boundary itself means never setting Content-Type explicitly here. */
 export async function uploadProfilePhoto(
-  accessToken: string,
   file: File,
 ): Promise<{ profilePhotoUrl: string }> {
   const formData = new FormData();
   formData.append("photo", file);
-  const res = await fetch(`${API_BASE_URL}/auth/me/photo`, {
+  const res = await fetch(`${PROXIED_API_PATH}/auth/me/photo`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
+    credentials: "include",
     body: formData,
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(body.message ?? `Upload failed with status ${res.status}`, res.status);
+    throw new ApiError(
+      body.message ?? `Upload failed with status ${res.status}`,
+      res.status,
+    );
   }
   return res.json();
 }
 
 export function changePassword(
-  accessToken: string,
   currentPassword: string,
   newPassword: string,
 ): Promise<void> {
-  return authedFetch<void>("/auth/change-password", accessToken, {
+  return authedFetch<void>("/auth/change-password", {
     method: "POST",
     body: JSON.stringify({ currentPassword, newPassword }),
   });
@@ -352,26 +434,37 @@ export function changePassword(
 
 // --- Two-factor authentication (TOTP) ---
 
-export function verify2fa(challengeToken: string, code: string): Promise<IssuedSession> {
+export function verify2fa(
+  challengeToken: string,
+  code: string,
+): Promise<IssuedSession> {
   return apiFetch<IssuedSession>("/auth/2fa/verify", {
     method: "POST",
     body: JSON.stringify({ challengeToken, code }),
   });
 }
 
-export function begin2faSetup(accessToken: string): Promise<{ secret: string; otpauthUri: string }> {
-  return authedFetch("/auth/2fa/setup", accessToken, { method: "POST" });
+export function begin2faSetup(): Promise<{
+  secret: string;
+  otpauthUri: string;
+}> {
+  return authedFetch("/auth/2fa/setup", { method: "POST" });
 }
 
-export function confirm2faSetup(accessToken: string, code: string): Promise<{ backupCodes: string[] }> {
-  return authedFetch("/auth/2fa/enable", accessToken, {
+export function confirm2faSetup(
+  code: string,
+): Promise<{ backupCodes: string[] }> {
+  return authedFetch("/auth/2fa/enable", {
     method: "POST",
     body: JSON.stringify({ code }),
   });
 }
 
-export function disable2fa(accessToken: string, currentPassword: string, code: string): Promise<void> {
-  return authedFetch<void>("/auth/2fa/disable", accessToken, {
+export function disable2fa(
+  currentPassword: string,
+  code: string,
+): Promise<void> {
+  return authedFetch<void>("/auth/2fa/disable", {
     method: "POST",
     body: JSON.stringify({ currentPassword, code }),
   });
@@ -393,39 +486,48 @@ export interface PasskeySummary {
   lastUsedAt: string | null;
 }
 
-export function getMyPasskeys(accessToken: string): Promise<PasskeySummary[]> {
-  return authedFetch<PasskeySummary[]>("/auth/passkeys", accessToken);
+export function getMyPasskeys(): Promise<PasskeySummary[]> {
+  return authedFetch<PasskeySummary[]>("/auth/passkeys");
 }
 
-export function removeMyPasskey(accessToken: string, id: string): Promise<void> {
-  return authedFetch<void>(`/auth/passkeys/${id}`, accessToken, { method: "DELETE" });
+export function removeMyPasskey(id: string): Promise<void> {
+  return authedFetch<void>(`/auth/passkeys/${id}`, { method: "DELETE" });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebAuthn options/response JSON, typed precisely in passkey.ts
-export function beginPasskeyRegistration(accessToken: string): Promise<{ options: any; challengeId: string }> {
-  return authedFetch("/auth/passkeys/register/options", accessToken, { method: "POST" });
+// WebAuthn options/response JSON, typed precisely in passkey.ts
+export function beginPasskeyRegistration(): Promise<{
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  options: any;
+  challengeId: string;
+}> {
+  return authedFetch("/auth/passkeys/register/options", { method: "POST" });
 }
 
 export function verifyPasskeyRegistration(
-  accessToken: string,
   challengeId: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   response: any,
   deviceLabel?: string,
 ): Promise<PasskeySummary> {
-  return authedFetch("/auth/passkeys/register/verify", accessToken, {
+  return authedFetch("/auth/passkeys/register/verify", {
     method: "POST",
     body: JSON.stringify({ challengeId, response, deviceLabel }),
   });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function beginPasskeyLogin(): Promise<{ options: any; challengeId: string }> {
+export function beginPasskeyLogin(): Promise<{
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  options: any;
+  challengeId: string;
+}> {
   return apiFetch("/auth/passkeys/login/options", { method: "POST" });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function verifyPasskeyLogin(challengeId: string, response: any): Promise<IssuedSession> {
+export function verifyPasskeyLogin(
+  challengeId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  response: any,
+): Promise<IssuedSession> {
   return apiFetch<IssuedSession>("/auth/passkeys/login/verify", {
     method: "POST",
     body: JSON.stringify({ challengeId, response }),
@@ -440,11 +542,17 @@ export function verifyPasskeyLogin(challengeId: string, response: any): Promise<
 // not fetch calls — buildOAuthStartUrl just builds the link href, it
 // doesn't call the API itself.
 
-export function getOAuthProviders(): Promise<{ google: boolean; apple: boolean }> {
+export function getOAuthProviders(): Promise<{
+  google: boolean;
+  apple: boolean;
+}> {
   return apiFetch("/auth/oauth/providers");
 }
 
-export function buildOAuthStartUrl(provider: "google" | "apple", next: string): string {
+export function buildOAuthStartUrl(
+  provider: "google" | "apple",
+  next: string,
+): string {
   const params = new URLSearchParams({ next });
   return `${API_BASE_URL}/auth/oauth/${provider}/start?${params.toString()}`;
 }
@@ -466,25 +574,25 @@ export interface ConnectedAccount {
   createdAt: string;
 }
 
-export function getConnectedAccounts(accessToken: string): Promise<ConnectedAccount[]> {
-  return authedFetch<ConnectedAccount[]>("/auth/connected-accounts", accessToken);
+export function getConnectedAccounts(): Promise<ConnectedAccount[]> {
+  return authedFetch<ConnectedAccount[]>("/auth/connected-accounts");
 }
 
-export function unlinkConnectedAccount(accessToken: string, id: string): Promise<void> {
-  return authedFetch<void>(`/auth/connected-accounts/${id}`, accessToken, { method: "DELETE" });
+export function unlinkConnectedAccount(id: string): Promise<void> {
+  return authedFetch<void>(`/auth/connected-accounts/${id}`, {
+    method: "DELETE",
+  });
 }
 
-/** Unlike buildOAuthStartUrl, this needs the bearer token to know which
- * account to link to, so it's a real authed fetch (returning the authorize
- * URL as JSON) rather than a plain <a href> — the caller navigates the
- * browser there itself once this resolves. */
+/** Unlike buildOAuthStartUrl, this needs the caller's own session to know
+ * which account to link to, so it's a real authed fetch (returning the
+ * authorize URL as JSON) rather than a plain <a href> — the caller
+ * navigates the browser there itself once this resolves. */
 export async function beginConnectOAuthProvider(
-  accessToken: string,
   provider: "google" | "apple",
 ): Promise<string> {
   const { url } = await authedFetch<{ url: string }>(
     `/auth/oauth/${provider}/connect?next=${encodeURIComponent("/settings")}`,
-    accessToken,
     { method: "POST" },
   );
   return url;
@@ -492,25 +600,27 @@ export async function beginConnectOAuthProvider(
 
 // --- Email verification ---
 
-export function confirmEmailVerification(token: string): Promise<{ verificationLevel: string }> {
+export function confirmEmailVerification(
+  token: string,
+): Promise<{ verificationLevel: string }> {
   return apiFetch<{ verificationLevel: string }>("/auth/verify-email/confirm", {
     method: "POST",
     body: JSON.stringify({ token }),
   });
 }
 
-export function resendEmailVerification(accessToken: string): Promise<void> {
-  return authedFetch<void>("/auth/verify-email/resend", accessToken, { method: "POST" });
+export function resendEmailVerification(): Promise<void> {
+  return authedFetch<void>("/auth/verify-email/resend", { method: "POST" });
 }
 
 // --- GDPR: data export + account deletion ---
 
-/** Fetches the export as an authenticated request (same reasoning as
- * downloadDocument — a plain <a href> can't send a bearer token), then
- * hands the browser a blob: URL so it saves like a normal download. */
-export async function downloadDataExport(accessToken: string, ndyId: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/gdpr/export`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+/** Fetches the export as an authenticated request, then hands the browser
+ * a blob: URL so it saves like a normal download with the right filename
+ * (a plain <a href> pointed at the API can't set Content-Disposition). */
+export async function downloadDataExport(ndyId: string): Promise<void> {
+  const res = await fetch(`${PROXIED_API_PATH}/gdpr/export`, {
+    credentials: "include",
   });
   if (!res.ok) throw new Error(`Export failed with status ${res.status}`);
   const blob = await res.blob();
@@ -522,8 +632,8 @@ export async function downloadDataExport(accessToken: string, ndyId: string): Pr
   URL.revokeObjectURL(url);
 }
 
-export function deleteAccount(accessToken: string, currentPassword: string): Promise<void> {
-  return authedFetch<void>("/gdpr/delete-account", accessToken, {
+export function deleteAccount(currentPassword: string): Promise<void> {
+  return authedFetch<void>("/gdpr/delete-account", {
     method: "POST",
     body: JSON.stringify({ currentPassword, confirm: "DELETE" }),
   });
@@ -542,8 +652,8 @@ export interface Transaction {
   date: string;
 }
 
-export function getMyTransactions(accessToken: string): Promise<Transaction[]> {
-  return authedFetch<Transaction[]>("/transactions/me", accessToken);
+export function getMyTransactions(): Promise<Transaction[]> {
+  return authedFetch<Transaction[]>("/transactions/me");
 }
 
 // --- Documents ---
@@ -555,8 +665,8 @@ export interface DocumentStub {
   date: string;
 }
 
-export function getMyDocuments(accessToken: string): Promise<DocumentStub[]> {
-  return authedFetch<DocumentStub[]>("/documents/me", accessToken);
+export function getMyDocuments(): Promise<DocumentStub[]> {
+  return authedFetch<DocumentStub[]>("/documents/me");
 }
 
 /** A plain <a href> can't send an Authorization header, and the guard
@@ -564,10 +674,16 @@ export function getMyDocuments(accessToken: string): Promise<DocumentStub[]> {
  * so fetch it as an authenticated request, then hand the browser a
  * blob: URL to actually save. Once real object storage exists, this
  * becomes a signed short-lived S3 URL instead and this function goes away. */
-export async function downloadDocument(accessToken: string, documentId: string, filename: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/documents/${documentId}/download`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+export async function downloadDocument(
+  documentId: string,
+  filename: string,
+): Promise<void> {
+  const res = await fetch(
+    `${PROXIED_API_PATH}/documents/${documentId}/download`,
+    {
+      credentials: "include",
+    },
+  );
   if (!res.ok) throw new Error(`Download failed with status ${res.status}`);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -592,16 +708,15 @@ export interface SupportTicket {
   createdAt: string;
 }
 
-export function getMySupportTickets(accessToken: string): Promise<SupportTicket[]> {
-  return authedFetch<SupportTicket[]>("/support/tickets", accessToken);
+export function getMySupportTickets(): Promise<SupportTicket[]> {
+  return authedFetch<SupportTicket[]>("/support/tickets");
 }
 
 export function createSupportTicket(
-  accessToken: string,
   subject: string,
   message: string,
 ): Promise<SupportTicket> {
-  return authedFetch<SupportTicket>("/support/tickets", accessToken, {
+  return authedFetch<SupportTicket>("/support/tickets", {
     method: "POST",
     body: JSON.stringify({ subject, message }),
   });
@@ -614,19 +729,21 @@ export interface AdminSupportTicket extends SupportTicket {
   user: { ndyId: string; email: string };
 }
 
-export function adminListSupportTickets(accessToken: string): Promise<AdminSupportTicket[]> {
-  return authedFetch<AdminSupportTicket[]>("/admin/support-tickets", accessToken);
+export function adminListSupportTickets(): Promise<AdminSupportTicket[]> {
+  return authedFetch<AdminSupportTicket[]>("/admin/support-tickets");
 }
 
 export function adminReplySupportTicket(
-  accessToken: string,
   ticketId: string,
   reply: string,
 ): Promise<AdminSupportTicket> {
-  return authedFetch<AdminSupportTicket>(`/admin/support-tickets/${ticketId}/reply`, accessToken, {
-    method: "POST",
-    body: JSON.stringify({ reply }),
-  });
+  return authedFetch<AdminSupportTicket>(
+    `/admin/support-tickets/${ticketId}/reply`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reply }),
+    },
+  );
 }
 
 // --- Admin (M6) ---
@@ -682,15 +799,14 @@ export interface AdminUserDetail extends AdminUserSummary {
 }
 
 export function searchAdminUsers(
-  accessToken: string,
   q?: string,
 ): Promise<{ users: AdminUserSummary[]; total: number }> {
   const query = q ? `?q=${encodeURIComponent(q)}` : "";
-  return authedFetch(`/admin/users${query}`, accessToken);
+  return authedFetch(`/admin/users${query}`);
 }
 
-export function getAdminUserDetail(accessToken: string, userId: string): Promise<AdminUserDetail> {
-  return authedFetch(`/admin/users/${userId}`, accessToken);
+export function getAdminUserDetail(userId: string): Promise<AdminUserDetail> {
+  return authedFetch(`/admin/users/${userId}`);
 }
 
 // --- Role changes: dual-approval, not instant. Creating a request doesn't
@@ -717,57 +833,55 @@ export interface RoleChangeRequest {
 }
 
 export function createRoleChangeRequest(
-  accessToken: string,
   targetUserId: string,
   role: UserRole,
   reason?: string,
 ): Promise<RoleChangeRequest> {
-  return authedFetch("/admin/role-requests", accessToken, {
+  return authedFetch("/admin/role-requests", {
     method: "POST",
     body: JSON.stringify({ targetUserId, role, reason }),
   });
 }
 
 export function listRoleChangeRequests(
-  accessToken: string,
   status?: RoleChangeRequestStatus,
 ): Promise<RoleChangeRequest[]> {
   const query = status ? `?status=${status}` : "";
-  return authedFetch(`/admin/role-requests${query}`, accessToken);
+  return authedFetch(`/admin/role-requests${query}`);
 }
 
 export function approveRoleChangeRequest(
-  accessToken: string,
   requestId: string,
   reason?: string,
 ): Promise<RoleChangeRequest> {
-  return authedFetch(`/admin/role-requests/${requestId}/approve`, accessToken, {
+  return authedFetch(`/admin/role-requests/${requestId}/approve`, {
     method: "POST",
     body: JSON.stringify({ reason }),
   });
 }
 
 export function rejectRoleChangeRequest(
-  accessToken: string,
   requestId: string,
   reason?: string,
 ): Promise<RoleChangeRequest> {
-  return authedFetch(`/admin/role-requests/${requestId}/reject`, accessToken, {
+  return authedFetch(`/admin/role-requests/${requestId}/reject`, {
     method: "POST",
     body: JSON.stringify({ reason }),
   });
 }
 
 export function adminSetSuspended(
-  accessToken: string,
   userId: string,
   suspended: boolean,
   reason?: string,
 ): Promise<{ id: string; ndyId: string; suspended: boolean }> {
-  return authedFetch(`/admin/users/${userId}/${suspended ? "suspend" : "unsuspend"}`, accessToken, {
-    method: "POST",
-    body: JSON.stringify({ reason }),
-  });
+  return authedFetch(
+    `/admin/users/${userId}/${suspended ? "suspend" : "unsuspend"}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    },
+  );
 }
 
 export interface AuditLogEntry {
@@ -781,8 +895,11 @@ export interface AuditLogEntry {
   createdAt: string;
 }
 
-export function getAdminAuditLog(accessToken: string): Promise<{ entries: AuditLogEntry[]; total: number }> {
-  return authedFetch("/admin/audit-log?take=25", accessToken);
+export function getAdminAuditLog(): Promise<{
+  entries: AuditLogEntry[];
+  total: number;
+}> {
+  return authedFetch("/admin/audit-log?take=25");
 }
 
 // --- Admin: OAuth client management (registering NDJOYIT sites as SSO
@@ -798,34 +915,40 @@ export interface AdminOAuthClient {
   createdAt: string;
 }
 
-export function getOAuthScopeCatalog(accessToken: string): Promise<{ scopes: Record<string, string>; all: string[] }> {
-  return authedFetch("/admin/oauth-clients/scopes", accessToken);
+export function getOAuthScopeCatalog(): Promise<{
+  scopes: Record<string, string>;
+  all: string[];
+}> {
+  return authedFetch("/admin/oauth-clients/scopes");
 }
 
-export function listAdminOAuthClients(accessToken: string): Promise<AdminOAuthClient[]> {
-  return authedFetch("/admin/oauth-clients", accessToken);
+export function listAdminOAuthClients(): Promise<AdminOAuthClient[]> {
+  return authedFetch("/admin/oauth-clients");
 }
 
 /** The response includes clientSecret in plaintext — the one and only time
  * it's ever visible. The caller must show it once and never fetch it again. */
-export function createAdminOAuthClient(
-  accessToken: string,
-  params: { name: string; redirectUris: string[]; allowedScopes: string[] },
-): Promise<AdminOAuthClient & { clientSecret: string }> {
-  return authedFetch("/admin/oauth-clients", accessToken, {
+export function createAdminOAuthClient(params: {
+  name: string;
+  redirectUris: string[];
+  allowedScopes: string[];
+}): Promise<AdminOAuthClient & { clientSecret: string }> {
+  return authedFetch("/admin/oauth-clients", {
     method: "POST",
     body: JSON.stringify(params),
   });
 }
 
 export function setAdminOAuthClientActive(
-  accessToken: string,
   id: string,
   active: boolean,
 ): Promise<AdminOAuthClient> {
-  return authedFetch(`/admin/oauth-clients/${id}/${active ? "activate" : "deactivate"}`, accessToken, {
-    method: "PATCH",
-  });
+  return authedFetch(
+    `/admin/oauth-clients/${id}/${active ? "activate" : "deactivate"}`,
+    {
+      method: "PATCH",
+    },
+  );
 }
 
 // --- OAuth / OIDC consent (SSO for third-party NDJOYIT sites) ---
@@ -848,31 +971,29 @@ export interface OAuthAuthorizeStatus {
 }
 
 export function getOAuthAuthorizeStatus(
-  accessToken: string,
   clientId: string,
   scope: string,
 ): Promise<OAuthAuthorizeStatus> {
   const params = new URLSearchParams({ client_id: clientId, scope });
-  return authedFetch<OAuthAuthorizeStatus>(`/oauth/authorize/status?${params.toString()}`, accessToken);
+  return authedFetch<OAuthAuthorizeStatus>(
+    `/oauth/authorize/status?${params.toString()}`,
+  );
 }
 
 export interface OAuthConsentResult {
   redirectUrl: string;
 }
 
-export function submitOAuthConsent(
-  accessToken: string,
-  params: {
-    clientId: string;
-    redirectUri: string;
-    scope: string;
-    state?: string;
-    approve: boolean;
-    codeChallenge?: string;
-    codeChallengeMethod?: string;
-  },
-): Promise<OAuthConsentResult> {
-  return authedFetch<OAuthConsentResult>("/oauth/authorize/consent", accessToken, {
+export function submitOAuthConsent(params: {
+  clientId: string;
+  redirectUri: string;
+  scope: string;
+  state?: string;
+  approve: boolean;
+  codeChallenge?: string;
+  codeChallengeMethod?: string;
+}): Promise<OAuthConsentResult> {
+  return authedFetch<OAuthConsentResult>("/oauth/authorize/consent", {
     method: "POST",
     body: JSON.stringify(params),
   });
@@ -887,12 +1008,12 @@ export interface ConnectedSite {
   updatedAt: string;
 }
 
-export function getConnectedSites(accessToken: string): Promise<ConnectedSite[]> {
-  return authedFetch<ConnectedSite[]>("/oauth/grants", accessToken);
+export function getConnectedSites(): Promise<ConnectedSite[]> {
+  return authedFetch<ConnectedSite[]>("/oauth/grants");
 }
 
-export function revokeConnectedSite(accessToken: string, grantId: string): Promise<void> {
-  return authedFetch<void>(`/oauth/grants/${grantId}`, accessToken, { method: "DELETE" });
+export function revokeConnectedSite(grantId: string): Promise<void> {
+  return authedFetch<void>(`/oauth/grants/${grantId}`, { method: "DELETE" });
 }
 
 /**
@@ -901,7 +1022,9 @@ export function revokeConnectedSite(accessToken: string, grantId: string): Promi
  * by accident land somewhere sane instead of a dead `ndyapps://` link.
  */
 export function buildLoginDeepLink(token: string): string {
-  const webFallback = encodeURIComponent(`${API_BASE_URL}/auth/login-request/${token}`);
+  const webFallback = encodeURIComponent(
+    `${API_BASE_URL}/auth/login-request/${token}`,
+  );
   return `ndyapps://login?token=${token}&fallback=${webFallback}`;
 }
 
@@ -932,8 +1055,8 @@ export interface FounderEcosystemOverview {
   generatedAt: string;
 }
 
-export function getFounderEcosystemOverview(accessToken: string): Promise<FounderEcosystemOverview> {
-  return authedFetch("/founder/overview", accessToken);
+export function getFounderEcosystemOverview(): Promise<FounderEcosystemOverview> {
+  return authedFetch("/founder/overview");
 }
 
 export interface FinancialSummary {
@@ -945,8 +1068,8 @@ export interface FinancialSummary {
 
 /** FINANCE-role-accessible subset of the founder overview — same data, no
  * user/session/system-health fields a finance user has no reason to see. */
-export function getFinancialSummary(accessToken: string): Promise<FinancialSummary> {
-  return authedFetch("/founder/financials", accessToken);
+export function getFinancialSummary(): Promise<FinancialSummary> {
+  return authedFetch("/founder/financials");
 }
 
 // --- Ecosystem overview: real, non-sensitive aggregate stats shown on both
@@ -961,7 +1084,11 @@ export interface EcosystemOverview {
   transactions24h: number;
   ndybitsIssued: number;
   cryndy: { totalSold: number; dailySeries: number[] };
-  bitcoin: { priceUsd: number; change24hPct: number; sparkline7d: number[] } | null;
+  bitcoin: {
+    priceUsd: number;
+    change24hPct: number;
+    sparkline7d: number[];
+  } | null;
   systemStatus: "ok" | "down";
   generatedAt: string;
 }

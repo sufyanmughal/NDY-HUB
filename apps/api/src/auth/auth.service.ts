@@ -109,6 +109,7 @@ export class AuthService {
   async getMe(userId: string) {
     const user = await this.identity.findById(userId);
     return {
+      id: user.id,
       ndyId: user.ndyId,
       email: user.email,
       fullName: user.fullName,

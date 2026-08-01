@@ -3,7 +3,11 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { getOAuthAuthorizeStatus, submitOAuthConsent, type OAuthAuthorizeStatus } from "@/lib/api";
+import {
+  getOAuthAuthorizeStatus,
+  submitOAuthConsent,
+  type OAuthAuthorizeStatus,
+} from "@/lib/api";
 
 type ConsentPhase =
   | { phase: "loading" }
@@ -30,9 +34,12 @@ function ConsentPageInner() {
   const scope = searchParams.get("scope") ?? "openid";
   const state = searchParams.get("state") ?? undefined;
   const codeChallenge = searchParams.get("code_challenge") ?? undefined;
-  const codeChallengeMethod = searchParams.get("code_challenge_method") ?? undefined;
+  const codeChallengeMethod =
+    searchParams.get("code_challenge_method") ?? undefined;
   const paramsError =
-    !clientId || !redirectUri ? "This sign-in link is missing required parameters." : null;
+    !clientId || !redirectUri
+      ? "This sign-in link is missing required parameters."
+      : null;
 
   const [consent, setConsent] = useState<ConsentPhase>({ phase: "loading" });
 
@@ -49,10 +56,8 @@ function ConsentPageInner() {
   useEffect(() => {
     if (auth.status !== "authenticated") return;
     if (paramsError || !clientId || !redirectUri) return;
-    const accessToken = auth.accessToken;
-
     let cancelled = false;
-    getOAuthAuthorizeStatus(accessToken, clientId, scope)
+    getOAuthAuthorizeStatus(clientId, scope)
       .then((status) => {
         if (cancelled) return;
         if (!status.alreadyGranted) {
@@ -62,7 +67,7 @@ function ConsentPageInner() {
         // Already granted everything being asked for — this is the actual
         // "one login, not one consent screen per visit" part of SSO.
         setConsent({ phase: "auto-approving" });
-        return submitOAuthConsent(accessToken, {
+        return submitOAuthConsent({
           clientId,
           redirectUri,
           scope,
@@ -85,10 +90,9 @@ function ConsentPageInner() {
 
   async function respond(approve: boolean) {
     if (auth.status !== "authenticated" || !clientId || !redirectUri) return;
-    const accessToken = auth.accessToken;
     setConsent({ phase: "submitting" });
     try {
-      const result = await submitOAuthConsent(accessToken, {
+      const result = await submitOAuthConsent({
         clientId,
         redirectUri,
         scope,
@@ -130,8 +134,10 @@ function ConsentPageInner() {
       </div>
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6">
         <p className="text-center text-sm text-foreground-muted">
-          <span className="font-medium text-foreground">{status.client.name}</span> wants to connect to
-          your NDY HUB account.
+          <span className="font-medium text-foreground">
+            {status.client.name}
+          </span>{" "}
+          wants to connect to your NDY HUB account.
         </p>
         <ul className="mt-4 space-y-2">
           {status.scopeDescriptions.map((s) => (
@@ -156,7 +162,8 @@ function ConsentPageInner() {
         </div>
       </div>
       <p className="max-w-sm text-center text-xs text-foreground-muted">
-        You can revoke this connection at any time from Security in your NDY HUB dashboard.
+        You can revoke this connection at any time from Security in your NDY HUB
+        dashboard.
       </p>
     </div>
   );

@@ -19,5 +19,8 @@ import { join } from 'path';
  * uploaded photos don't durably survive on that platform until this moves
  * to real object storage.
  */
-export const UPLOADS_ROOT_DIR = join(process.env.VERCEL ? '/tmp' : process.cwd(), 'uploads');
+export const UPLOADS_ROOT_DIR = join(
+  process.env.VERCEL ? '/tmp' : process.cwd(),
+  'uploads',
+);
 export const PROFILE_PHOTOS_DIR = join(UPLOADS_ROOT_DIR, 'profile-photos');

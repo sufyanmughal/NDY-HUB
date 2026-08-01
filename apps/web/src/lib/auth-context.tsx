@@ -1,107 +1,79 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import type { IssuedSession } from "./api";
-import { logoutSession, refreshSession } from "./api";
 import {
-  clearStoredSession,
-  decodeAccessToken,
-  isExpired,
-  readStoredSession,
-  storeSession,
-  type StoredSession,
-} from "./auth-client";
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { ApiError, getMe, logoutSession } from "./api";
 
 type AuthState =
   | { status: "loading" }
   | { status: "unauthenticated" }
-  | { status: "authenticated"; ndyId: string; accessToken: string; refreshToken: string };
+  | { status: "authenticated"; ndyId: string };
 
 interface AuthContextValue {
   auth: AuthState;
-  login: (session: IssuedSession) => void;
+  /** Re-syncs auth state from the server — call this right after any flow
+   * that ends in a freshly issued session (password login, 2FA verify,
+   * passkey login, QR exchange, OAuth exchange). The session itself is
+   * already set as an httpOnly cookie by the API response that preceded
+   * this call; there's nothing for the client to store, just its own
+   * "am I logged in, and as whom" state to catch up. */
+  login: () => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/**
- * Resolves what, if anything, should become the session on first load:
- * nothing stored, a still-valid stored session, or — if the 15-minute
- * access token has gone stale — a freshly refreshed one. Returning a
- * promise (rather than calling setAuth per-branch) is what lets the effect
- * that calls this defer every state update into a .then callback.
- */
-async function resolveStoredAuth(): Promise<{ session: StoredSession | null; shouldPersist: boolean }> {
-  const stored = readStoredSession();
-  if (!stored) return { session: null, shouldPersist: false };
-
-  const payload = decodeAccessToken(stored.accessToken);
-  if (payload && !isExpired(payload)) {
-    return { session: stored, shouldPersist: false };
-  }
-
-  try {
-    const refreshed = await refreshSession(stored.refreshToken);
-    return { session: refreshed, shouldPersist: true };
-  } catch {
-    clearStoredSession();
-    return { session: null, shouldPersist: false };
-  }
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
 
-  const applySession = useCallback((session: StoredSession) => {
-    const payload = decodeAccessToken(session.accessToken);
-    if (!payload) {
-      clearStoredSession();
-      setAuth({ status: "unauthenticated" });
-      return;
+  // Resolves what the current auth state actually is, without touching
+  // React state itself — kept side-effect-free so both the mount effect
+  // and the exposed `login()` (called imperatively after a fresh session
+  // is issued) can share it, each doing its own setAuth off the result.
+  const resolveAuth = useCallback(async (): Promise<AuthState> => {
+    try {
+      const me = await getMe();
+      return { status: "authenticated", ndyId: me.ndyId };
+    } catch (err) {
+      // A visitor with no session at all fails here twice over: /auth/me
+      // 401s (no access token cookie), and authedFetch's own reactive
+      // refresh-and-retry then also fails (no refresh token cookie either,
+      // so /auth/refresh 400s). Both are the ordinary, expected shape of
+      // "not logged in" — only something that isn't an ApiError at all
+      // (a network failure, a 500) is actually worth surfacing.
+      if (!(err instanceof ApiError)) {
+        console.error("Failed to resolve auth state:", err);
+      }
+      return { status: "unauthenticated" };
     }
-    setAuth({
-      status: "authenticated",
-      ndyId: payload.ndyId,
-      accessToken: session.accessToken,
-      refreshToken: session.refreshToken,
-    });
   }, []);
 
   useEffect(() => {
-    // Every branch below resolves through this promise chain rather than
-    // calling setAuth directly in the effect body — same reasoning as
-    // useLoginRequest's fetchAndSubscribe: keeps every state update inside
-    // a callback instead of synchronous-in-effect.
-    resolveStoredAuth().then(({ session, shouldPersist }) => {
-      if (!session) {
-        setAuth({ status: "unauthenticated" });
-        return;
-      }
-      if (shouldPersist) storeSession(session);
-      applySession(session);
-    });
-  }, [applySession]);
+    resolveAuth().then(setAuth);
+  }, [resolveAuth]);
 
-  const login = useCallback(
-    (session: IssuedSession) => {
-      storeSession(session);
-      applySession(session);
-    },
-    [applySession],
-  );
+  const login = useCallback(async () => {
+    setAuth(await resolveAuth());
+  }, [resolveAuth]);
 
   const logout = useCallback(() => {
-    if (auth.status === "authenticated") {
-      void logoutSession(auth.refreshToken).catch(() => {
-        /* best-effort — the client-side session is cleared either way */
-      });
-    }
-    clearStoredSession();
+    // Best-effort: the cookies are cleared server-side either way, and
+    // local state flips to logged-out regardless of whether this network
+    // call itself succeeds.
+    void logoutSession().catch(() => {});
     setAuth({ status: "unauthenticated" });
-  }, [auth]);
+  }, []);
 
-  return <AuthContext.Provider value={{ auth, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ auth, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

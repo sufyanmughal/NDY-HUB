@@ -7,8 +7,7 @@ import {
   rejectRoleChangeRequest,
   type RoleChangeRequest,
 } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
-import { decodeAccessToken } from "@/lib/auth-client";
+import { useMe } from "@/lib/use-me";
 
 /**
  * The review queue for dual-approval role changes. A request created by
@@ -18,25 +17,23 @@ import { decodeAccessToken } from "@/lib/auth-client";
  * someone click a button that's guaranteed to 403).
  */
 export function RoleChangeRequestPanel({
-  accessToken,
   refreshKey,
 }: {
-  accessToken: string;
   /** Bump this (e.g. a counter) from the parent whenever a request might
    * have been created elsewhere on the page — this component has its own
    * fetch state and otherwise only refreshes after its own actions. */
   refreshKey?: number;
 }) {
-  const { auth } = useAuth();
+  const me = useMe();
   const [pending, setPending] = useState<RoleChangeRequest[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
-    listRoleChangeRequests(accessToken, "PENDING")
+    listRoleChangeRequests("PENDING")
       .then(setPending)
       .catch((err) => setError((err as Error).message));
-  }, [accessToken]);
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -51,9 +48,9 @@ export function RoleChangeRequestPanel({
     setError(null);
     try {
       if (approve) {
-        await approveRoleChangeRequest(accessToken, request.id, reason || undefined);
+        await approveRoleChangeRequest(request.id, reason || undefined);
       } else {
-        await rejectRoleChangeRequest(accessToken, request.id, reason || undefined);
+        await rejectRoleChangeRequest(request.id, reason || undefined);
       }
       refresh();
     } catch (err) {
@@ -63,14 +60,16 @@ export function RoleChangeRequestPanel({
     }
   }
 
-  const currentUserId =
-    auth.status === "authenticated" ? decodeAccessToken(auth.accessToken)?.sub ?? null : null;
+  const currentUserId = me?.id ?? null;
 
   return (
     <div className="rounded-lg border border-border bg-surface p-5">
-      <h2 className="text-sm font-medium text-foreground-muted">Pending Role Change Requests</h2>
+      <h2 className="text-sm font-medium text-foreground-muted">
+        Pending Role Change Requests
+      </h2>
       <p className="mt-1 text-xs text-foreground-muted">
-        A role change proposed by one admin has to be approved by a different admin before it takes effect.
+        A role change proposed by one admin has to be approved by a different
+        admin before it takes effect.
       </p>
 
       {error && (
@@ -80,7 +79,9 @@ export function RoleChangeRequestPanel({
       )}
 
       {pending && pending.length === 0 && (
-        <p className="mt-4 text-sm text-foreground-muted">No pending requests.</p>
+        <p className="mt-4 text-sm text-foreground-muted">
+          No pending requests.
+        </p>
       )}
 
       {pending && pending.length > 0 && (
@@ -88,10 +89,14 @@ export function RoleChangeRequestPanel({
           {pending.map((r) => {
             const isOwnRequest = r.requestedByUserId === currentUserId;
             return (
-              <li key={r.id} className="rounded-md border border-border p-3 text-sm">
+              <li
+                key={r.id}
+                className="rounded-md border border-border p-3 text-sm"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <p>
-                    <span className="font-mono text-xs">{r.targetNdyId}</span>: {r.previousRole} →{" "}
+                    <span className="font-mono text-xs">{r.targetNdyId}</span>:{" "}
+                    {r.previousRole} →{" "}
                     <span className="font-medium">{r.requestedRole}</span>
                   </p>
                   <span className="shrink-0 rounded-full bg-warn/15 px-2 py-0.5 text-[11px] font-medium text-warn">
@@ -99,14 +104,19 @@ export function RoleChangeRequestPanel({
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-foreground-muted">
-                  Requested by {r.requestedByNdyId} · {new Date(r.createdAt).toLocaleString()}
+                  Requested by {r.requestedByNdyId} ·{" "}
+                  {new Date(r.createdAt).toLocaleString()}
                   {r.requestReason && <> · &ldquo;{r.requestReason}&rdquo;</>}
                 </p>
                 <div className="mt-3 flex gap-2">
                   <button
                     onClick={() => handleDecision(r, true)}
                     disabled={busyId === r.id || isOwnRequest}
-                    title={isOwnRequest ? "You requested this — a different admin has to approve it" : undefined}
+                    title={
+                      isOwnRequest
+                        ? "You requested this — a different admin has to approve it"
+                        : undefined
+                    }
                     className="rounded-md bg-good/15 px-3 py-1.5 text-xs font-medium text-good hover:bg-good/25 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Approve
@@ -114,13 +124,19 @@ export function RoleChangeRequestPanel({
                   <button
                     onClick={() => handleDecision(r, false)}
                     disabled={busyId === r.id || isOwnRequest}
-                    title={isOwnRequest ? "You requested this — a different admin has to review it" : undefined}
+                    title={
+                      isOwnRequest
+                        ? "You requested this — a different admin has to review it"
+                        : undefined
+                    }
                     className="rounded-md bg-critical/15 px-3 py-1.5 text-xs font-medium text-critical hover:bg-critical/25 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Reject
                   </button>
                   {isOwnRequest && (
-                    <span className="self-center text-xs text-foreground-muted">Your request — needs another admin</span>
+                    <span className="self-center text-xs text-foreground-muted">
+                      Your request — needs another admin
+                    </span>
                   )}
                 </div>
               </li>
@@ -131,4 +147,3 @@ export function RoleChangeRequestPanel({
     </div>
   );
 }
-

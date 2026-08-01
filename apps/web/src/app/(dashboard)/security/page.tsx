@@ -22,14 +22,14 @@ export default function SecurityPage() {
 
   const refresh = useCallback(() => {
     if (auth.status !== "authenticated") return;
-    getMySessions(auth.accessToken)
+    getMySessions()
       .then(setSessions)
       .catch((err) => setError((err as Error).message));
   }, [auth]);
 
   const refreshSites = useCallback(() => {
     if (auth.status !== "authenticated") return;
-    getConnectedSites(auth.accessToken)
+    getConnectedSites()
       .then(setSites)
       .catch((err) => setError((err as Error).message));
   }, [auth]);
@@ -40,13 +40,11 @@ export default function SecurityPage() {
   }, [refresh, refreshSites]);
 
   if (auth.status !== "authenticated") return null;
-  const accessToken = auth.accessToken;
-
   async function handleRevoke(sessionId: string) {
     setBusyId(sessionId);
     setError(null);
     try {
-      await revokeSessionById(accessToken, sessionId);
+      await revokeSessionById(sessionId);
       refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -59,7 +57,7 @@ export default function SecurityPage() {
     setSiteBusyId(grantId);
     setError(null);
     try {
-      await revokeConnectedSite(accessToken, grantId);
+      await revokeConnectedSite(grantId);
       refreshSites();
     } catch (err) {
       setError((err as Error).message);
@@ -71,7 +69,7 @@ export default function SecurityPage() {
   async function handleRevokeAll() {
     setError(null);
     try {
-      await revokeAllSessions(accessToken);
+      await revokeAllSessions();
       // Revokes the current session too — the local session is now stale,
       // so clear it and let DashboardGate send this tab back to /login.
       logout();
@@ -106,13 +104,20 @@ export default function SecurityPage() {
       )}
 
       <div className="rounded-lg border border-border bg-surface p-5">
-        <h2 className="text-sm font-medium text-foreground-muted">Active Sessions</h2>
+        <h2 className="text-sm font-medium text-foreground-muted">
+          Active Sessions
+        </h2>
         {sessions && sessions.length === 0 ? (
-          <p className="mt-3 text-sm text-foreground-muted">No active sessions.</p>
+          <p className="mt-3 text-sm text-foreground-muted">
+            No active sessions.
+          </p>
         ) : (
           <ul className="mt-3 divide-y divide-border">
             {sessions?.map((session) => (
-              <li key={session.id} className="flex items-center justify-between py-3 text-sm">
+              <li
+                key={session.id}
+                className="flex items-center justify-between py-3 text-sm"
+              >
                 <div>
                   <div className="flex items-center gap-2 font-medium">
                     {session.userAgent ?? "Unknown device"}
@@ -143,7 +148,9 @@ export default function SecurityPage() {
       </div>
 
       <div className="rounded-lg border border-border bg-surface p-5">
-        <h2 className="text-sm font-medium text-foreground-muted">Connected Websites</h2>
+        <h2 className="text-sm font-medium text-foreground-muted">
+          Connected Websites
+        </h2>
         {sites && sites.length === 0 ? (
           <p className="mt-3 text-sm text-foreground-muted">
             No third-party sites are connected to your NDY HUB account yet.
@@ -151,7 +158,10 @@ export default function SecurityPage() {
         ) : (
           <ul className="mt-3 divide-y divide-border">
             {sites?.map((site) => (
-              <li key={site.id} className="flex items-center justify-between py-3 text-sm">
+              <li
+                key={site.id}
+                className="flex items-center justify-between py-3 text-sm"
+              >
                 <div>
                   <div className="font-medium">{site.clientName}</div>
                   <div className="text-xs text-foreground-muted">
@@ -173,10 +183,11 @@ export default function SecurityPage() {
       </div>
 
       <p className="text-xs text-foreground-muted">
-        Revoking a session stops it from staying signed in past its current 15-minute access
-        token — it can no longer refresh into a new one. Revoking a connected website also kills
-        every refresh token it holds for your account, so it can&apos;t silently mint new access
-        tokens after the fact. NDYAPPS connection controls and login history land in a later
+        Revoking a session stops it from staying signed in past its current
+        15-minute access token — it can no longer refresh into a new one.
+        Revoking a connected website also kills every refresh token it holds for
+        your account, so it can&apos;t silently mint new access tokens after the
+        fact. NDYAPPS connection controls and login history land in a later
         milestone.
       </p>
     </div>

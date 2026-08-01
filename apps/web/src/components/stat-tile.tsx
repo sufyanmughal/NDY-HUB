@@ -23,7 +23,9 @@ export function StatTile({
   return (
     <div className="rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between">
-        <div className="text-xs uppercase tracking-wide text-foreground-muted">{label}</div>
+        <div className="text-xs uppercase tracking-wide text-foreground-muted">
+          {label}
+        </div>
         {Icon && (
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent">
             <Icon size={14} strokeWidth={2} />
@@ -31,9 +33,13 @@ export function StatTile({
         )}
       </div>
       <div className="mt-2 flex items-center gap-2">
-        <span className="font-mono text-lg font-semibold tabular-nums">{value}</span>
+        <span className="font-mono text-lg font-semibold tabular-nums">
+          {value}
+        </span>
         {badge && (
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${badgeTone}`}>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${badgeTone}`}
+          >
             {badge.text}
           </span>
         )}

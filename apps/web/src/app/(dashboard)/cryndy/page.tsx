@@ -51,7 +51,8 @@ export default function CryndyPage() {
         <div>
           <h1 className="text-2xl font-semibold">CRYNDY</h1>
           <p className="mt-1 text-sm text-foreground-muted">
-            Your CRYNDY purchase history and current holdings across the presale pipeline.
+            Your CRYNDY purchase history and current holdings across the presale
+            pipeline.
           </p>
         </div>
         <button
@@ -75,16 +76,22 @@ export default function CryndyPage() {
             key={status}
             label={STATUS_META[status].label}
             value={`${cryndyAmount.toLocaleString()} CRYNDY`}
-            badge={{ text: `${count} purchase${count === 1 ? "" : "s"}`, tone: STATUS_META[status].tone }}
+            badge={{
+              text: `${count} purchase${count === 1 ? "" : "s"}`,
+              tone: STATUS_META[status].tone,
+            }}
           />
         ))}
       </div>
 
       <div className="rounded-lg border border-border bg-surface p-5">
-        <h2 className="text-sm font-medium text-foreground-muted">Purchase History</h2>
+        <h2 className="text-sm font-medium text-foreground-muted">
+          Purchase History
+        </h2>
         {summary && summary.purchases.length === 0 ? (
           <p className="mt-3 text-sm text-foreground-muted">
-            No purchases yet — they&apos;ll show up here once the presale site sends one through.
+            No purchases yet — they&apos;ll show up here once the presale site
+            sends one through.
           </p>
         ) : (
           <div className="mt-3 overflow-x-auto">
@@ -104,10 +111,15 @@ export default function CryndyPage() {
                   const meta = STATUS_META[purchase.status];
                   return (
                     <tr key={purchase.id}>
-                      <td className="py-3 pr-4 font-mono text-xs">{purchase.reference}</td>
-                      <td className="py-3 pr-4 text-foreground-muted">{purchase.packageName ?? "—"}</td>
+                      <td className="py-3 pr-4 font-mono text-xs">
+                        {purchase.reference}
+                      </td>
+                      <td className="py-3 pr-4 text-foreground-muted">
+                        {purchase.packageName ?? "—"}
+                      </td>
                       <td className="py-3 pr-4 tabular-nums">
-                        {purchase.amountPaid.toLocaleString()} {purchase.currency}
+                        {purchase.amountPaid.toLocaleString()}{" "}
+                        {purchase.currency}
                       </td>
                       <td className="py-3 pr-4 tabular-nums">
                         {purchase.cryndyAmount.toLocaleString()}
@@ -137,8 +149,9 @@ export default function CryndyPage() {
       </div>
 
       <p className="text-xs text-foreground-muted">
-        Only CRYNDY in Available or Distributed On-Chain status can be used or transferred — Locked
-        and Allocated CRYNDY is yours but not yet spendable.
+        Only CRYNDY in Available or Distributed On-Chain status can be used or
+        transferred — Locked and Allocated CRYNDY is yours but not yet
+        spendable.
       </p>
     </div>
   );

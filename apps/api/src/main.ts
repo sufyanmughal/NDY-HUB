@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { mkdirSync } from 'fs';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { UPLOADS_ROOT_DIR, PROFILE_PHOTOS_DIR } from './common/upload-dir.util';
 
@@ -48,6 +49,10 @@ async function bootstrap() {
     },
     credentials: true,
   });
+  // Reads the httpOnly session cookies (see auth/session-cookie.util.ts)
+  // into req.cookies — JwtAuthGuard and the refresh endpoint both need
+  // this to authenticate a browser request that carries no Bearer header.
+  app.use(cookieParser());
   app.useStaticAssets(UPLOADS_ROOT_DIR, { prefix: '/uploads/' });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   await app.listen(process.env.PORT ?? 3000);

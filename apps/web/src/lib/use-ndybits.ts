@@ -11,7 +11,7 @@ export function useNdybitsSummary(): NdybitsSummary | null {
   useEffect(() => {
     if (auth.status !== "authenticated") return;
     let cancelled = false;
-    getMyNdybits(auth.accessToken)
+    getMyNdybits()
       .then((result) => {
         if (!cancelled) setSummary(result);
       })

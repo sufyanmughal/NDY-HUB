@@ -11,7 +11,7 @@ export function useMembershipSummary(): MembershipSummary | null {
   useEffect(() => {
     if (auth.status !== "authenticated") return;
     let cancelled = false;
-    getMyMembership(auth.accessToken)
+    getMyMembership()
       .then((result) => {
         if (!cancelled) setSummary(result);
       })
