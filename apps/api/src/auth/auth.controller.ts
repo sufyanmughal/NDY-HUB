@@ -18,9 +18,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { randomUUID } from 'crypto';
-import { extname } from 'path';
+import { memoryStorage } from 'multer';
 import type { Request, Response } from 'express';
 import { SessionCookieInterceptor } from './session-cookie.interceptor';
 import {
@@ -52,7 +50,6 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthenticatedRequestUser } from './guards/jwt-auth.guard';
 import type { SessionMeta } from './session.service';
-import { PROFILE_PHOTOS_DIR } from '../common/upload-dir.util';
 
 // 5 attempts/minute/IP — the actual credential-guessing targets. Tighter
 // than the app-wide default (100/min, set in AppModule) on purpose: these
@@ -173,19 +170,11 @@ export class AuthController {
   @Post('me/photo')
   @UseInterceptors(
     FileInterceptor('photo', {
-      storage: diskStorage({
-        destination: PROFILE_PHOTOS_DIR,
-        // A random filename, not the original — the original is
-        // attacker-controlled input and never trusted for a path, and a
-        // random name also means re-uploading always produces a fresh URL
-        // (no browser/CDN cache serving a stale image back).
-        filename: (_req, file, cb) => {
-          cb(
-            null,
-            `${randomUUID()}${extname(file.originalname).toLowerCase()}`,
-          );
-        },
-      }),
+      // In memory, not disk — PhotoStorageService uploads the buffer
+      // straight to Vercel Blob (or writes it to local disk in dev) and
+      // picks its own random filename, not the attacker-controlled
+      // original one.
+      storage: memoryStorage(),
       limits: { fileSize: MAX_PHOTO_SIZE_BYTES },
       fileFilter: (_req, file, cb) => {
         if (!ALLOWED_PHOTO_MIME_TYPES.includes(file.mimetype)) {
@@ -208,7 +197,7 @@ export class AuthController {
     if (!file) {
       throw new BadRequestException('No photo file was uploaded.');
     }
-    return this.auth.updateProfilePhoto(user.sub, file.filename);
+    return this.auth.updateProfilePhoto(user.sub, file);
   }
 
   @Throttle(BRUTE_FORCE_GUARD)

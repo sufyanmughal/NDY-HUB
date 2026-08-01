@@ -9,8 +9,6 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { customAlphabet } from 'nanoid';
 import { createHash } from 'crypto';
-import { unlink } from 'fs/promises';
-import { join } from 'path';
 import {
   LoginRequestMethod,
   LoginRequestStatus,
@@ -18,8 +16,8 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
-import { PROFILE_PHOTOS_DIR } from '../common/upload-dir.util';
 import { GeoIpService } from '../common/geo-ip.service';
+import { PhotoStorageService } from '../common/photo-storage.service';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
 import { TotpService } from './totp.service';
 import { LoginRequestGateway } from './login-request.gateway';
@@ -53,6 +51,7 @@ export class AuthService {
     private readonly gateway: LoginRequestGateway,
     private readonly config: ConfigService,
     private readonly geoIp: GeoIpService,
+    private readonly photoStorage: PhotoStorageService,
   ) {}
 
   async register(dto: RegisterDto, meta: SessionMeta): Promise<IssuedSession> {
@@ -134,39 +133,27 @@ export class AuthService {
 
   /**
    * The upload endpoint's counterpart to updateProfile's arbitrary-URL
-   * path — this one is what the file actually landed on disk as, not a
+   * path — this one is a real uploaded file, stored via PhotoStorageService
+   * (Vercel Blob in production, local disk in dev) rather than a
    * client-supplied string. Deletes whatever photo the user had before
    * (best-effort — a leftover file if this fails is harmless, unlike
    * failing the new upload over it) so re-uploading doesn't pile up
-   * orphaned files on disk forever.
+   * orphaned files forever.
    */
   async updateProfilePhoto(
     userId: string,
-    filename: string,
+    file: Express.Multer.File,
   ): Promise<{ profilePhotoUrl: string }> {
     const user = await this.identity.findById(userId);
-    const apiUrl =
-      this.config.get<string>('API_URL') ??
-      `http://localhost:${this.config.get('PORT') ?? 3000}`;
-    const profilePhotoUrl = `${apiUrl}/uploads/profile-photos/${filename}`;
+    const profilePhotoUrl = await this.photoStorage.save(file);
 
-    await this.deleteStalePhoto(user.profilePhotoUrl);
+    await this.photoStorage.deleteByUrl(user.profilePhotoUrl);
     await this.prisma.user.update({
       where: { id: userId },
       data: { profilePhotoUrl },
     });
 
     return { profilePhotoUrl };
-  }
-
-  private async deleteStalePhoto(currentUrl: string | null): Promise<void> {
-    const marker = '/uploads/profile-photos/';
-    if (!currentUrl?.includes(marker)) return;
-    const filename = currentUrl.split(marker)[1];
-    if (!filename) return;
-    await unlink(join(PROFILE_PHOTOS_DIR, filename)).catch(() => {
-      /* best-effort — a stray file left on disk is harmless */
-    });
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
