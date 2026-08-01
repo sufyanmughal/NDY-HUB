@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common';
 import { FounderController } from './founder.controller';
 import { FounderService } from './founder.service';
-import { FounderGuard } from './guards/founder.guard';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [AuthModule], // for JwtAuthGuard on FounderController
+  imports: [AuthModule], // for JwtAuthGuard on FounderController — PermissionGuard resolves via the global PrismaModule
   controllers: [FounderController],
-  providers: [FounderService, FounderGuard],
+  providers: [FounderService],
 })
 export class FounderModule {}

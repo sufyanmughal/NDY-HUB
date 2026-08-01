@@ -35,15 +35,24 @@ enum LoginRequestMethod {
 // the proposal eventually wants (Verified User + Member + CRYNDY Holder +
 // Business Verified, worn simultaneously) — that needs a join table and
 // isn't needed yet to gate "can this person see the admin dashboard."
-// FOUNDER sits above ADMIN — it's the gate for Founder Mission Control (see
-// the founder module) and implicitly has every ADMIN capability too (see
-// AdminGuard). Not the full role set from the client's long-term RBAC
-// requirements (Finance/Support/Content/Partners/Auditor) — deliberately
-// scoped to just what Founder Mission Control's first shell needs.
+// The client's requested role set (FOUNDER, SUPER_ADMIN, DEVELOPER,
+// FINANCE, SUPPORT, CONTENT, PARTNERS, AUDITOR) plus USER as the default.
+// What each role can actually *do* is defined in code, not the schema —
+// see common/permissions.ts. CONTENT and PARTNERS are assignable today but
+// currently grant no permissions: there's no content or partner management
+// feature yet for them to gate, so wiring a permission for either would be
+// hollow. FOUNDER implicitly has every permission (see permissions.ts);
+// every other role's access is exactly what's listed there, nothing more.
 enum Role {
   USER
-  ADMIN
   FOUNDER
+  SUPER_ADMIN
+  DEVELOPER
+  FINANCE
+  SUPPORT
+  CONTENT
+  PARTNERS
+  AUDITOR
 }
 
 model User {

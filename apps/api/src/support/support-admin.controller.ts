@@ -11,11 +11,14 @@ import type { Request } from 'express';
 import { SupportService } from './support.service';
 import { ReplySupportTicketDto } from './dto/reply-support-ticket.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../admin/guards/admin.guard';
+import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { Permission } from '../common/permissions';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedRequestUser } from '../auth/guards/jwt-auth.guard';
 
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission(Permission.MANAGE_SUPPORT_TICKETS)
 @Controller('admin/support-tickets')
 export class SupportAdminController {
   constructor(private readonly support: SupportService) {}

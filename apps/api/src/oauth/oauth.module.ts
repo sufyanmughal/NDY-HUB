@@ -15,10 +15,10 @@ import { AuthModule } from '../auth/auth.module';
 import { IdentityModule } from '../identity/identity.module';
 
 @Module({
-  // AuthModule: JwtAuthGuard (consent/status/grants endpoints), AdminGuard,
-  // and the shared JwtModule (OAuthTokenService signs with the same
-  // JwtService). IdentityModule: user lookups the token/userinfo endpoints
-  // both need.
+  // AuthModule: JwtAuthGuard (consent/status/grants endpoints), and the
+  // shared JwtModule (OAuthTokenService signs with the same JwtService).
+  // PermissionGuard resolves via the global PrismaModule. IdentityModule:
+  // user lookups the token/userinfo endpoints both need.
   imports: [AuthModule, IdentityModule],
   controllers: [
     OAuthClientAdminController,

@@ -10,13 +10,16 @@ import {
 import { OAuthClientService } from './oauth-client.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../admin/guards/admin.guard';
+import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { Permission } from '../common/permissions';
 import { ALL_SCOPES, OIDC_SCOPES } from './scopes';
 
 // "Manage website integrations" from the admin dashboard requirements —
 // this is where a connected NDJOYIT site gets registered as an OAuth
 // client, with the redirect URIs and scopes it's allowed to request.
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission(Permission.MANAGE_OAUTH_CLIENTS)
 @Controller('admin/oauth-clients')
 export class OAuthClientAdminController {
   constructor(private readonly clients: OAuthClientService) {}

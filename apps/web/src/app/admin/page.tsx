@@ -10,42 +10,50 @@ import {
   setAdminOAuthClientActive,
   adminListSupportTickets,
   adminReplySupportTicket,
-  ApiError,
   type AuditLogEntry,
   type AdminOAuthClient,
   type AdminSupportTicket,
 } from "@/lib/api";
+import { useMe } from "@/lib/use-me";
+import { roleHasPermission, roleHasAnyPermission } from "@/lib/permissions";
 import { UserManagementPanel } from "@/components/user-management-panel";
 
+/**
+ * With 9 roles each granting different, non-overlapping admin capabilities
+ * (see common/permissions.ts on the API side), there's no single "admin
+ * access" gate anymore — a Support agent legitimately sees only Support
+ * Tickets here, an Auditor only the Audit Log, and so on. Each section is
+ * shown or hidden based on the viewer's own role rather than one
+ * all-or-nothing check.
+ */
 export default function AdminPage() {
   const { auth } = useAuth();
-  const [auditLog, setAuditLog] = useState<AuditLogEntry[] | null>(null);
-  const [accessDenied, setAccessDenied] = useState(false);
-
-  const refresh = useCallback(() => {
-    if (auth.status !== "authenticated") return;
-    getAdminAuditLog(auth.accessToken)
-      .then(({ entries }) => setAuditLog(entries))
-      .catch((err) => {
-        if (err instanceof ApiError && err.status === 403) {
-          setAccessDenied(true);
-        }
-      });
-  }, [auth]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  const me = useMe();
 
   if (auth.status !== "authenticated") return null;
   const accessToken = auth.accessToken;
 
-  if (accessDenied) {
+  // me is null only while the /auth/me fetch is still in flight — render
+  // nothing rather than flash "no access" and then sections popping in.
+  if (!me) return null;
+
+  const canManageUsers = roleHasPermission(me.role, "MANAGE_USERS");
+  const canViewAuditLog = roleHasPermission(me.role, "VIEW_AUDIT_LOG");
+  const canManageOAuthClients = roleHasPermission(me.role, "MANAGE_OAUTH_CLIENTS");
+  const canManageSupportTickets = roleHasPermission(me.role, "MANAGE_SUPPORT_TICKETS");
+  const hasAnyAdminAccess = roleHasAnyPermission(me.role, [
+    "MANAGE_USERS",
+    "VIEW_AUDIT_LOG",
+    "MANAGE_OAUTH_CLIENTS",
+    "MANAGE_SUPPORT_TICKETS",
+  ]);
+
+  if (!hasAnyAdminAccess) {
     return (
       <div className="rounded-lg border border-critical/30 bg-critical/10 p-6 text-center">
         <p className="text-sm font-medium text-critical">Admin access required.</p>
         <p className="mt-1 text-xs text-foreground-muted">
-          {auth.ndyId} is signed in but isn&apos;t an admin on this server.
+          {auth.ndyId} is signed in as {me.role}, which doesn&apos;t include any admin permissions on this server.
         </p>
       </div>
     );
@@ -56,38 +64,53 @@ export default function AdminPage() {
       <div>
         <h1 className="text-2xl font-semibold">Admin</h1>
         <p className="mt-1 text-sm text-foreground-muted">
-          User search, roles, and suspension. Every action here is written to the audit log.
+          Signed in as {me.role}. Sections below reflect exactly what that role can do — every action taken is
+          written to the audit log.
         </p>
       </div>
 
-      <UserManagementPanel accessToken={accessToken} />
+      {canManageUsers && <UserManagementPanel accessToken={accessToken} />}
+      {canViewAuditLog && <AuditLogSection accessToken={accessToken} />}
+      {canManageOAuthClients && <OAuthClientsSection accessToken={accessToken} />}
+      {canManageSupportTickets && <SupportTicketsSection accessToken={accessToken} />}
+    </div>
+  );
+}
 
-      <div className="rounded-lg border border-border bg-surface p-5">
-        <h2 className="text-sm font-medium text-foreground-muted">Audit Log</h2>
-        {auditLog && auditLog.length === 0 ? (
-          <p className="mt-3 text-sm text-foreground-muted">No admin actions yet.</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-border">
-            {auditLog?.map((entry) => (
-              <li key={entry.id} className="py-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs">{entry.action}</span>
-                  <span className="text-xs text-foreground-muted">
-                    {new Date(entry.createdAt).toLocaleString()}
-                  </span>
-                </div>
-                <div className="mt-1 text-xs text-foreground-muted">
-                  {entry.adminNdyId} → {entry.targetNdyId ?? "—"}
-                  {entry.reason && <> · &ldquo;{entry.reason}&rdquo;</>}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+function AuditLogSection({ accessToken }: { accessToken: string }) {
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[] | null>(null);
 
-      <OAuthClientsSection accessToken={accessToken} />
-      <SupportTicketsSection accessToken={accessToken} />
+  useEffect(() => {
+    getAdminAuditLog(accessToken)
+      .then(({ entries }) => setAuditLog(entries))
+      .catch(() => {
+        /* section just stays empty on failure — this viewer already passed the client-side permission check */
+      });
+  }, [accessToken]);
+
+  return (
+    <div className="rounded-lg border border-border bg-surface p-5">
+      <h2 className="text-sm font-medium text-foreground-muted">Audit Log</h2>
+      {auditLog && auditLog.length === 0 ? (
+        <p className="mt-3 text-sm text-foreground-muted">No admin actions yet.</p>
+      ) : (
+        <ul className="mt-3 divide-y divide-border">
+          {auditLog?.map((entry) => (
+            <li key={entry.id} className="py-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs">{entry.action}</span>
+                <span className="text-xs text-foreground-muted">
+                  {new Date(entry.createdAt).toLocaleString()}
+                </span>
+              </div>
+              <div className="mt-1 text-xs text-foreground-muted">
+                {entry.adminNdyId} → {entry.targetNdyId ?? "—"}
+                {entry.reason && <> · &ldquo;{entry.reason}&rdquo;</>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -635,7 +635,31 @@ export function adminReplySupportTicket(
 // UI element. The frontend has no separate "am I admin" check; it just
 // calls these and handles the 403 (see AdminGate).
 
-export type UserRole = "USER" | "ADMIN" | "FOUNDER";
+export type UserRole =
+  | "USER"
+  | "FOUNDER"
+  | "SUPER_ADMIN"
+  | "DEVELOPER"
+  | "FINANCE"
+  | "SUPPORT"
+  | "CONTENT"
+  | "PARTNERS"
+  | "AUDITOR";
+
+/** Only roles a Super Admin (or anyone else with MANAGE_ROLES but not
+ * FOUNDER) may assign — mirrors the backend's ASSIGNABLE_BY_SUPER_ADMIN in
+ * common/permissions.ts. FOUNDER and SUPER_ADMIN are deliberately excluded:
+ * only an existing Founder can hand those out, enforced server-side
+ * regardless of what this list says — this is just what the picker offers. */
+export const ASSIGNABLE_ROLES: UserRole[] = [
+  "USER",
+  "DEVELOPER",
+  "FINANCE",
+  "SUPPORT",
+  "CONTENT",
+  "PARTNERS",
+  "AUDITOR",
+];
 
 export interface AdminUserSummary {
   id: string;

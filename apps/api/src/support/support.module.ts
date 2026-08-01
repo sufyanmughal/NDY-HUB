@@ -5,7 +5,7 @@ import { SupportAdminController } from './support-admin.controller';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [AuthModule], // for JwtAuthGuard — AdminGuard resolves via the global PrismaModule, same as OAuthClientAdminController
+  imports: [AuthModule], // for JwtAuthGuard — PermissionGuard resolves via the global PrismaModule, same as OAuthClientAdminController
   controllers: [SupportController, SupportAdminController],
   providers: [SupportService],
 })

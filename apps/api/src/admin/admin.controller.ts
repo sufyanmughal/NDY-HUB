@@ -14,15 +14,18 @@ import { AdminService, type AdminActor } from './admin.service';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { SuspendUserDto } from './dto/suspend-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminGuard } from './guards/admin.guard';
+import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { Permission } from '../common/permissions';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedRequestUser } from '../auth/guards/jwt-auth.guard';
 
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 @Controller('admin')
 export class AdminController {
   constructor(private readonly admin: AdminService) {}
 
+  @RequirePermission(Permission.MANAGE_USERS)
   @Get('users')
   searchUsers(
     @Query('q') q?: string,
@@ -32,11 +35,13 @@ export class AdminController {
     return this.admin.searchUsers(q, clampTake(take), parseSkip(skip));
   }
 
+  @RequirePermission(Permission.MANAGE_USERS)
   @Get('users/:id')
   getUser(@Param('id') id: string) {
     return this.admin.getUserDetail(id);
   }
 
+  @RequirePermission(Permission.MANAGE_ROLES)
   @Patch('users/:id/role')
   updateRole(
     @Param('id') id: string,
@@ -52,6 +57,7 @@ export class AdminController {
     );
   }
 
+  @RequirePermission(Permission.MANAGE_USERS)
   @Post('users/:id/suspend')
   suspend(
     @Param('id') id: string,
@@ -62,6 +68,7 @@ export class AdminController {
     return this.admin.setSuspended(actorFrom(user, req), id, true, dto.reason);
   }
 
+  @RequirePermission(Permission.MANAGE_USERS)
   @Post('users/:id/unsuspend')
   unsuspend(
     @Param('id') id: string,
@@ -72,6 +79,7 @@ export class AdminController {
     return this.admin.setSuspended(actorFrom(user, req), id, false, dto.reason);
   }
 
+  @RequirePermission(Permission.VIEW_AUDIT_LOG)
   @Get('audit-log')
   getAuditLog(@Query('take') take?: string, @Query('skip') skip?: string) {
     return this.admin.getAuditLog(clampTake(take), parseSkip(skip));

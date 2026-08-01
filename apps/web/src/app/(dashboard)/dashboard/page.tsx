@@ -46,7 +46,7 @@ export default function DashboardPage() {
           },
         ]
       : []),
-    ...(me?.role === "ADMIN" || me?.role === "FOUNDER"
+    ...(me?.role === "SUPER_ADMIN" || me?.role === "FOUNDER"
       ? [
           {
             href: "/admin",

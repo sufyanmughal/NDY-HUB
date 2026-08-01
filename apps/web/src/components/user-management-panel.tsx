@@ -5,19 +5,50 @@ import {
   searchAdminUsers,
   adminUpdateRole,
   adminSetSuspended,
+  ASSIGNABLE_ROLES,
   type AdminUserSummary,
+  type UserRole,
 } from "@/lib/api";
+import { useMe } from "@/lib/use-me";
+
+const ALL_ROLES: UserRole[] = [
+  "USER",
+  "SUPPORT",
+  "AUDITOR",
+  "DEVELOPER",
+  "FINANCE",
+  "CONTENT",
+  "PARTNERS",
+  "SUPER_ADMIN",
+  "FOUNDER",
+];
+
+const ROLE_BADGE_CLASS: Record<UserRole, string> = {
+  FOUNDER: "bg-warn/15 text-warn",
+  SUPER_ADMIN: "bg-accent/15 text-accent",
+  DEVELOPER: "bg-cyan-500/15 text-cyan-400",
+  FINANCE: "bg-amber-500/15 text-amber-400",
+  SUPPORT: "bg-emerald-500/15 text-emerald-400",
+  CONTENT: "bg-pink-500/15 text-pink-400",
+  PARTNERS: "bg-violet-500/15 text-violet-400",
+  AUDITOR: "bg-blue-500/15 text-blue-400",
+  USER: "bg-foreground-muted/15 text-foreground-muted",
+};
 
 /**
- * Shared between /admin and /founder — both roles reach the same
- * user-search/role/suspend endpoints (AdminGuard accepts ADMIN and
- * FOUNDER), so this is one implementation instead of two copies drifting
- * apart. The promote/demote toggle deliberately only cycles USER<->ADMIN;
- * assigning FOUNDER stays a manual, deliberate action (see the "Bootstrapping
- * the first Founder" doc) rather than something reachable from a list-view
- * button click.
+ * Shared between /admin and /founder — both reach the same user-search/
+ * role/suspend endpoints (PermissionGuard's MANAGE_USERS/MANAGE_ROLES
+ * accept both SUPER_ADMIN and FOUNDER), so this is one implementation
+ * instead of two copies drifting apart.
+ *
+ * The role picker only *offers* what the current viewer is actually
+ * allowed to assign (mirrors the backend's ASSIGNABLE_BY_SUPER_ADMIN — a
+ * Founder sees every role including Founder/Super Admin, anyone else sees
+ * the restricted operational set) but the server is the real authority:
+ * this is UX, not the security boundary.
  */
 export function UserManagementPanel({ accessToken }: { accessToken: string }) {
+  const me = useMe();
   const [users, setUsers] = useState<AdminUserSummary[] | null>(null);
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
@@ -40,11 +71,12 @@ export function UserManagementPanel({ accessToken }: { accessToken: string }) {
     refresh();
   }, [refresh]);
 
-  async function handlePromote(user: AdminUserSummary) {
-    if (user.role === "FOUNDER") return; // not reachable from here, see doc comment above
-    const nextRole = user.role === "ADMIN" ? "USER" : "ADMIN";
+  const assignableRoles = me?.role === "FOUNDER" ? ALL_ROLES : ASSIGNABLE_ROLES;
+
+  async function handleRoleChange(user: AdminUserSummary, nextRole: UserRole) {
+    if (nextRole === user.role) return;
     const reason = window.prompt(
-      `${nextRole === "ADMIN" ? "Promote" : "Demote"} ${user.ndyId} to ${nextRole}? Optional reason for the audit log:`,
+      `Change ${user.ndyId}'s role from ${user.role} to ${nextRole}? Optional reason for the audit log:`,
     );
     if (reason === null) return; // cancelled
     setBusyUserId(user.id);
@@ -77,12 +109,6 @@ export function UserManagementPanel({ accessToken }: { accessToken: string }) {
     }
   }
 
-  function roleBadgeClass(role: AdminUserSummary["role"]) {
-    if (role === "FOUNDER") return "bg-warn/15 text-warn";
-    if (role === "ADMIN") return "bg-accent/15 text-accent";
-    return "bg-foreground-muted/15 text-foreground-muted";
-  }
-
   return (
     <div className="rounded-lg border border-border bg-surface p-5">
       <div className="flex items-center justify-between">
@@ -112,7 +138,7 @@ export function UserManagementPanel({ accessToken }: { accessToken: string }) {
       </div>
 
       <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[820px] text-left text-sm">
           <thead>
             <tr className="border-b border-border text-xs uppercase tracking-wide text-foreground-muted">
               <th className="py-2 pr-4 font-medium">NDY ID</th>
@@ -124,36 +150,53 @@ export function UserManagementPanel({ accessToken }: { accessToken: string }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {users?.map((u) => (
-              <tr key={u.id}>
-                <td className="py-3 pr-4 font-mono text-xs">{u.ndyId}</td>
-                <td className="py-3 pr-4">{u.email}</td>
-                <td className="py-3 pr-4">
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${roleBadgeClass(u.role)}`}>
-                    {u.role}
-                  </span>
-                </td>
-                <td className="py-3 pr-4">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                      u.suspended ? "bg-critical/15 text-critical" : "bg-good/15 text-good"
-                    }`}
-                  >
-                    {u.suspended ? "Suspended" : "Active"}
-                  </span>
-                </td>
-                <td className="py-3 pr-4 text-foreground-muted">
-                  {new Date(u.createdAt).toLocaleDateString()}
-                </td>
-                <td className="py-3 pr-4">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handlePromote(u)}
-                      disabled={busyUserId === u.id || u.role === "FOUNDER"}
-                      className="rounded-md border border-border px-2 py-1 text-xs hover:bg-surface-2 disabled:opacity-50"
+            {users?.map((u) => {
+              // Can't offer a role this viewer isn't allowed to assign —
+              // except the user's own current role, so the <select> always
+              // has a valid selected option even if that role is otherwise
+              // out of the viewer's reach (e.g. a Super Admin viewing a
+              // Founder's row).
+              const options = assignableRoles.includes(u.role)
+                ? assignableRoles
+                : [u.role, ...assignableRoles];
+
+              return (
+                <tr key={u.id}>
+                  <td className="py-3 pr-4 font-mono text-xs">{u.ndyId}</td>
+                  <td className="py-3 pr-4">{u.email}</td>
+                  <td className="py-3 pr-4">
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${ROLE_BADGE_CLASS[u.role]}`}>
+                        {u.role}
+                      </span>
+                      <select
+                        value={u.role}
+                        onChange={(e) => handleRoleChange(u, e.target.value as UserRole)}
+                        disabled={busyUserId === u.id}
+                        className="rounded-md border border-border bg-background px-1.5 py-1 text-xs disabled:opacity-50"
+                        aria-label={`Change role for ${u.ndyId}`}
+                      >
+                        {options.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </td>
+                  <td className="py-3 pr-4">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        u.suspended ? "bg-critical/15 text-critical" : "bg-good/15 text-good"
+                      }`}
                     >
-                      {u.role === "ADMIN" ? "Demote" : "Promote"}
-                    </button>
+                      {u.suspended ? "Suspended" : "Active"}
+                    </span>
+                  </td>
+                  <td className="py-3 pr-4 text-foreground-muted">
+                    {new Date(u.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="py-3 pr-4">
                     <button
                       onClick={() => handleSuspendToggle(u)}
                       disabled={busyUserId === u.id}
@@ -161,10 +204,10 @@ export function UserManagementPanel({ accessToken }: { accessToken: string }) {
                     >
                       {u.suspended ? "Unsuspend" : "Suspend"}
                     </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
