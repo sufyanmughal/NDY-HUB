@@ -5,11 +5,14 @@ import {
   searchAdminUsers,
   createRoleChangeRequest,
   adminSetSuspended,
+  getAdminUserDetail,
   ASSIGNABLE_ROLES,
   type AdminUserSummary,
+  type AdminUserDetail,
   type UserRole,
 } from "@/lib/api";
 import { useMe } from "@/lib/use-me";
+import { UserDetailPanel } from "@/components/user-detail-panel";
 
 const ALL_ROLES: UserRole[] = [
   "USER",
@@ -63,6 +66,28 @@ export function UserManagementPanel({
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<AdminUserDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  function openDetail(userId: string) {
+    setDetailUserId(userId);
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(true);
+    getAdminUserDetail(userId)
+      .then(setDetail)
+      .catch((err) => setDetailError((err as Error).message))
+      .finally(() => setDetailLoading(false));
+  }
+
+  function closeDetail() {
+    setDetailUserId(null);
+    setDetail(null);
+    setDetailError(null);
+  }
 
   const refresh = useCallback((q?: string) => {
     searchAdminUsers(q)
@@ -221,13 +246,21 @@ export function UserManagementPanel({
                     {new Date(u.createdAt).toLocaleDateString()}
                   </td>
                   <td className="py-3 pr-4">
-                    <button
-                      onClick={() => handleSuspendToggle(u)}
-                      disabled={busyUserId === u.id}
-                      className="rounded-md border border-border px-2 py-1 text-xs hover:bg-surface-2 disabled:opacity-50"
-                    >
-                      {u.suspended ? "Unsuspend" : "Suspend"}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openDetail(u.id)}
+                        className="rounded-md border border-border px-2 py-1 text-xs hover:bg-surface-2"
+                      >
+                        View
+                      </button>
+                      <button
+                        onClick={() => handleSuspendToggle(u)}
+                        disabled={busyUserId === u.id}
+                        className="rounded-md border border-border px-2 py-1 text-xs hover:bg-surface-2 disabled:opacity-50"
+                      >
+                        {u.suspended ? "Unsuspend" : "Suspend"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -238,6 +271,15 @@ export function UserManagementPanel({
       <p className="mt-3 text-xs text-foreground-muted">
         {total} total user(s).
       </p>
+
+      {detailUserId && (
+        <UserDetailPanel
+          detail={detail}
+          loading={detailLoading}
+          error={detailError}
+          onClose={closeDetail}
+        />
+      )}
     </div>
   );
 }

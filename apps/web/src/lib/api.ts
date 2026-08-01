@@ -790,12 +790,37 @@ export interface AdminUserSummary {
   createdAt: string;
 }
 
-export interface AdminUserDetail extends AdminUserSummary {
+export interface AdminUserDetail {
+  id: string;
+  ndyId: string;
+  email: string;
+  fullName: string | null;
+  profilePhotoUrl: string | null;
+  role: UserRole;
+
+  suspended: boolean;
+  suspendedAt: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+
+  verificationLevel: string;
+  emailVerifiedAt: string | null;
+  phoneVerifiedAt: string | null;
+  identityVerifiedAt: string | null;
+
+  twoFactorEnabled: boolean;
+  passkeyCount: number;
+  activeSessionCount: number;
+
+  ndyappsConnected: boolean;
+  ndyappsConnectedAt: string | null;
+  connectedProviders: { provider: "GOOGLE" | "APPLE"; email: string | null; linkedAt: string }[];
+
   membership: { tierLabel: string; status: string } | null;
   cryndyAvailableBalance: number;
   cryndyPurchaseCount: number;
   ndybitsBalance: number;
-  activeSessionCount: number;
 }
 
 export function searchAdminUsers(

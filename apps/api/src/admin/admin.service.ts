@@ -51,20 +51,31 @@ export class AdminService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('No user with that id.');
 
-    const [currentMembership, cryndyPurchases, ndybitsAgg, activeSessionCount] =
-      await Promise.all([
-        this.prisma.membership.findFirst({
-          where: { userId: id, status: 'ACTIVE' },
-        }),
-        this.prisma.cryndyPurchase.findMany({ where: { userId: id } }),
-        this.prisma.ndybitsLedgerEntry.aggregate({
-          where: { userId: id },
-          _sum: { amount: true },
-        }),
-        this.prisma.session.count({
-          where: { userId: id, revokedAt: null, expiresAt: { gt: new Date() } },
-        }),
-      ]);
+    const [
+      currentMembership,
+      cryndyPurchases,
+      ndybitsAgg,
+      activeSessionCount,
+      passkeyCount,
+      authIdentities,
+    ] = await Promise.all([
+      this.prisma.membership.findFirst({
+        where: { userId: id, status: 'ACTIVE' },
+      }),
+      this.prisma.cryndyPurchase.findMany({ where: { userId: id } }),
+      this.prisma.ndybitsLedgerEntry.aggregate({
+        where: { userId: id },
+        _sum: { amount: true },
+      }),
+      this.prisma.session.count({
+        where: { userId: id, revokedAt: null, expiresAt: { gt: new Date() } },
+      }),
+      this.prisma.passkey.count({ where: { userId: id } }),
+      this.prisma.authIdentity.findMany({
+        where: { userId: id },
+        select: { provider: true, email: true, createdAt: true },
+      }),
+    ]);
 
     const cryndyAvailable = cryndyPurchases
       .filter(
@@ -76,15 +87,45 @@ export class AdminService {
       );
 
     return {
+      // Identity
       id: user.id,
       ndyId: user.ndyId,
       email: user.email,
       fullName: user.fullName,
+      profilePhotoUrl: user.profilePhotoUrl,
       role: user.role,
+
+      // Account status
       suspended: user.suspended,
-      verificationLevel: user.verificationLevel,
-      ndyappsConnected: user.ndyappsConnected,
+      suspendedAt: user.suspendedAt,
+      deletedAt: user.deletedAt,
       createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+
+      // Verification — the summary level plus exactly when each step
+      // actually happened, not just the rolled-up LEVEL_N label.
+      verificationLevel: user.verificationLevel,
+      emailVerifiedAt: user.emailVerifiedAt,
+      phoneVerifiedAt: user.phoneVerifiedAt,
+      identityVerifiedAt: user.identityVerifiedAt,
+
+      // Security posture — enough for a support/security review without
+      // exposing the secrets themselves (no password hash, no TOTP secret,
+      // no token hashes; none of that is meaningful to display anyway).
+      twoFactorEnabled: Boolean(user.totpEnabledAt),
+      passkeyCount,
+      activeSessionCount,
+
+      // External connections
+      ndyappsConnected: user.ndyappsConnected,
+      ndyappsConnectedAt: user.ndyappsConnectedAt,
+      connectedProviders: authIdentities.map((identity) => ({
+        provider: identity.provider,
+        email: identity.email,
+        linkedAt: identity.createdAt,
+      })),
+
+      // Ecosystem activity
       membership: currentMembership
         ? {
             tierLabel: TIER_CONFIG[currentMembership.tier].label,
@@ -94,7 +135,6 @@ export class AdminService {
       cryndyAvailableBalance: cryndyAvailable,
       cryndyPurchaseCount: cryndyPurchases.length,
       ndybitsBalance: ndybitsAgg._sum.amount ?? 0,
-      activeSessionCount,
     };
   }
 
