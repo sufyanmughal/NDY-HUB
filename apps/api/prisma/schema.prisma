@@ -35,9 +35,15 @@ enum LoginRequestMethod {
 // the proposal eventually wants (Verified User + Member + CRYNDY Holder +
 // Business Verified, worn simultaneously) — that needs a join table and
 // isn't needed yet to gate "can this person see the admin dashboard."
+// FOUNDER sits above ADMIN — it's the gate for Founder Mission Control (see
+// the founder module) and implicitly has every ADMIN capability too (see
+// AdminGuard). Not the full role set from the client's long-term RBAC
+// requirements (Finance/Support/Content/Partners/Auditor) — deliberately
+// scoped to just what Founder Mission Control's first shell needs.
 enum Role {
   USER
   ADMIN
+  FOUNDER
 }
 
 model User {

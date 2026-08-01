@@ -17,6 +17,7 @@ import { AdminModule } from './admin/admin.module';
 import { OAuthModule } from './oauth/oauth.module';
 import { GdprModule } from './gdpr/gdpr.module';
 import { SupportModule } from './support/support.module';
+import { FounderModule } from './founder/founder.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { SupportModule } from './support/support.module';
     OAuthModule,
     GdprModule,
     SupportModule,
+    FounderModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

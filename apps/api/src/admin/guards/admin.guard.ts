@@ -18,6 +18,10 @@ import type { AuthenticatedRequestUser } from '../../auth/guards/jwt-auth.guard'
  * immediately, not linger for up to 15 minutes the way session revocation
  * does for ordinary logout. Admin actions are rare enough that the extra
  * query is worth it.
+ *
+ * FOUNDER passes too — Founder Mission Control needs everything Admin has
+ * (user search/detail/role/suspend) plus its own founder-only endpoints,
+ * see founder/guards/founder.guard.ts for the stricter FOUNDER-only check.
  */
 @Injectable()
 export class AdminGuard implements CanActivate {
@@ -36,7 +40,7 @@ export class AdminGuard implements CanActivate {
       select: { role: true },
     });
 
-    if (!user || user.role !== Role.ADMIN) {
+    if (!user || (user.role !== Role.ADMIN && user.role !== Role.FOUNDER)) {
       throw new ForbiddenException('Admin access required.');
     }
 

@@ -634,7 +634,7 @@ export function adminReplySupportTicket(
 // UI element. The frontend has no separate "am I admin" check; it just
 // calls these and handles the 403 (see AdminGate).
 
-export type UserRole = "USER" | "ADMIN";
+export type UserRole = "USER" | "ADMIN" | "FOUNDER";
 
 export interface AdminUserSummary {
   id: string;
@@ -825,4 +825,35 @@ export function revokeConnectedSite(accessToken: string, grantId: string): Promi
 export function buildLoginDeepLink(token: string): string {
   const webFallback = encodeURIComponent(`${API_BASE_URL}/auth/login-request/${token}`);
   return `ndyapps://login?token=${token}&fallback=${webFallback}`;
+}
+
+// --- Founder Mission Control: FOUNDER-role-only, calls /founder/* and
+// handles a 403 the same way AdminGate handles admin's (see FounderGate).
+
+export interface FounderEcosystemOverview {
+  users: {
+    total: number;
+    newToday: number;
+    newThisMonth: number;
+    newVerificationsToday: number;
+    activeSessions: number;
+  };
+  memberships: { newToday: number; active: number };
+  revenue: {
+    todayCents: number;
+    membershipTodayCentsEstimated: number;
+    cryndyTodayCents: number;
+    note: string;
+  };
+  cryndy: {
+    salesToday: { count: number; amountCents: number };
+    salesAllTime: { count: number; amountCents: number };
+  };
+  ndybits: { issuedToday: number; issuedAllTime: number };
+  systemStatus: { database: "ok" | "down" };
+  generatedAt: string;
+}
+
+export function getFounderEcosystemOverview(accessToken: string): Promise<FounderEcosystemOverview> {
+  return authedFetch("/founder/overview", accessToken);
 }
