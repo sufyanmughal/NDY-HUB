@@ -28,6 +28,11 @@ ufw allow 80/tcp
 ufw allow 3000/tcp
 ufw --force enable
 
+echo "== DigitalOcean monitoring agent (free CPU/memory/disk/bandwidth alerts) =="
+if ! command -v do-agent >/dev/null 2>&1; then
+  curl -sSL https://repos.insights.digitalocean.com/install.sh | bash
+fi
+
 echo "== Cloning repo =="
 if [ ! -d ~/ndy-hub/.git ]; then
   git clone "$REPO_URL" ~/ndy-hub
@@ -42,9 +47,17 @@ if [ ! -f .env.prod ]; then
   echo
 fi
 
+chmod +x deploy/backup.sh deploy/restore.sh
+
+echo "== Nightly backup cron job =="
+CRON_LINE="0 3 * * * /bin/bash $HOME/ndy-hub/deploy/backup.sh >> $HOME/ndy-hub-backups/backup.log 2>&1"
+( crontab -l 2>/dev/null | grep -vF "ndy-hub/deploy/backup.sh" ; echo "$CRON_LINE" ) | crontab -
+
 echo "== Done. Next steps: =="
 echo "1. Fill in ~/ndy-hub/.env.prod (secrets, IMAGE_API/IMAGE_WEB tags, WEB_APP_URL/API_URL with this server's IP)."
 echo "2. If the GitHub Container Registry images are private, run: docker login ghcr.io"
 echo "3. docker compose -f docker-compose.prod.yml --env-file .env.prod pull"
 echo "4. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d"
 echo "5. docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T api npx prisma migrate deploy"
+echo "6. Nightly backups run automatically at 03:00 UTC, kept 14 days, in ~/ndy-hub-backups/."
+echo "7. Set alert policies in the DigitalOcean dashboard: Monitoring -> Alerts -> Create (CPU, memory, disk)."

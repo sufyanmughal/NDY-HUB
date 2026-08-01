@@ -8,7 +8,7 @@ product, manage their membership tier, track CRYNDY and NDYBITS holdings,
 and control exactly which platforms and devices are connected to their
 identity.
 
-[![Build & Deploy](https://github.com/sufyanmughal/NDY-HUB/actions/workflows/deploy.yml/badge.svg)](https://github.com/sufyanmughal/NDY-HUB/actions/workflows/deploy.yml)
+[![Deploy to staging](https://github.com/sufyanmughal/NDY-HUB/actions/workflows/deploy-staging.yml/badge.svg)](https://github.com/sufyanmughal/NDY-HUB/actions/workflows/deploy-staging.yml)
 
 ---
 
@@ -202,6 +202,30 @@ flowchart LR
 The server only ever pulls and runs pre-built images — it never compiles
 anything itself, which keeps deploys fast and the server's resource
 requirements small.
+
+### Environments
+
+| Environment | Trigger | Status |
+|---|---|---|
+| Development | Local machine | Always available to the dev team |
+| Staging | Push to `main` | Live — this is what the client reviews |
+| Production | Manual promotion once ready to go live | Not provisioned yet — the pipeline (`deploy-reusable.yml`) is already built to support it: a second GitHub Environment with its own server and secrets is all that's needed, no rebuild |
+
+No untested change reaches a real user: `main` only ever deploys to
+Staging automatically. Promoting to Production will always be a deliberate,
+separate action once that environment exists.
+
+### Reliability & operations
+
+- **Monitoring**: server-level metrics (CPU, memory, disk, bandwidth) are
+  monitored with alert thresholds, so infrastructure problems surface
+  before they become outages.
+- **Backups**: the database is backed up automatically every night, with a
+  documented, tested restore procedure — see `deploy/README.md` for the
+  full disaster-recovery process.
+- **Immutable audit trail**: every admin action and every CRYNDY/NDYBITS
+  transaction is append-only and permanently recorded — nothing gets
+  silently edited or deleted.
 
 ## Feature matrix
 
