@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Param,
-  Patch,
   Post,
   Query,
   Req,
@@ -11,7 +10,6 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { AdminService, type AdminActor } from './admin.service';
-import { UpdateRoleDto } from './dto/update-role.dto';
 import { SuspendUserDto } from './dto/suspend-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../common/guards/permission.guard';
@@ -41,21 +39,8 @@ export class AdminController {
     return this.admin.getUserDetail(id);
   }
 
-  @RequirePermission(Permission.MANAGE_ROLES)
-  @Patch('users/:id/role')
-  updateRole(
-    @Param('id') id: string,
-    @Body() dto: UpdateRoleDto,
-    @CurrentUser() user: AuthenticatedRequestUser,
-    @Req() req: Request,
-  ) {
-    return this.admin.updateRole(
-      actorFrom(user, req),
-      id,
-      dto.role,
-      dto.reason,
-    );
-  }
+  // Role changes: see RoleChangeRequestController (admin/role-requests) —
+  // no longer a direct mutation here, dual-approval applies.
 
   @RequirePermission(Permission.MANAGE_USERS)
   @Post('users/:id/suspend')
@@ -86,7 +71,10 @@ export class AdminController {
   }
 }
 
-function actorFrom(user: AuthenticatedRequestUser, req: Request): AdminActor {
+export function actorFrom(
+  user: AuthenticatedRequestUser,
+  req: Request,
+): AdminActor {
   return { id: user.sub, ndyId: user.ndyId, ip: req.ip };
 }
 

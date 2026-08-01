@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   searchAdminUsers,
-  adminUpdateRole,
+  createRoleChangeRequest,
   adminSetSuspended,
   ASSIGNABLE_ROLES,
   type AdminUserSummary,
@@ -47,13 +47,24 @@ const ROLE_BADGE_CLASS: Record<UserRole, string> = {
  * the restricted operational set) but the server is the real authority:
  * this is UX, not the security boundary.
  */
-export function UserManagementPanel({ accessToken }: { accessToken: string }) {
+export function UserManagementPanel({
+  accessToken,
+  onRoleChangeRequested,
+}: {
+  accessToken: string;
+  /** Called after a role change request is successfully created — lets the
+   * parent page refresh a sibling RoleChangeRequestPanel, which has its own
+   * independent fetch state and wouldn't otherwise know a new request just
+   * appeared. */
+  onRoleChangeRequested?: () => void;
+}) {
   const me = useMe();
   const [users, setUsers] = useState<AdminUserSummary[] | null>(null);
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = useCallback(
     (q?: string) => {
@@ -76,14 +87,17 @@ export function UserManagementPanel({ accessToken }: { accessToken: string }) {
   async function handleRoleChange(user: AdminUserSummary, nextRole: UserRole) {
     if (nextRole === user.role) return;
     const reason = window.prompt(
-      `Change ${user.ndyId}'s role from ${user.role} to ${nextRole}? Optional reason for the audit log:`,
+      `Request changing ${user.ndyId}'s role from ${user.role} to ${nextRole}? This won't take effect until a ` +
+        `different admin approves it. Optional reason:`,
     );
     if (reason === null) return; // cancelled
     setBusyUserId(user.id);
     setError(null);
+    setNotice(null);
     try {
-      await adminUpdateRole(accessToken, user.id, nextRole, reason || undefined);
-      refresh(query);
+      await createRoleChangeRequest(accessToken, user.id, nextRole, reason || undefined);
+      setNotice(`Role change requested for ${user.ndyId} — waiting on a different admin to approve it.`);
+      onRoleChangeRequested?.();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -118,6 +132,11 @@ export function UserManagementPanel({ accessToken }: { accessToken: string }) {
       {error && (
         <p className="mt-3 rounded-md border border-critical/30 bg-critical/10 px-3 py-2 text-sm text-critical">
           {error}
+        </p>
+      )}
+      {notice && (
+        <p className="mt-3 rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent">
+          {notice}
         </p>
       )}
 

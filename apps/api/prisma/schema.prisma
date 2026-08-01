@@ -468,6 +468,42 @@ model AuditLogEntry {
   @@index([createdAt])
 }
 
+enum RoleChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Dual-approval for role changes — the client's explicit requirement for
+// "critical actions." A role change no longer applies the moment one admin
+// clicks a button: it creates a PENDING row here, and a *different* admin
+// (see RoleChangeRequestService.approve — same person can't approve their
+// own request) has to approve it before the role actually changes. Same
+// denormalized-snapshot reasoning as AuditLogEntry for who's who.
+model RoleChangeRequest {
+  id             String @id @default(uuid())
+  targetUserId   String
+  targetNdyId    String
+  requestedRole  Role
+  previousRole   Role
+
+  requestedByUserId String
+  requestedByNdyId  String
+  requestReason     String?
+
+  status RoleChangeRequestStatus @default(PENDING)
+
+  reviewedByUserId String?
+  reviewedByNdyId  String?
+  reviewReason     String?
+  resolvedAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@index([targetUserId])
+}
+
 // --- SSO / OAuth2 + OpenID Connect provider ---
 // NDY HUB is the identity provider; every connected NDJOYIT site is a
 // registered "client" (relying party) that redirects here to authenticate

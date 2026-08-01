@@ -693,15 +693,68 @@ export function getAdminUserDetail(accessToken: string, userId: string): Promise
   return authedFetch(`/admin/users/${userId}`, accessToken);
 }
 
-export function adminUpdateRole(
+// --- Role changes: dual-approval, not instant. Creating a request doesn't
+// change anyone's role — a *different* admin has to approve it first (see
+// RoleChangeRequestPanel). Kept alongside the rest of the admin bindings.
+
+export type RoleChangeRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface RoleChangeRequest {
+  id: string;
+  targetUserId: string;
+  targetNdyId: string;
+  requestedRole: UserRole;
+  previousRole: UserRole;
+  requestedByUserId: string;
+  requestedByNdyId: string;
+  requestReason: string | null;
+  status: RoleChangeRequestStatus;
+  reviewedByUserId: string | null;
+  reviewedByNdyId: string | null;
+  reviewReason: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+export function createRoleChangeRequest(
   accessToken: string,
-  userId: string,
+  targetUserId: string,
   role: UserRole,
   reason?: string,
-): Promise<{ id: string; ndyId: string; role: UserRole }> {
-  return authedFetch(`/admin/users/${userId}/role`, accessToken, {
-    method: "PATCH",
-    body: JSON.stringify({ role, reason }),
+): Promise<RoleChangeRequest> {
+  return authedFetch("/admin/role-requests", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ targetUserId, role, reason }),
+  });
+}
+
+export function listRoleChangeRequests(
+  accessToken: string,
+  status?: RoleChangeRequestStatus,
+): Promise<RoleChangeRequest[]> {
+  const query = status ? `?status=${status}` : "";
+  return authedFetch(`/admin/role-requests${query}`, accessToken);
+}
+
+export function approveRoleChangeRequest(
+  accessToken: string,
+  requestId: string,
+  reason?: string,
+): Promise<RoleChangeRequest> {
+  return authedFetch(`/admin/role-requests/${requestId}/approve`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function rejectRoleChangeRequest(
+  accessToken: string,
+  requestId: string,
+  reason?: string,
+): Promise<RoleChangeRequest> {
+  return authedFetch(`/admin/role-requests/${requestId}/reject`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
   });
 }
 

@@ -1,16 +1,6 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TIER_CONFIG } from '../membership/tier-config';
-
-const FOUNDER_ONLY_ASSIGNABLE: readonly Role[] = [
-  Role.FOUNDER,
-  Role.SUPER_ADMIN,
-];
 
 export interface AdminActor {
   id: string;
@@ -108,51 +98,9 @@ export class AdminService {
     };
   }
 
-  /**
-   * FOUNDER and SUPER_ADMIN are deliberately not assignable by just anyone
-   * holding MANAGE_ROLES (i.e. a Super Admin) — otherwise a Super Admin
-   * could mint a peer or promote themselves to Founder. Only an existing
-   * Founder can hand out either of those two; everything else in the role
-   * enum is fair game for MANAGE_ROLES.
-   */
-  async updateRole(
-    actor: AdminActor,
-    targetUserId: string,
-    role: Role,
-    reason?: string,
-  ) {
-    if (FOUNDER_ONLY_ASSIGNABLE.includes(role)) {
-      const actorUser = await this.prisma.user.findUnique({
-        where: { id: actor.id },
-        select: { role: true },
-      });
-      if (actorUser?.role !== Role.FOUNDER) {
-        throw new ForbiddenException(
-          `Only a Founder can assign the ${role} role.`,
-        );
-      }
-    }
-
-    const target = await this.prisma.user.findUnique({
-      where: { id: targetUserId },
-    });
-    if (!target) throw new NotFoundException('No user with that id.');
-
-    const updated = await this.prisma.user.update({
-      where: { id: targetUserId },
-      data: { role },
-    });
-
-    await this.writeAuditLog(actor, {
-      action: 'user.role.update',
-      target,
-      previousValue: { role: target.role },
-      newValue: { role: updated.role },
-      reason,
-    });
-
-    return { id: updated.id, ndyId: updated.ndyId, role: updated.role };
-  }
+  // Role changes are no longer instant — see RoleChangeRequestService.
+  // Dual-approval is the client's explicit requirement for this "critical
+  // action": one admin proposes, a *different* admin approves.
 
   async setSuspended(
     actor: AdminActor,

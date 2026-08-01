@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { getFounderEcosystemOverview, ApiError, type FounderEcosystemOverview } from "@/lib/api";
 import { StatTile } from "@/components/stat-tile";
 import { UserManagementPanel } from "@/components/user-management-panel";
+import { RoleChangeRequestPanel } from "@/components/role-change-request-panel";
 
 function formatCents(cents: number): string {
   return (cents / 100).toLocaleString(undefined, { style: "currency", currency: "USD" });
@@ -16,6 +17,7 @@ export default function FounderMissionControlPage() {
   const [overview, setOverview] = useState<FounderEcosystemOverview | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [roleRequestsVersion, setRoleRequestsVersion] = useState(0);
 
   const refresh = useCallback(() => {
     if (auth.status !== "authenticated") return;
@@ -142,7 +144,11 @@ export default function FounderMissionControlPage() {
         )}
       </div>
 
-      <UserManagementPanel accessToken={accessToken} />
+      <UserManagementPanel
+        accessToken={accessToken}
+        onRoleChangeRequested={() => setRoleRequestsVersion((v) => v + 1)}
+      />
+      <RoleChangeRequestPanel accessToken={accessToken} refreshKey={roleRequestsVersion} />
     </div>
   );
 }

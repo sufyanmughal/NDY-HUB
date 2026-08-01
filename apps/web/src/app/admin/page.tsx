@@ -17,6 +17,7 @@ import {
 import { useMe } from "@/lib/use-me";
 import { roleHasPermission, roleHasAnyPermission } from "@/lib/permissions";
 import { UserManagementPanel } from "@/components/user-management-panel";
+import { RoleChangeRequestPanel } from "@/components/role-change-request-panel";
 
 /**
  * With 9 roles each granting different, non-overlapping admin capabilities
@@ -29,6 +30,11 @@ import { UserManagementPanel } from "@/components/user-management-panel";
 export default function AdminPage() {
   const { auth } = useAuth();
   const me = useMe();
+  // UserManagementPanel and RoleChangeRequestPanel are independent
+  // components with their own fetch state — this is what tells the queue
+  // to refetch right after a request is created, instead of only updating
+  // on the next full page load.
+  const [roleRequestsVersion, setRoleRequestsVersion] = useState(0);
 
   if (auth.status !== "authenticated") return null;
   const accessToken = auth.accessToken;
@@ -38,11 +44,13 @@ export default function AdminPage() {
   if (!me) return null;
 
   const canManageUsers = roleHasPermission(me.role, "MANAGE_USERS");
+  const canManageRoles = roleHasPermission(me.role, "MANAGE_ROLES");
   const canViewAuditLog = roleHasPermission(me.role, "VIEW_AUDIT_LOG");
   const canManageOAuthClients = roleHasPermission(me.role, "MANAGE_OAUTH_CLIENTS");
   const canManageSupportTickets = roleHasPermission(me.role, "MANAGE_SUPPORT_TICKETS");
   const hasAnyAdminAccess = roleHasAnyPermission(me.role, [
     "MANAGE_USERS",
+    "MANAGE_ROLES",
     "VIEW_AUDIT_LOG",
     "MANAGE_OAUTH_CLIENTS",
     "MANAGE_SUPPORT_TICKETS",
@@ -69,7 +77,15 @@ export default function AdminPage() {
         </p>
       </div>
 
-      {canManageUsers && <UserManagementPanel accessToken={accessToken} />}
+      {canManageUsers && (
+        <UserManagementPanel
+          accessToken={accessToken}
+          onRoleChangeRequested={() => setRoleRequestsVersion((v) => v + 1)}
+        />
+      )}
+      {canManageRoles && (
+        <RoleChangeRequestPanel accessToken={accessToken} refreshKey={roleRequestsVersion} />
+      )}
       {canViewAuditLog && <AuditLogSection accessToken={accessToken} />}
       {canManageOAuthClients && <OAuthClientsSection accessToken={accessToken} />}
       {canManageSupportTickets && <SupportTicketsSection accessToken={accessToken} />}
