@@ -59,6 +59,12 @@ const CARD_ICONS = {
       <path d="M2 20h20M9.5 10.2l-1.7 1.7 1.7 1.7M14.5 10.2l1.7 1.7-1.7 1.7" />
     </svg>
   ),
+  finance: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5v9M14.8 9.8c0-1.3-1.3-2.3-2.8-2.3s-2.8.9-2.8 2.1c0 3 5.6 1.5 5.6 4.4 0 1.2-1.3 2.1-2.8 2.1s-2.8-1-2.8-2.3" />
+    </svg>
+  ),
 } as const;
 
 export type CardIconName = keyof typeof CARD_ICONS;

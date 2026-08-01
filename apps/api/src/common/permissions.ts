@@ -14,6 +14,7 @@ export enum Permission {
   MANAGE_SUPPORT_TICKETS = 'MANAGE_SUPPORT_TICKETS',
   VIEW_AUDIT_LOG = 'VIEW_AUDIT_LOG',
   VIEW_FOUNDER_OVERVIEW = 'VIEW_FOUNDER_OVERVIEW',
+  VIEW_FINANCIALS = 'VIEW_FINANCIALS',
 }
 
 /**
@@ -21,10 +22,9 @@ export enum Permission {
  * except for FOUNDER) so adding a new role never silently grants more than
  * intended. CONTENT and PARTNERS are real, assignable roles (see
  * schema.prisma) but grant nothing here — there's no content or partner
- * management feature yet for either to gate. FINANCE is the same story for
- * now: revenue data currently only exists bundled inside
- * VIEW_FOUNDER_OVERVIEW, not as its own endpoint, so FINANCE has nothing
- * to grant until that's split out.
+ * management feature yet for either to gate. Wiring permissions for those
+ * two means inventing the feature surface first, not something to guess at
+ * here.
  */
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   USER: [],
@@ -37,7 +37,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.VIEW_AUDIT_LOG,
   ],
   DEVELOPER: [Permission.MANAGE_OAUTH_CLIENTS],
-  FINANCE: [],
+  FINANCE: [Permission.VIEW_FINANCIALS],
   SUPPORT: [Permission.MANAGE_SUPPORT_TICKETS],
   CONTENT: [],
   PARTNERS: [],

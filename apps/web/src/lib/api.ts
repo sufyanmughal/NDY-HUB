@@ -936,6 +936,19 @@ export function getFounderEcosystemOverview(accessToken: string): Promise<Founde
   return authedFetch("/founder/overview", accessToken);
 }
 
+export interface FinancialSummary {
+  revenue: FounderEcosystemOverview["revenue"];
+  cryndy: FounderEcosystemOverview["cryndy"];
+  ndybits: FounderEcosystemOverview["ndybits"];
+  generatedAt: string;
+}
+
+/** FINANCE-role-accessible subset of the founder overview — same data, no
+ * user/session/system-health fields a finance user has no reason to see. */
+export function getFinancialSummary(accessToken: string): Promise<FinancialSummary> {
+  return authedFetch("/founder/financials", accessToken);
+}
+
 // --- Ecosystem overview: real, non-sensitive aggregate stats shown on both
 // the public landing page and the authenticated dashboard home. Fully
 // public endpoint — no token needed, since the landing page needs it

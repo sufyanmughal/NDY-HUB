@@ -46,6 +46,17 @@ export default function DashboardPage() {
           },
         ]
       : []),
+    ...(me?.role === "FINANCE" || me?.role === "FOUNDER"
+      ? [
+          {
+            href: "/finance",
+            icon: "finance" as const,
+            color: "#e0a83c",
+            title: "Financials",
+            description: "Revenue, CRYNDY sales, and NDYBITS issuance.",
+          },
+        ]
+      : []),
     ...(me?.role === "SUPER_ADMIN" || me?.role === "FOUNDER"
       ? [
           {

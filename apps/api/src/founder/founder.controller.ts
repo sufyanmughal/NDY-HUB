@@ -15,4 +15,10 @@ export class FounderController {
   getOverview() {
     return this.founder.getEcosystemOverview();
   }
+
+  @Get('financials')
+  @RequirePermission(Permission.VIEW_FINANCIALS)
+  getFinancials() {
+    return this.founder.getFinancialSummary();
+  }
 }

@@ -17,6 +17,10 @@ const CONFIRMED_SALE_STATUSES: readonly CryndyPurchaseStatus[] = [
   CryndyPurchaseStatus.DISTRIBUTED_ON_CHAIN,
 ];
 
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
 @Injectable()
 export class FounderService {
   private readonly logger = new Logger(FounderService.name);
@@ -25,11 +29,7 @@ export class FounderService {
 
   async getEcosystemOverview() {
     const now = new Date();
-    const startOfToday = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-    );
+    const startOfToday = startOfDay(now);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [
@@ -39,12 +39,8 @@ export class FounderService {
       newVerificationsToday,
       activeSessions,
       newMembershipsToday,
-      membershipsCreatedToday,
       activeMemberships,
-      cryndySalesToday,
-      cryndySalesAllTime,
-      ndybitsIssuedToday,
-      ndybitsIssuedAllTime,
+      financials,
       databaseOk,
     ] = await Promise.all([
       this.prisma.user.count({ where: { deletedAt: null } }),
@@ -63,12 +59,56 @@ export class FounderService {
       this.prisma.membership.count({
         where: { createdAt: { gte: startOfToday } },
       }),
+      this.prisma.membership.count({
+        where: { status: MembershipStatus.ACTIVE },
+      }),
+      this.computeFinancials(now, startOfToday),
+      this.checkDatabaseHealth(),
+    ]);
+
+    return {
+      users: {
+        total: totalUsers,
+        newToday: newUsersToday,
+        newThisMonth: newUsersThisMonth,
+        newVerificationsToday,
+        activeSessions,
+      },
+      memberships: {
+        newToday: newMembershipsToday,
+        active: activeMemberships,
+      },
+      ...financials,
+      systemStatus: {
+        database: databaseOk ? 'ok' : 'down',
+      },
+      generatedAt: now,
+    };
+  }
+
+  /**
+   * The subset of getEcosystemOverview() that's genuinely financial
+   * (revenue, CRYNDY sales, ndybits issuance) — split out so FINANCE can
+   * see the money without also getting user counts, session data, or
+   * system health, which are founder/ops concerns, not finance ones.
+   */
+  async getFinancialSummary() {
+    const now = new Date();
+    const financials = await this.computeFinancials(now, startOfDay(now));
+    return { ...financials, generatedAt: now };
+  }
+
+  private async computeFinancials(now: Date, startOfToday: Date) {
+    const [
+      membershipsCreatedToday,
+      cryndySalesToday,
+      cryndySalesAllTime,
+      ndybitsIssuedToday,
+      ndybitsIssuedAllTime,
+    ] = await Promise.all([
       this.prisma.membership.findMany({
         where: { createdAt: { gte: startOfToday } },
         select: { tier: true, billingCycle: true },
-      }),
-      this.prisma.membership.count({
-        where: { status: MembershipStatus.ACTIVE },
       }),
       this.prisma.cryndyPurchase.aggregate({
         where: {
@@ -91,7 +131,6 @@ export class FounderService {
         where: { amount: { gt: 0 } },
         _sum: { amount: true },
       }),
-      this.checkDatabaseHealth(),
     ]);
 
     // Membership pricing is still placeholder (see tier-config.ts) — this
@@ -114,17 +153,6 @@ export class FounderService {
     );
 
     return {
-      users: {
-        total: totalUsers,
-        newToday: newUsersToday,
-        newThisMonth: newUsersThisMonth,
-        newVerificationsToday,
-        activeSessions,
-      },
-      memberships: {
-        newToday: newMembershipsToday,
-        active: activeMemberships,
-      },
       revenue: {
         todayCents: membershipRevenueTodayCents + cryndyRevenueTodayCents,
         membershipTodayCentsEstimated: membershipRevenueTodayCents,
@@ -147,13 +175,6 @@ export class FounderService {
         issuedToday: ndybitsIssuedToday._sum.amount ?? 0,
         issuedAllTime: ndybitsIssuedAllTime._sum.amount ?? 0,
       },
-      systemStatus: {
-        database: databaseOk ? 'ok' : 'down',
-        // Redis is provisioned (docker-compose) but not yet used by any API
-        // code path — nothing to health-check here honestly until that
-        // changes.
-      },
-      generatedAt: now,
     };
   }
 
