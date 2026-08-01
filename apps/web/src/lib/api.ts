@@ -869,6 +869,7 @@ export interface EcosystemOverview {
   newUsersToday: number;
   connectedPlatforms: number;
   transactions24h: number;
+  ndybitsIssued: number;
   cryndy: { totalSold: number; dailySeries: number[] };
   bitcoin: { priceUsd: number; change24hPct: number; sparkline7d: number[] } | null;
   systemStatus: "ok" | "down";

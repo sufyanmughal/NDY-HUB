@@ -1,5 +1,15 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
+import {
+  Sparkle,
+  MessageCircle,
+  Plane,
+  Building2,
+  Gamepad2,
+  Coins,
+  ShieldCheck,
+  Gem,
+} from "lucide-react";
 
 /** Shared between the public landing page (app/page.tsx) and the
  * authenticated dashboard home ((dashboard)/dashboard/page.tsx) — same
@@ -16,31 +26,84 @@ export interface LauncherCard {
   comingSoon?: boolean;
 }
 
-export const CARD_COLOR_CLASSES: Record<string, { ring: string; icon: string; button: string }> = {
-  violet: { ring: "ring-violet-500/30", icon: "bg-violet-500/15 text-violet-400", button: "text-violet-400 hover:text-violet-300" },
-  blue: { ring: "ring-blue-500/30", icon: "bg-blue-500/15 text-blue-400", button: "text-blue-400 hover:text-blue-300" },
-  emerald: { ring: "ring-emerald-500/30", icon: "bg-emerald-500/15 text-emerald-400", button: "text-emerald-400 hover:text-emerald-300" },
-  amber: { ring: "ring-amber-500/30", icon: "bg-amber-500/15 text-amber-400", button: "text-amber-400 hover:text-amber-300" },
-  cyan: { ring: "ring-cyan-500/30", icon: "bg-cyan-500/15 text-cyan-400", button: "text-cyan-400 hover:text-cyan-300" },
-  pink: { ring: "ring-pink-500/30", icon: "bg-pink-500/15 text-pink-400", button: "text-pink-400 hover:text-pink-300" },
+export const CARD_COLORS: Record<
+  string,
+  { border: string; ring: string; icon: string; iconRing: string; glow: string; button: string }
+> = {
+  violet: {
+    border: "border-violet-500/30",
+    ring: "hover:ring-1 hover:ring-violet-500/40",
+    icon: "text-violet-400",
+    iconRing: "border-violet-500/50",
+    glow: "shadow-[0_0_20px_-4px_rgba(139,92,246,0.5)]",
+    button: "text-violet-400 hover:text-violet-300",
+  },
+  blue: {
+    border: "border-blue-500/30",
+    ring: "hover:ring-1 hover:ring-blue-500/40",
+    icon: "text-blue-400",
+    iconRing: "border-blue-500/50",
+    glow: "shadow-[0_0_20px_-4px_rgba(59,130,246,0.5)]",
+    button: "text-blue-400 hover:text-blue-300",
+  },
+  emerald: {
+    border: "border-emerald-500/30",
+    ring: "hover:ring-1 hover:ring-emerald-500/40",
+    icon: "text-emerald-400",
+    iconRing: "border-emerald-500/50",
+    glow: "shadow-[0_0_20px_-4px_rgba(16,185,129,0.5)]",
+    button: "text-emerald-400 hover:text-emerald-300",
+  },
+  amber: {
+    border: "border-amber-500/30",
+    ring: "hover:ring-1 hover:ring-amber-500/40",
+    icon: "text-amber-400",
+    iconRing: "border-amber-500/50",
+    glow: "shadow-[0_0_20px_-4px_rgba(245,158,11,0.5)]",
+    button: "text-amber-400 hover:text-amber-300",
+  },
+  cyan: {
+    border: "border-cyan-500/30",
+    ring: "hover:ring-1 hover:ring-cyan-500/40",
+    icon: "text-cyan-400",
+    iconRing: "border-cyan-500/50",
+    glow: "shadow-[0_0_20px_-4px_rgba(34,211,238,0.5)]",
+    button: "text-cyan-400 hover:text-cyan-300",
+  },
+  pink: {
+    border: "border-pink-500/30",
+    ring: "hover:ring-1 hover:ring-pink-500/40",
+    icon: "text-pink-400",
+    iconRing: "border-pink-500/50",
+    glow: "shadow-[0_0_20px_-4px_rgba(236,72,153,0.5)]",
+    button: "text-pink-400 hover:text-pink-300",
+  },
 };
 
 export function LauncherCardView({ card }: { card: LauncherCard }) {
-  const colors = CARD_COLOR_CLASSES[card.color];
+  const colors = CARD_COLORS[card.color];
   const Icon = card.icon;
 
   const inner = (
     <div
-      className={`h-full rounded-lg border border-border bg-surface p-5 text-center transition ${
-        card.comingSoon ? "opacity-60" : `hover:ring-1 ${colors.ring}`
+      className={`h-full rounded-xl border bg-surface/60 p-6 text-center backdrop-blur-sm transition ${
+        card.comingSoon ? "border-border opacity-60" : `${colors.border} ${colors.ring}`
       }`}
     >
-      <div className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full ${colors.icon}`}>
-        <Icon size={22} strokeWidth={2} />
+      <div
+        className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full border-2 bg-background ${
+          card.comingSoon ? "border-border text-foreground-muted" : `${colors.iconRing} ${colors.icon} ${colors.glow}`
+        }`}
+      >
+        <Icon size={24} strokeWidth={2} />
       </div>
-      <div className="mt-3 font-medium">{card.title}</div>
+      <div className="mt-4 font-semibold">{card.title}</div>
       <p className="mt-1 text-xs text-foreground-muted">{card.description}</p>
-      <div className={`mt-3 inline-flex items-center gap-1 text-xs font-medium ${card.comingSoon ? "text-foreground-muted" : colors.button}`}>
+      <div
+        className={`mt-4 inline-flex items-center gap-1 text-xs font-semibold ${
+          card.comingSoon ? "text-foreground-muted" : colors.button
+        }`}
+      >
         {card.comingSoon ? "Coming soon" : "Go to →"}
       </div>
     </div>
@@ -57,50 +120,78 @@ export function LauncherCardView({ card }: { card: LauncherCard }) {
   return <Link href={card.href}>{inner}</Link>;
 }
 
-export function EcosystemStatCard({
-  label,
-  value,
-  icon: Icon,
+export function EcosystemStatsRow({
+  items,
 }: {
-  label: string;
-  value: number | undefined;
-  icon: LucideIcon;
+  items: { label: string; value: number | undefined; icon: LucideIcon; color: string }[];
 }) {
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <div className="flex items-center justify-between">
-        <div className="text-xs uppercase tracking-wide text-foreground-muted">{label}</div>
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/15 text-accent">
-          <Icon size={14} strokeWidth={2} />
-        </div>
-      </div>
-      <div className="mt-2 font-mono text-lg font-semibold tabular-nums">
-        {value === undefined ? "…" : value.toLocaleString()}
-      </div>
+    <div className="grid grid-cols-2 gap-x-4 gap-y-5 rounded-xl border border-border bg-surface/60 p-5 backdrop-blur-sm sm:grid-cols-3 lg:grid-cols-6">
+      {items.map((item) => {
+        const colors = CARD_COLORS[item.color];
+        const Icon = item.icon;
+        return (
+          <div key={item.label} className="flex items-center gap-3">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background ${colors.icon}`}>
+              <Icon size={18} strokeWidth={2} />
+            </div>
+            <div className="min-w-0">
+              <div className="font-mono text-lg font-semibold tabular-nums">
+                {item.value === undefined ? "…" : item.value.toLocaleString()}
+              </div>
+              <div className="text-xs leading-tight text-foreground-muted">{item.label}</div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
+const ECOSYSTEM_ITEMS: {
+  label: string;
+  sub: string;
+  icon: LucideIcon;
+  bg: string;
+  href?: string;
+  comingSoon?: boolean;
+}[] = [
+  { label: "NDJOYIT", sub: "Lifestyle Platform", icon: Sparkle, bg: "bg-emerald-500 text-white" },
+  { label: "NDYAPPS", sub: "Smart Messaging", icon: MessageCircle, bg: "bg-blue-500 text-white", comingSoon: true },
+  { label: "NDYSTAYS", sub: "Travel & Stays", icon: Plane, bg: "bg-pink-500 text-white", comingSoon: true },
+  { label: "NDYXTRA", sub: "AI Marketplace", icon: Building2, bg: "bg-orange-500 text-white", comingSoon: true },
+  { label: "NDYQUIZ", sub: "Learn · Play · Earn", icon: Gamepad2, bg: "bg-violet-500 text-white", comingSoon: true },
+  { label: "CRYNDY", sub: "Community Token", icon: Coins, bg: "bg-purple-500 text-white", href: "/cryndy" },
+  { label: "NDYNEX", sub: "Crypto & Bitcoin", icon: ShieldCheck, bg: "bg-amber-500 text-white", comingSoon: true },
+  { label: "NDYCOLLECT", sub: "Collectibles", icon: Gem, bg: "bg-cyan-500 text-white", comingSoon: true },
+];
+
 export function EcosystemBadge({
   label,
   sub,
-  color,
+  icon: Icon,
+  bg,
   href,
   comingSoon,
 }: {
   label: string;
   sub: string;
-  color: string;
+  icon: LucideIcon;
+  bg: string;
   href?: string;
   comingSoon?: boolean;
 }) {
   const content = (
-    <div className={`flex items-center gap-2 rounded-lg border border-border bg-surface p-3 ${comingSoon ? "opacity-50" : "hover:bg-surface-2"}`}>
-      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${color}`}>
-        {label[0]}
+    <div
+      className={`flex items-center gap-2.5 rounded-lg border border-border bg-surface p-3 ${
+        comingSoon ? "opacity-50" : "hover:bg-surface-2"
+      }`}
+    >
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${bg}`}>
+        <Icon size={16} strokeWidth={2} />
       </div>
       <div className="min-w-0">
-        <div className="truncate text-xs font-medium">{label}</div>
+        <div className="truncate text-xs font-semibold">{label}</div>
         <div className="truncate text-[11px] text-foreground-muted">{sub}</div>
       </div>
     </div>
@@ -117,38 +208,37 @@ export function EcosystemDirectory() {
         NDJOYIT Ecosystem
       </h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-        <EcosystemBadge label="NDJOYIT" sub="Lifestyle Platform" color="bg-emerald-500/15 text-emerald-400" />
-        <EcosystemBadge label="NDYAPPS" sub="Smart Messaging" color="bg-blue-500/15 text-blue-400" comingSoon />
-        <EcosystemBadge label="NDYSTAYS" sub="Travel & Stays" color="bg-pink-500/15 text-pink-400" comingSoon />
-        <EcosystemBadge label="NDYXTRA" sub="AI Marketplace" color="bg-orange-500/15 text-orange-400" comingSoon />
-        <EcosystemBadge label="NDYQUIZ" sub="Learn · Play · Earn" color="bg-violet-500/15 text-violet-400" comingSoon />
-        <EcosystemBadge label="CRYNDY" sub="Community Token" color="bg-purple-500/15 text-purple-400" href="/cryndy" />
-        <EcosystemBadge label="NDYNEX" sub="Crypto & Bitcoin" color="bg-amber-500/15 text-amber-400" comingSoon />
-        <EcosystemBadge label="NDYCOLLECT" sub="Collectibles" color="bg-cyan-500/15 text-cyan-400" comingSoon />
+        {ECOSYSTEM_ITEMS.map((item) => (
+          <EcosystemBadge key={item.label} {...item} />
+        ))}
       </div>
     </div>
   );
 }
 
+/** Full-bleed hero — no border/box, a radial glow evoking a planet horizon
+ * against dark space instead of the mockup's literal photo (no image asset
+ * available), content centered on top. Meant to be rendered outside any
+ * padded container so it can span edge to edge. */
 export function EcosystemHero({ eyebrow = "Welcome to NDY HUB" }: { eyebrow?: string }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-8 text-center">
+    <div className="relative overflow-hidden px-6 pb-16 pt-14 text-center">
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-accent-2/20 blur-3xl"
+        className="pointer-events-none absolute -left-1/4 top-1/3 h-[36rem] w-[36rem] rounded-full bg-blue-600/25 blur-[100px]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-accent/20 blur-3xl"
+        className="pointer-events-none absolute right-0 top-0 h-96 w-96 rounded-full bg-violet-600/20 blur-[100px]"
       />
       <p className="relative text-xs font-semibold uppercase tracking-widest text-accent-2">{eyebrow}</p>
-      <h1 className="relative mt-2 text-3xl font-semibold sm:text-4xl">
+      <h1 className="relative mt-3 text-4xl font-bold sm:text-5xl">
         One Identity. One Passport.{" "}
         <span className="bg-gradient-to-r from-accent to-accent-2 bg-clip-text text-transparent">
           One Ecosystem.
         </span>
       </h1>
-      <p className="relative mx-auto mt-3 max-w-2xl text-sm text-foreground-muted">
+      <p className="relative mx-auto mt-4 max-w-2xl text-sm text-foreground-muted sm:text-base">
         NDY HUB is your central gateway to everything in the NDJOYIT ecosystem — manage your
         identity, connect platforms, and help build a global ecosystem.
       </p>

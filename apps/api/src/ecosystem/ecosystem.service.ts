@@ -53,6 +53,7 @@ export class EcosystemService {
       cryndyTx24h,
       cryndySoldAgg,
       cryndyDailySeries,
+      ndybitsIssuedAgg,
       databaseOk,
       bitcoin,
     ] = await Promise.all([
@@ -70,6 +71,10 @@ export class EcosystemService {
         _sum: { cryndyAmount: true, bonusAmount: true },
       }),
       this.getCryndyDailySeries(),
+      this.prisma.ndybitsLedgerEntry.aggregate({
+        where: { amount: { gt: 0 } },
+        _sum: { amount: true },
+      }),
       this.checkDatabaseHealth(),
       this.bitcoinPrice.getPrice(),
     ]);
@@ -79,6 +84,7 @@ export class EcosystemService {
       newUsersToday,
       connectedPlatforms,
       transactions24h: membershipTx24h + cryndyTx24h,
+      ndybitsIssued: ndybitsIssuedAgg._sum.amount ?? 0,
       cryndy: {
         totalSold:
           Number(cryndySoldAgg._sum?.cryndyAmount ?? 0) +

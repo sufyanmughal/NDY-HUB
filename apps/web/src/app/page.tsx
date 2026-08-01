@@ -15,9 +15,9 @@ import {
   Link2,
   Activity,
   Coins,
+  Boxes,
   Bitcoin,
-  TrendingUp,
-  TrendingDown,
+  ArrowUp,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useEcosystemOverview } from "@/lib/use-ecosystem-overview";
@@ -25,9 +25,10 @@ import { Sparkline } from "@/components/sparkline";
 import { Logo } from "@/components/logo";
 import { API_BASE_URL } from "@/lib/api";
 import {
+  EcosystemHero,
   EcosystemDirectory,
+  EcosystemStatsRow,
   LauncherCardView,
-  EcosystemStatCard,
   type LauncherCard,
 } from "@/components/homepage-widgets";
 
@@ -89,70 +90,56 @@ export default function LandingPage() {
 
   if (auth.status !== "unauthenticated") return null;
 
+  const stats = [
+    { label: "Total Users", value: overview?.totalUsers, icon: Users, color: "violet" },
+    { label: "New Today", value: overview?.newUsersToday, icon: UserPlus, color: "blue" },
+    { label: "Connected Platforms", value: overview?.connectedPlatforms, icon: Link2, color: "emerald" },
+    { label: "Transactions (24h)", value: overview?.transactions24h, icon: Activity, color: "pink" },
+    { label: "CRYNDY Sold", value: overview?.cryndy.totalSold, icon: Coins, color: "amber" },
+    { label: "NDYBITS Issued", value: overview?.ndybitsIssued, icon: Boxes, color: "cyan" },
+  ];
+
   return (
     <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <Logo />
-        <Link
-          href="/login"
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
-        >
-          Sign In / Sign Up
-        </Link>
-      </header>
-
-      <main className="mx-auto max-w-6xl space-y-6 p-6">
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-10 text-center">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-accent-2/20 blur-3xl"
-          />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-accent/20 blur-3xl"
-          />
-          <p className="relative text-xs font-semibold uppercase tracking-widest text-accent-2">
-            Welcome to NDY HUB
-          </p>
-          <h1 className="relative mt-2 text-3xl font-semibold sm:text-5xl">
-            One Identity. One Passport.{" "}
-            <span className="bg-gradient-to-r from-accent to-accent-2 bg-clip-text text-transparent">
-              One Ecosystem.
-            </span>
-          </h1>
-          <p className="relative mx-auto mt-3 max-w-2xl text-sm text-foreground-muted sm:text-base">
-            NDY HUB is your central gateway to everything in the NDJOYIT ecosystem — manage your
-            identity, connect platforms, and help build a global ecosystem.
-          </p>
+      <div className="relative">
+        <header className="relative z-10 flex items-center justify-between px-6 py-5">
+          <Logo />
           <Link
             href="/login"
-            className="relative mt-6 inline-block rounded-md bg-accent px-6 py-3 text-sm font-medium text-white hover:bg-accent/90"
+            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+          >
+            Sign In / Sign Up
+          </Link>
+        </header>
+        <EcosystemHero />
+      </div>
+
+      <main className="mx-auto max-w-6xl space-y-6 px-6 pb-16">
+        <div className="text-center">
+          <Link
+            href="/login"
+            className="inline-block rounded-md bg-accent px-6 py-3 text-sm font-medium text-white hover:bg-accent/90"
           >
             Get Started — Sign In / Sign Up
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {CARDS.map((card) => (
             <LauncherCardView key={card.title} card={card} />
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <EcosystemStatCard label="Total Users" value={overview?.totalUsers} icon={Users} />
-          <EcosystemStatCard label="New Today" value={overview?.newUsersToday} icon={UserPlus} />
-          <EcosystemStatCard label="Connected Platforms" value={overview?.connectedPlatforms} icon={Link2} />
-          <EcosystemStatCard label="Transactions (24h)" value={overview?.transactions24h} icon={Activity} />
-        </div>
+        <EcosystemStatsRow items={stats} />
 
-        <div className="grid gap-3 lg:grid-cols-2">
-          <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-5">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="flex items-center justify-between rounded-xl border border-violet-500/30 bg-surface/60 p-5 backdrop-blur-sm">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/15 text-violet-400">
-                <Coins size={18} strokeWidth={2} />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-violet-500/50 bg-background text-violet-400">
+                <Coins size={20} strokeWidth={2} />
               </div>
               <div>
-                <div className="font-medium">CRYNDY</div>
+                <div className="font-semibold">CRYNDY</div>
                 <div className="text-xs text-foreground-muted">
                   {overview ? `${overview.cryndy.totalSold.toLocaleString()} sold` : "…"}
                 </div>
@@ -165,13 +152,13 @@ export default function LandingPage() {
             )}
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-5">
+          <div className="flex items-center justify-between rounded-xl border border-orange-500/30 bg-surface/60 p-5 backdrop-blur-sm">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/15 text-orange-400">
-                <Bitcoin size={18} strokeWidth={2} />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-orange-500/50 bg-background text-orange-400">
+                <Bitcoin size={20} strokeWidth={2} />
               </div>
               <div>
-                <div className="font-medium">Bitcoin</div>
+                <div className="font-semibold">Bitcoin</div>
                 <div className="text-xs text-foreground-muted">Live market reference</div>
               </div>
             </div>
@@ -182,12 +169,11 @@ export default function LandingPage() {
                     {overview.bitcoin.priceUsd.toLocaleString(undefined, { style: "currency", currency: "USD" })}
                   </div>
                   <div
-                    className={`flex items-center justify-end gap-1 text-xs ${
-                      overview.bitcoin.change24hPct >= 0 ? "text-good" : "text-critical"
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                      overview.bitcoin.change24hPct >= 0 ? "bg-good/15 text-good" : "bg-critical/15 text-critical"
                     }`}
                   >
-                    {overview.bitcoin.change24hPct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                    {overview.bitcoin.change24hPct.toFixed(2)}%
+                    {overview.bitcoin.change24hPct >= 0 ? "▲" : "▼"} {Math.abs(overview.bitcoin.change24hPct).toFixed(2)}%
                   </div>
                 </div>
                 <Sparkline values={overview.bitcoin.sparkline7d} color="#f97316" />
@@ -201,13 +187,27 @@ export default function LandingPage() {
         <EcosystemDirectory />
       </main>
 
-      <footer className="border-t border-border px-6 py-6">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 text-xs text-foreground-muted sm:flex-row">
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-6 text-xs text-foreground-muted sm:flex-row">
           <Logo size={20} />
           <span>Powered by NDJOYIT</span>
+          <nav className="flex items-center gap-4">
+            <span className="cursor-default opacity-60">Privacy Policy</span>
+            <span className="cursor-default opacity-60">Terms of Service</span>
+            <span className="cursor-default opacity-60">Support</span>
+            <span className="cursor-default opacity-60">Status</span>
+          </nav>
           <span>&copy; {new Date().getFullYear()} NDJOYIT. All rights reserved.</span>
         </div>
       </footer>
+
+      <a
+        href="#top"
+        aria-label="Back to top"
+        className="fixed bottom-6 right-6 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-foreground-muted shadow-lg hover:bg-surface-2 hover:text-foreground"
+      >
+        <ArrowUp size={18} strokeWidth={2} />
+      </a>
     </div>
   );
 }

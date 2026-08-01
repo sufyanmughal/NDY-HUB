@@ -12,9 +12,8 @@ import {
   Link2,
   Activity,
   Coins,
+  Boxes,
   Bitcoin,
-  TrendingUp,
-  TrendingDown,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useEcosystemOverview } from "@/lib/use-ecosystem-overview";
@@ -24,8 +23,8 @@ import { API_BASE_URL } from "@/lib/api";
 import {
   EcosystemHero,
   EcosystemDirectory,
+  EcosystemStatsRow,
   LauncherCardView,
-  EcosystemStatCard,
   type LauncherCard,
 } from "@/components/homepage-widgets";
 
@@ -90,31 +89,40 @@ export default function DashboardPage() {
     },
   ];
 
+  const stats = [
+    { label: "Total Users", value: overview?.totalUsers, icon: Users, color: "violet" },
+    { label: "New Today", value: overview?.newUsersToday, icon: UserPlus, color: "blue" },
+    { label: "Connected Platforms", value: overview?.connectedPlatforms, icon: Link2, color: "emerald" },
+    { label: "Transactions (24h)", value: overview?.transactions24h, icon: Activity, color: "pink" },
+    { label: "CRYNDY Sold", value: overview?.cryndy.totalSold, icon: Coins, color: "amber" },
+    { label: "NDYBITS Issued", value: overview?.ndybitsIssued, icon: Boxes, color: "cyan" },
+  ];
+
   return (
     <div className="space-y-6">
-      <EcosystemHero />
+      {/* -m-6 cancels the dashboard layout's `<main className="p-6">` padding
+          so the hero can be full-bleed, matching the mockup — the rest of
+          the page stays inside the normal padded flow. */}
+      <div className="-mx-6 -mt-6">
+        <EcosystemHero />
+      </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((card) => (
           <LauncherCardView key={card.title} card={card} />
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <EcosystemStatCard label="Total Users" value={overview?.totalUsers} icon={Users} />
-        <EcosystemStatCard label="New Today" value={overview?.newUsersToday} icon={UserPlus} />
-        <EcosystemStatCard label="Connected Platforms" value={overview?.connectedPlatforms} icon={Link2} />
-        <EcosystemStatCard label="Transactions (24h)" value={overview?.transactions24h} icon={Activity} />
-      </div>
+      <EcosystemStatsRow items={stats} />
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-5">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="flex items-center justify-between rounded-xl border border-violet-500/30 bg-surface/60 p-5 backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/15 text-violet-400">
-              <Coins size={18} strokeWidth={2} />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-violet-500/50 bg-background text-violet-400">
+              <Coins size={20} strokeWidth={2} />
             </div>
             <div>
-              <div className="font-medium">CRYNDY</div>
+              <div className="font-semibold">CRYNDY</div>
               <div className="text-xs text-foreground-muted">
                 {overview ? `${overview.cryndy.totalSold.toLocaleString()} sold` : "…"}
               </div>
@@ -127,13 +135,13 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-5">
+        <div className="flex items-center justify-between rounded-xl border border-orange-500/30 bg-surface/60 p-5 backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/15 text-orange-400">
-              <Bitcoin size={18} strokeWidth={2} />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-orange-500/50 bg-background text-orange-400">
+              <Bitcoin size={20} strokeWidth={2} />
             </div>
             <div>
-              <div className="font-medium">Bitcoin</div>
+              <div className="font-semibold">Bitcoin</div>
               <div className="text-xs text-foreground-muted">Live market reference</div>
             </div>
           </div>
@@ -144,12 +152,11 @@ export default function DashboardPage() {
                   {overview.bitcoin.priceUsd.toLocaleString(undefined, { style: "currency", currency: "USD" })}
                 </div>
                 <div
-                  className={`flex items-center justify-end gap-1 text-xs ${
-                    overview.bitcoin.change24hPct >= 0 ? "text-good" : "text-critical"
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                    overview.bitcoin.change24hPct >= 0 ? "bg-good/15 text-good" : "bg-critical/15 text-critical"
                   }`}
                 >
-                  {overview.bitcoin.change24hPct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                  {overview.bitcoin.change24hPct.toFixed(2)}%
+                  {overview.bitcoin.change24hPct >= 0 ? "▲" : "▼"} {Math.abs(overview.bitcoin.change24hPct).toFixed(2)}%
                 </div>
               </div>
               <Sparkline values={overview.bitcoin.sparkline7d} color="#f97316" />
