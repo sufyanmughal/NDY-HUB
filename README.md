@@ -49,7 +49,6 @@ flowchart TB
 
     subgraph Data["Data layer"]
         PG[("PostgreSQL 16")]
-        Redis[("Redis 7")]
     end
 
     subgraph External["External services"]
@@ -65,7 +64,6 @@ flowchart TB
     NDYAPPS -->|approve login request| API
     Web -->|REST + WebSocket| API
     API --> PG
-    API --> Redis
     API <--> Google
     API <--> Apple
     API <--> Stripe
@@ -254,7 +252,6 @@ separate action once that environment exists.
 | Frontend | Next.js 16 (App Router), React 19, Tailwind CSS v4 |
 | Backend | NestJS 11, Prisma ORM |
 | Database | PostgreSQL 16 |
-| Cache / pub-sub | Redis 7 |
 | Auth | JWT + rotating refresh tokens, TOTP 2FA, WebAuthn passkeys, OAuth 2.0 (Google, Apple), OIDC provider |
 | Infrastructure | Docker, GitHub Actions CI/CD, nginx, DigitalOcean |
 
@@ -266,19 +263,19 @@ ndy-hub/
 │   ├── api/    NestJS + TypeScript — the Core API, the only thing that writes identity data
 │   └── web/    Next.js + TypeScript + Tailwind — the NDY HUB dashboard
 ├── deploy/     Server bootstrap script, nginx config, deployment docs
-├── docker-compose.yml        Local Postgres + Redis (development)
+├── docker-compose.yml        Local Postgres (development)
 ├── docker-compose.prod.yml   Full production stack
 └── package.json               npm workspaces root
 ```
 
 ## Running it locally
 
-Requires Node 20+, npm, and Docker Desktop running (for Postgres/Redis).
+Requires Node 20+, npm, and Docker Desktop running (for Postgres).
 
 ```bash
 # from the repo root
 npm install
-npm run db:up                 # starts Postgres + Redis
+npm run db:up                 # starts Postgres
 npm run --workspace apps/api exec -- prisma migrate dev --name init
 npm run dev:api                # http://localhost:3000
 npm run dev:web                # http://localhost:3001

@@ -12,16 +12,5 @@ services:
     volumes:
       - ndy_hub_postgres_data:/var/lib/postgresql/data
 
-  redis:
-    image: redis:7-alpine
-    container_name: ndy-hub-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - ndy_hub_redis_data:/data
-
 volumes:
   ndy_hub_postgres_data:
-  ndy_hub_redis_data:

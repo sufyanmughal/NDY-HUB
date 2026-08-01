@@ -1,5 +1,5 @@
-# Production stack. Unlike the root docker-compose.yml (Postgres+Redis only,
-# for local dev), this runs everything — api and web are pre-built images
+# Production stack. Unlike the root docker-compose.yml (Postgres only, for
+# local dev), this runs everything — api and web are pre-built images
 # pushed to ghcr.io by .github/workflows/deploy.yml, pulled here rather than
 # built on the box. Needs a .env.prod file alongside this one (see
 # .env.prod.example) with real secrets and the ghcr.io image tags.
@@ -26,14 +26,6 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    container_name: ndy-hub-redis
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - ndy_hub_redis_data:/data
-
   api:
     image: ${IMAGE_API}
     container_name: ndy-hub-api
@@ -41,11 +33,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_started
     environment:
       DATABASE_URL: postgresql://ndyhub:${POSTGRES_PASSWORD}@postgres:5432/ndyhub
-      REDIS_URL: redis://redis:6379
       PORT: 3000
       WEB_APP_URL: ${WEB_APP_URL}
       API_URL: ${API_URL}
@@ -92,5 +81,4 @@ services:
 
 volumes:
   ndy_hub_postgres_data:
-  ndy_hub_redis_data:
   ndy_hub_api_uploads:
