@@ -12,6 +12,12 @@ import { join } from 'path';
  * than __dirname so it agrees with the app whether run via `nest start`
  * or `node dist/main`, both of which run with apps/api as the working
  * directory.
+ *
+ * On Vercel, process.cwd() is a read-only bundle directory — mkdirSync
+ * against it throws EROFS on every cold start. /tmp is the only writable
+ * path there, though it's ephemeral (wiped between invocations), so
+ * uploaded photos don't durably survive on that platform until this moves
+ * to real object storage.
  */
-export const UPLOADS_ROOT_DIR = join(process.cwd(), 'uploads');
+export const UPLOADS_ROOT_DIR = join(process.env.VERCEL ? '/tmp' : process.cwd(), 'uploads');
 export const PROFILE_PHOTOS_DIR = join(UPLOADS_ROOT_DIR, 'profile-photos');

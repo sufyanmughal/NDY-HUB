@@ -6,7 +6,14 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
+// Imported from @otplib/totp directly rather than the top-level `otplib`
+// package: otplib's own barrel module eagerly requires its noble/scure
+// plugin packages (for default crypto/base32 fallbacks), and those are
+// pure ESM with no CJS build — merely importing anything from `otplib`
+// pulls them in and crashes under Vercel's per-file CJS transpilation.
+// @otplib/totp has no such fallback logic and no plugin dependencies at all.
+import { TOTP } from '@otplib/totp';
+import { NodeCryptoPlugin, NodeBase32Plugin } from '../common/otplib-node-plugins';
 import { customAlphabet } from 'nanoid';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -64,8 +71,8 @@ export class TotpService {
     }
 
     const secret = new TOTP({
-      crypto: new NobleCryptoPlugin(),
-      base32: new ScureBase32Plugin(),
+      crypto: new NodeCryptoPlugin(),
+      base32: new NodeBase32Plugin(),
     }).generateSecret();
 
     const encryptionKey = this.config.getOrThrow<string>('TOTP_ENCRYPTION_KEY');
@@ -78,8 +85,8 @@ export class TotpService {
       secret,
       issuer: 'NDY HUB',
       label: user.email,
-      crypto: new NobleCryptoPlugin(),
-      base32: new ScureBase32Plugin(),
+      crypto: new NodeCryptoPlugin(),
+      base32: new NodeBase32Plugin(),
     }).toURI();
 
     return { secret, otpauthUri };
@@ -236,8 +243,8 @@ export class TotpService {
     const secret = decryptTotpSecret(encryptedSecret, encryptionKey);
     const totp = new TOTP({
       secret,
-      crypto: new NobleCryptoPlugin(),
-      base32: new ScureBase32Plugin(),
+      crypto: new NodeCryptoPlugin(),
+      base32: new NodeBase32Plugin(),
     });
     // ±30s tolerance for clock drift between the server and the user's
     // phone — RFC 6238's own transmission-delay rationale, just widened a

@@ -24,8 +24,28 @@ async function bootstrap() {
   // CORS headers but /uploads/* never did — invisible for an <img> tag
   // (which doesn't enforce CORS) and completely broken for a cross-origin
   // fetch() of the same URL, e.g. to embed a photo in a client-generated PDF.
+  //
+  // A Vercel project answers on several origins at once — the custom alias
+  // (WEB_APP_URL), the team-scoped default, and a separately-generated
+  // "production" alias — and none of them are derivable from the others, so
+  // a single-origin check here rejects real visitors depending on which
+  // link they landed on. Explicitly listing the known stable ones (plus
+  // local dev) rather than pattern-matching *.vercel.app, which would also
+  // accept requests from unrelated Vercel-hosted sites.
+  const allowedOrigins = [
+    process.env.WEB_APP_URL ?? 'http://localhost:3001',
+    'https://ndy-hub-web.vercel.app',
+    'https://web-six-eta-15.vercel.app',
+    'https://web-ndy-hub.vercel.app',
+  ];
   app.enableCors({
-    origin: process.env.WEB_APP_URL ?? 'http://localhost:3001',
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} is not allowed by CORS.`));
+      }
+    },
     credentials: true,
   });
   app.useStaticAssets(UPLOADS_ROOT_DIR, { prefix: '/uploads/' });
