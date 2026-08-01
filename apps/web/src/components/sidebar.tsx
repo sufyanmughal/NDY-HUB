@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS, isNavItemActive } from "@/lib/nav-items";
+import { Logo } from "@/components/logo";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -10,10 +11,7 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-surface">
       <div className="px-6 py-6">
-        <span className="font-semibold tracking-tight text-lg">
-          NDY <span className="text-accent">HUB</span>
-          <sup className="text-[10px] align-super text-foreground-muted">™</sup>
-        </span>
+        <Logo />
       </div>
       <nav className="flex-1 px-3 space-y-0.5">
         {NAV_ITEMS.map((item) => {

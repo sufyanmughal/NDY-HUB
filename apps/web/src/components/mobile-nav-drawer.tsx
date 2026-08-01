@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { NAV_ITEMS, isNavItemActive } from "@/lib/nav-items";
 import { useMobileNav } from "@/lib/mobile-nav-context";
+import { Logo } from "@/components/logo";
 
 /**
  * Mobile-only counterpart to the desktop Sidebar (which is `hidden` below
@@ -49,10 +50,7 @@ export function MobileNavDrawer() {
         }`}
       >
         <div className="flex items-center justify-between px-6 py-6">
-          <span className="font-semibold tracking-tight text-lg">
-            NDY <span className="text-accent">HUB</span>
-            <sup className="text-[10px] align-super text-foreground-muted">™</sup>
-          </span>
+          <Logo />
           <button
             onClick={close}
             aria-label="Close menu"
