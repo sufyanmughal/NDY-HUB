@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 const RECENT_ENTRIES_LIMIT = 20;
@@ -40,13 +41,38 @@ export class NdybitsService {
    * but sound to call from other modules once one exists: just appends a
    * signed ledger entry, which is all a "credit" needs to be in a sum-on-
    * read balance model.
+   *
+   * sourceEventId is what makes a future caller (e.g. "credit NDYBITS when
+   * a CRYNDY purchase allocates") idempotent: pass a stable id derived from
+   * the triggering event (e.g. `cryndy_purchase:${purchaseId}`) and a retry
+   * of the same trigger returns the original entry instead of posting a
+   * second credit. Omit it only for genuinely one-off manual/admin credits
+   * that have no external event to key off of.
    */
-  async creditNdybits(userId: string, amount: number, reason: string) {
+  async creditNdybits(
+    userId: string,
+    amount: number,
+    reason: string,
+    sourceEventId?: string,
+  ) {
     if (amount === 0) {
       throw new BadRequestException('NDYBITS ledger entries must be non-zero.');
     }
-    return this.prisma.ndybitsLedgerEntry.create({
-      data: { userId, amount, reason },
-    });
+    try {
+      return await this.prisma.ndybitsLedgerEntry.create({
+        data: { userId, amount, reason, sourceEventId },
+      });
+    } catch (err) {
+      if (
+        sourceEventId &&
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        return this.prisma.ndybitsLedgerEntry.findUniqueOrThrow({
+          where: { sourceEventId },
+        });
+      }
+      throw err;
+    }
   }
 }

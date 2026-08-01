@@ -355,6 +355,12 @@ model NdybitsLedgerEntry {
   amount Int // positive = credit, negative = debit
   reason String // e.g. "daily_login", "referral_bonus", "purchase_reward"
 
+  // Nullable — a manual/admin credit has no external event to key off of.
+  // When set (e.g. "cryndy_purchase:<purchaseId>"), it's what makes
+  // creditNdybits() idempotent: the same triggering event can never post
+  // two ledger entries, even if whatever calls it retries.
+  sourceEventId String? @unique
+
   createdAt DateTime @default(now())
 
   @@index([userId])
@@ -411,6 +417,18 @@ model Membership {
 
   @@index([userId])
   @@index([status])
+}
+
+// One row per successfully-processed Stripe event id. Stripe retries
+// webhook deliveries until it gets a 2xx, so the same event can legitimately
+// arrive more than once — this table is what makes handleCheckoutCompleted
+// et al. safe to run twice on the same event instead of double-cancelling/
+// double-creating a membership. Checked by StripeWebhookController before
+// dispatching, same idempotency shape as CryndyPurchase.providerTransactionId.
+model ProcessedStripeEvent {
+  id        String   @id @default(uuid())
+  eventId   String   @unique
+  createdAt DateTime @default(now())
 }
 
 // Deliberately not a foreign-key relation to User — an audit trail needs to

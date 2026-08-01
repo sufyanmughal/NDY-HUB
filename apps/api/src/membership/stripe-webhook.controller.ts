@@ -26,6 +26,13 @@ export class StripeWebhookController {
       signature,
     );
 
+    const isFirstDelivery = await this.membership.recordStripeEventOnce(
+      event.id,
+    );
+    if (!isFirstDelivery) {
+      return { received: true, duplicate: true };
+    }
+
     switch (event.type) {
       case 'checkout.session.completed':
         await this.membership.handleCheckoutCompleted(event.data.object);

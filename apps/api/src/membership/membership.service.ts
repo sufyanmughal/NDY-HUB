@@ -7,7 +7,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
-import { BillingCycle, MembershipStatus, MembershipTier } from '@prisma/client';
+import {
+  BillingCycle,
+  MembershipStatus,
+  MembershipTier,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TIER_CONFIG } from './tier-config';
 
@@ -138,6 +143,29 @@ export class MembershipService {
       where: { userId, status: MembershipStatus.ACTIVE },
       data: { status: MembershipStatus.CANCELLED, cancelledAt: new Date() },
     });
+  }
+
+  /**
+   * Stripe retries webhook deliveries until it gets a 2xx, so the same
+   * event id can legitimately arrive more than once. Returns true the
+   * first time an event id is seen (caller should process it), false on
+   * every subsequent delivery of the same id (caller should no-op) — same
+   * create-and-catch-P2002 idempotency shape as CryndyPurchase's
+   * providerTransactionId.
+   */
+  async recordStripeEventOnce(eventId: string): Promise<boolean> {
+    try {
+      await this.prisma.processedStripeEvent.create({ data: { eventId } });
+      return true;
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        return false;
+      }
+      throw err;
+    }
   }
 
   verifyWebhookSignature(rawBody: Buffer, signature: string): Stripe.Event {
