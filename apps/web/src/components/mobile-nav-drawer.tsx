@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
-import { NAV_ITEMS, isNavItemActive } from "@/lib/nav-items";
+import { useNavItems, isNavItemActive } from "@/lib/nav-items";
 import { useMobileNav } from "@/lib/mobile-nav-context";
 import { Logo } from "@/components/logo";
 
@@ -16,6 +16,7 @@ import { Logo } from "@/components/logo";
 export function MobileNavDrawer() {
   const { isOpen, close } = useMobileNav();
   const pathname = usePathname();
+  const navItems = useNavItems();
 
   // Locks background scroll while the drawer is open, and lets Escape
   // close it the same way clicking the backdrop does.
@@ -60,7 +61,7 @@ export function MobileNavDrawer() {
           </button>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active = isNavItemActive(item.href, pathname);
             const Icon = item.icon;
             return (

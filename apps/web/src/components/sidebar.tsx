@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_ITEMS, isNavItemActive } from "@/lib/nav-items";
+import { useNavItems, isNavItemActive } from "@/lib/nav-items";
 import { Logo } from "@/components/logo";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const navItems = useNavItems();
 
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-surface">
@@ -14,7 +15,7 @@ export function Sidebar() {
         <Logo />
       </div>
       <nav className="flex-1 px-3 space-y-0.5">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const active = isNavItemActive(item.href, pathname);
           const Icon = item.icon;
           return (
