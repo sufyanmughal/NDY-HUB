@@ -3,28 +3,29 @@
 **One Identity. One Passport. One Ecosystem.**
 
 NDY HUB is the identity and membership core of the NDY ecosystem — a single
-account (the **NDY Passport**) that a member uses to sign into every NDY
-product, manage their membership tier, track CRYNDY and NDYBITS holdings,
-and control exactly which platforms and devices are connected to their
-identity.
+account (the **NDY Passport**) a member uses to sign into every NDY product,
+manage their membership tier, track CRYNDY and NDYBITS holdings, and control
+exactly which platforms and devices are connected to their identity. It is
+also an **OAuth 2.0 / OIDC identity provider** in its own right: any other
+NDJOYIT site can register as a client and let members sign in with their
+existing NDY Passport instead of standing up separate accounts.
 
-[![Deploy to staging](https://github.com/sufyanmughal/NDY-HUB/actions/workflows/deploy-staging.yml/badge.svg)](https://github.com/sufyanmughal/NDY-HUB/actions/workflows/deploy-staging.yml)
+**Live:** [ndy-hub-web.vercel.app](https://ndy-hub-web.vercel.app)
 
 ---
 
 ## Table of contents
 
 - [System architecture](#system-architecture)
+- [Identity & access model](#identity--access-model)
 - [Core workflows](#core-workflows)
-  - [QR / deep-link login](#1-qr--deep-link-login)
-  - [Connected accounts (Google/Apple linking)](#2-connected-accounts-googleapple-linking)
-  - [Membership subscription](#3-membership-subscription)
-  - [Admin moderation & audit trail](#4-admin-moderation--audit-trail)
-- [Deployment pipeline](#deployment-pipeline)
-- [Feature matrix](#feature-matrix)
+- [Security posture](#security-posture)
 - [Tech stack](#tech-stack)
+- [Deployment](#deployment)
+- [Testing](#testing)
 - [Project layout](#project-layout)
 - [Running it locally](#running-it-locally)
+- [Feature matrix](#feature-matrix)
 - [Roadmap](#roadmap)
 
 ---
@@ -38,17 +39,14 @@ flowchart TB
         NDYAPPS["NDYAPPS mobile app\n(QR scan / approve)"]
     end
 
-    subgraph Edge["Reverse proxy"]
-        Nginx["nginx"]
-    end
-
-    subgraph App["Application layer"]
+    subgraph Vercel["Vercel"]
         Web["Web dashboard\nNext.js 16 / React 19"]
         API["Core API\nNestJS 11"]
     end
 
     subgraph Data["Data layer"]
-        PG[("PostgreSQL 16")]
+        PG[("Neon Postgres 16\n(serverless)")]
+        Blob[("Vercel Blob\nprofile photos")]
     end
 
     subgraph External["External services"]
@@ -58,16 +56,23 @@ flowchart TB
         CRYNDY["CRYNDY presale site\n(webhook)"]
     end
 
-    Browser -->|HTTPS| Nginx
-    Nginx --> Web
-    Nginx --> API
-    NDYAPPS -->|approve login request| API
-    Web -->|REST + WebSocket| API
+    subgraph Ecosystem["Next phase: other NDJOYIT sites"]
+        SiteA["Site A"]
+        SiteB["Site B"]
+    end
+
+    Browser -->|HTTPS| Web
+    Web -->|"/api/* rewrite\n(same-origin, carries the\nhttpOnly session cookie)"| API
+    NDYAPPS -->|approve login request\nBearer token| API
+    Web -.->|WebSocket, token-based| API
     API --> PG
+    API --> Blob
     API <--> Google
     API <--> Apple
     API <--> Stripe
     CRYNDY -->|signed webhook| API
+    SiteA -.->|OAuth 2.0 / OIDC\n"Sign in with NDY Passport"| API
+    SiteB -.->|OAuth 2.0 / OIDC| API
 ```
 
 Everything a member does — register, log in, manage 2FA/passkeys, link a
@@ -76,13 +81,50 @@ open a support ticket — goes through the one Core API. It is the single
 source of truth for identity data; nothing else in the ecosystem writes to it
 directly.
 
+The frontend never calls the API directly from the browser. `apps/web`
+proxies `/api/*` through its own origin (a Next.js rewrite) to the API's real
+Vercel deployment, so the API's session cookie stays `SameSite=Lax` instead
+of needing `SameSite=None` — the two apps live on different `vercel.app`
+subdomains, which browsers treat as genuinely different sites, and
+`SameSite=None` cookies are exactly what Safari/Firefox's cross-site tracking
+protections are increasingly aggressive about dropping.
+
+## Identity & access model
+
+A member's own account is always `USER`. Staff/operator roles are a separate
+axis, assigned by a Founder or Super Admin and enforced end-to-end:
+
+| Role | What it can do |
+|---|---|
+| **FOUNDER** | Everything — the only role that can grant `FOUNDER` or `SUPER_ADMIN` to someone else |
+| **SUPER_ADMIN** | Manage users, manage roles (except Founder/Super Admin), manage OAuth clients, manage support tickets, view the audit log |
+| **DEVELOPER** | Manage OAuth clients (registering/rotating the sites allowed to use NDY HUB as an identity provider) |
+| **FINANCE** | Read-only visibility into revenue, CRYNDY sales, and NDYBITS issuance — nothing else |
+| **SUPPORT** | Manage support tickets |
+| **AUDITOR** | Read-only access to the audit log |
+| **CONTENT**, **PARTNERS** | Reserved roles with no permissions wired yet — no content or partner-management feature exists to gate |
+
+Permissions are checked against a `Role → Permission[]` map
+(`apps/api/src/common/permissions.ts`) on every request — a guard re-queries
+the caller's *current* role from the database rather than trusting a claim
+baked into their access token, so a demoted admin's session stops working
+immediately instead of lingering until the token naturally expires. The
+frontend mirrors the same map to decide what to show (`lib/permissions.ts`),
+but that's UX only; the API is the actual authority.
+
+**Role changes are dual-approval**, not instant: one admin with
+`MANAGE_ROLES` proposes a change, and a *different* admin has to approve it
+before it takes effect. The requester can't approve their own request, and
+assigning Founder or Super Admin requires the approver to themselves be a
+Founder — both enforced server-side, not just hidden in the UI.
+
 ## Core workflows
 
-### 1. QR / deep-link login
+### QR / deep-link login
 
-The flagship flow: a member scans a QR code on `/login` with the NDYAPPS
-mobile app, approves it there, and the browser tab logs in live — no polling,
-no page refresh.
+A member scans a QR code on `/login` with the NDYAPPS mobile app, approves it
+there, and the browser tab logs in live over a WebSocket — no polling, no
+page refresh (with a polling fallback if the socket never connects).
 
 ```mermaid
 sequenceDiagram
@@ -100,160 +142,151 @@ sequenceDiagram
     NDYAPPS->>API: POST /auth/login-request/:token/approve\n(authenticated NDYAPPS session)
     API->>API: mint access + refresh tokens
     API->>WS: publish "approved" event
-    WS-->>Browser: push tokens over the open socket
-    Browser->>Browser: store session, redirect to dashboard
+    WS-->>Browser: notify over the open socket
+    Browser->>API: POST /auth/login-request/:token/exchange
+    API-->>Browser: session cookies (httpOnly)
 ```
 
 The login request is single-use and expires after 90 seconds. Approval
 requires an already-authenticated NDYAPPS session — there is no path that
 lets an unauthenticated device approve a login for someone else.
 
-### 2. Connected accounts (Google/Apple linking)
+### Connected accounts (Google/Apple linking)
 
 Linking a social identity to an *already signed-in* account is a distinct
 flow from using that same provider to log in — the two are never allowed to
-collide silently.
+collide silently. If the provider identity is already linked to a different
+NDY HUB account, the link attempt is rejected rather than silently taking
+over. Unlinking is guarded the same way in reverse: the API refuses to remove
+the last remaining sign-in method (no password, no other linked identity, no
+passkey) so a member can never accidentally lock themselves out.
+
+### Membership subscription
+
+Stripe Checkout when configured; in dev/staging without Stripe credentials,
+the membership activates directly so the rest of the flow can still be
+tested end to end.
+
+### Dual-approval role changes
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant Settings as Settings page
+    participant AdminA as Admin A
     participant API as Core API
-    participant Provider as Google / Apple
+    participant AdminB as Admin B (different person)
 
-    User->>Settings: click "Connect Google"
-    Settings->>API: POST /auth/oauth/google/connect (authenticated)
-    API->>API: create OAuth state tagged with the current user's ID
-    API-->>Settings: provider authorize URL
-    Settings->>Provider: redirect
-    User->>Provider: approve
-    Provider->>API: callback + authorization code
-    API->>API: exchange code, resolve identity
+    AdminA->>API: POST /admin/role-requests (propose role change)
+    API->>API: create PENDING request, write audit log
+    Note over API: Change has NOT taken effect
 
-    alt identity already linked to a different NDY HUB account
-        API-->>Settings: redirect with error — no silent takeover
-    else identity free (or already linked to this account)
-        API->>API: attach identity to the current user
-        API-->>Settings: redirect with success
-    end
+    AdminB->>API: GET /admin/role-requests?status=PENDING
+    AdminB->>API: POST /admin/role-requests/:id/approve
+    API->>API: verify AdminB != AdminA
+    API->>API: verify AdminB is a Founder, if role is Founder/Super Admin
+    API->>API: apply role change, write audit log
 ```
 
-Unlinking is guarded the same way in reverse: the API refuses to remove the
-last remaining sign-in method (no password, no other linked identity, no
-passkey) so a member can never accidentally lock themselves out of their own
-account.
-
-### 3. Membership subscription
-
-```mermaid
-sequenceDiagram
-    participant Member
-    participant Web
-    participant API as Core API
-    participant Stripe
-
-    Member->>Web: choose a membership tier
-    Web->>API: POST /memberships/subscribe
-    alt Stripe configured
-        API->>Stripe: create Checkout Session
-        Stripe-->>API: session URL
-        API-->>Web: redirect to Stripe Checkout
-        Member->>Stripe: complete payment
-        Stripe->>API: webhook (signature-verified)
-        API->>API: activate membership
-    else Stripe not configured (dev/staging)
-        API->>API: activate membership directly, logged as a fallback
-    end
-    API-->>Web: membership active, visible on dashboard + Passport
-```
-
-### 4. Admin moderation & audit trail
+### Admin moderation & audit trail
 
 Every privileged action — role changes, suspensions, OAuth client changes,
 support replies — writes an immutable entry to the shared audit log with
-before/after values, so there is always a record of who changed what and why.
+before/after values and the acting admin's identity, so there is always a
+record of who changed what and why.
 
-```mermaid
-flowchart LR
-    Admin["Admin user"] -->|"/admin action"| Guard["AdminGuard"]
-    Guard -->|role check| Action["Perform action\n(suspend, role change, etc.)"]
-    Action --> Audit[("AuditLogEntry\nadmin, target, before/after, reason")]
-    Action --> DB[("Primary data")]
-```
+## Security posture
 
-## Deployment pipeline
-
-Every push to `main` ships automatically — no manual server work required to
-get a change in front of the client.
-
-```mermaid
-flowchart LR
-    Dev["Push to main"] --> Build["GitHub Actions:\nbuild api + web images"]
-    Build --> Push["Push images to\nGitHub Container Registry"]
-    Push --> Deploy["SSH into server"]
-    Deploy --> Pull["Pull latest images"]
-    Pull --> Restart["Restart containers"]
-    Restart --> Migrate["Run database migrations"]
-    Migrate --> Live(["Live on the staging server"])
-```
-
-The server only ever pulls and runs pre-built images — it never compiles
-anything itself, which keeps deploys fast and the server's resource
-requirements small.
-
-### Environments
-
-| Environment | Trigger | Status |
-|---|---|---|
-| Development | Local machine | Always available to the dev team |
-| Staging | Push to `main` | Live — this is what the client reviews |
-| Production | Manual promotion once ready to go live | Not provisioned yet — the pipeline (`deploy-reusable.yml`) is already built to support it: a second GitHub Environment with its own server and secrets is all that's needed, no rebuild |
-
-No untested change reaches a real user: `main` only ever deploys to
-Staging automatically. Promoting to Production will always be a deliberate,
-separate action once that environment exists.
-
-### Reliability & operations
-
-- **Monitoring**: server-level metrics (CPU, memory, disk, bandwidth) are
-  monitored with alert thresholds, so infrastructure problems surface
-  before they become outages.
-- **Backups**: the database is backed up automatically every night, with a
-  documented, tested restore procedure — see `deploy/README.md` for the
-  full disaster-recovery process.
-- **Immutable audit trail**: every admin action and every CRYNDY/NDYBITS
-  transaction is append-only and permanently recorded — nothing gets
-  silently edited or deleted.
-
-## Feature matrix
-
-| Area | Status | Notes |
-|---|---|---|
-| Registration, login, profile | ✅ Live | NDY ID generation is collision-safe and excludes visually ambiguous characters |
-| QR / deep-link login | ✅ Live | Real-time over WebSocket, 90-second single-use requests |
-| Two-factor authentication | ✅ Live | TOTP + backup codes |
-| Passkeys (WebAuthn) | ✅ Live | Passwordless sign-in |
-| Google / Apple sign-in | ✅ Live | Includes account linking distinct from login |
-| Session & device management | ✅ Live | Per-session revoke, revoke-all |
-| Membership tiers & billing | ✅ Live | Stripe Checkout when configured, dev fallback otherwise |
-| CRYNDY & NDYBITS | ✅ Live | Full purchase lifecycle, signed webhook intake, append-only ledger |
-| Transactions history | ✅ Live | Unified across memberships and CRYNDY |
-| Documents | ✅ Live | Generated on demand from live data |
-| Admin console | ✅ Live | User management, audit log, OAuth client management |
-| Support tickets | ✅ Live | Member submission + admin reply |
-| Mobile navigation | ✅ Live | Responsive drawer navigation |
-| Connected Platforms | 🔜 Planned | UI in place, backend not yet built |
-| Object storage (S3/R2) | 🔜 Planned | Documents currently generated on demand rather than stored |
+- **httpOnly session cookies** — access and refresh tokens never touch
+  `localStorage` or any script-readable storage; an XSS bug can't exfiltrate
+  a session. Cookies are `Secure`, `SameSite=Lax`, and rotated on every
+  refresh (the old refresh token is revoked the instant a new one is issued,
+  so a stolen-and-reused token only works once).
+- **Non-browser clients** (NDYAPPS, future API integrations) authenticate
+  with a Bearer token instead — there's no cookie jar to rely on there. The
+  guard accepts either.
+- **RBAC re-checked server-side on every request**, not cached in the token
+  (see [Identity & access model](#identity--access-model)).
+- **Dual-approval on role changes** — no single admin can grant themselves
+  or anyone else elevated access unilaterally.
+- **2FA (TOTP + backup codes) and WebAuthn passkeys**, independent of
+  password auth.
+- **Rate limiting** on every credential-guessing surface (login, register,
+  password reset, 2FA verify) tighter than the app-wide default.
+- **CORS is an explicit allowlist** of known frontend origins, not a
+  wildcard.
+- **Uploaded photos go to Vercel Blob**, not local disk — a serverless
+  function's local filesystem is ephemeral and per-instance, so anything
+  written there can vanish before a later request tries to read it back.
 
 ## Tech stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 16 (App Router), React 19, Tailwind CSS v4 |
-| Backend | NestJS 11, Prisma ORM |
-| Database | PostgreSQL 16 |
-| Auth | JWT + rotating refresh tokens, TOTP 2FA, WebAuthn passkeys, OAuth 2.0 (Google, Apple), OIDC provider |
-| Infrastructure | Docker, GitHub Actions CI/CD, nginx, DigitalOcean |
+| Frontend | Next.js 16 (App Router, Turbopack), React 19, Tailwind CSS v4 |
+| Backend | NestJS 11, Prisma ORM 6 |
+| Database | PostgreSQL 16 (Neon, serverless) |
+| File storage | Vercel Blob (profile photos) |
+| Auth | httpOnly-cookie sessions with rotating refresh tokens, TOTP 2FA, WebAuthn passkeys, OAuth 2.0 (Google, Apple), and NDY HUB itself as an OIDC provider for other sites |
+| Hosting | Vercel (both apps, independently deployed) |
+| Testing | Jest (unit) + Supertest (e2e, against a real Postgres) |
+
+Docker Compose is still available for local Postgres and for a self-hosted
+deployment path (`docker-compose.prod.yml`, nginx, GitHub Actions in
+`.github/workflows/`) — it's how this project deployed before moving to
+Vercel, and remains a documented option, but isn't the current live path.
+
+## Deployment
+
+Both apps deploy independently to Vercel, straight from this repo:
+
+- **`apps/web`** — the dashboard. Proxies `/api/*` to the API (see
+  [System architecture](#system-architecture)); this is also where
+  `NEXT_PUBLIC_API_URL` and the rewrite destination point.
+- **`apps/api`** — the NestJS API, deployed as a Vercel Node.js backend
+  (auto-detected from `package.json`; no `vercel.json` build config needed).
+  Requires `DATABASE_URL`/`DIRECT_URL` (Neon), `JWT_ACCESS_SECRET`,
+  `JWT_REFRESH_SECRET`, `TOTP_ENCRYPTION_KEY`, `WEB_APP_URL`, `API_URL`,
+  `BLOB_READ_WRITE_TOKEN` (Vercel Blob), plus `STRIPE_*`/`GOOGLE_*`/`APPLE_*`
+  once those integrations are turned on.
+
+Database migrations are hand-written SQL under
+`apps/api/prisma/migrations/`, applied with `prisma migrate deploy`.
+
+### Connecting another site as an OAuth client
+
+This is the mechanism the next phase relies on. Any NDJOYIT site can let
+members sign in with their NDY Passport instead of a separate account:
+
+1. A Developer, Super Admin, or Founder registers the site under **Admin →
+   Connected Websites**, providing its redirect URI(s) and the scopes it
+   needs. This returns a `client_id`/`client_secret` pair (the secret is
+   shown once).
+2. The site implements a standard OAuth 2.0 Authorization Code flow (PKCE
+   supported) against NDY HUB's endpoints, discoverable at
+   `/.well-known/openid-configuration`.
+3. NDY HUB shows the member a consent screen the first time (subsequent
+   logins are silent if the same scopes were already granted — one login,
+   not one consent screen per visit).
+4. The site receives a signed ID token plus an access token scoped to what
+   it asked for and was granted.
+
+A member can review and revoke any site's access at any time from the
+**Security** page.
+
+## Testing
+
+```bash
+npm run --workspace apps/api test        # unit tests — no database needed
+npm run --workspace apps/api test:e2e    # e2e — needs a real Postgres (DATABASE_URL)
+```
+
+Unit tests cover the security-critical logic in isolation with mocked
+dependencies: the permission matrix, the crypto/base32 primitives behind 2FA,
+the auth guards, and the dual-approval role-change logic (self-approval
+rejection, Founder-only gating, already-resolved conflicts). E2E tests run
+real HTTP requests against a real database, covering the full cookie-based
+session lifecycle: register/login/refresh/logout, refresh-token rotation and
+single-use enforcement, and cookie-only authentication with no Authorization
+header.
 
 ## Project layout
 
@@ -262,9 +295,9 @@ ndy-hub/
 ├── apps/
 │   ├── api/    NestJS + TypeScript — the Core API, the only thing that writes identity data
 │   └── web/    Next.js + TypeScript + Tailwind — the NDY HUB dashboard
-├── deploy/     Server bootstrap script, nginx config, deployment docs
+├── deploy/     Server bootstrap script, nginx config — the self-hosted deployment path
 ├── docker-compose.yml        Local Postgres (development)
-├── docker-compose.prod.yml   Full production stack
+├── docker-compose.prod.yml   Full self-hosted stack (alternative to Vercel)
 └── package.json               npm workspaces root
 ```
 
@@ -285,11 +318,44 @@ npm run dev:web                # http://localhost:3001
 needed for local dev. `.env.example` files (in both `apps/api` and
 `apps/web`) document every variable if you're pointing at something else.
 
+## Feature matrix
+
+| Area | Status | Notes |
+|---|---|---|
+| Registration, login, profile | ✅ Live | NDY ID generation is collision-safe and excludes visually ambiguous characters |
+| httpOnly-cookie sessions | ✅ Live | Rotating refresh tokens, reactive refresh-and-retry on the frontend |
+| QR / deep-link login | ✅ Live | Real-time over WebSocket, 90-second single-use requests |
+| Two-factor authentication | ✅ Live | TOTP + backup codes |
+| Passkeys (WebAuthn) | ✅ Live | Passwordless sign-in |
+| Google / Apple sign-in | ⚙️ Built, not configured | Code path is live; needs real provider credentials |
+| Session & device management | ✅ Live | Per-session revoke, revoke-all |
+| 9-role RBAC | ✅ Live | Founder, Super Admin, Developer, Finance, Support, Auditor wired; Content/Partners reserved |
+| Dual-approval role changes | ✅ Live | Propose/approve split across two different admins, enforced server-side |
+| Admin user detail view | ✅ Live | Full profile — verification history, security posture, linked accounts — not just the summary row |
+| Membership tiers & billing | ⚙️ Built, placeholder pricing | Stripe Checkout when configured, dev fallback otherwise |
+| CRYNDY & NDYBITS | ✅ Live | Full purchase lifecycle, signed webhook intake, append-only ledger |
+| Transactions history | ✅ Live | Unified across memberships and CRYNDY |
+| Documents | ✅ Live | Generated on demand from live data |
+| Profile photos | ✅ Live | Vercel Blob storage |
+| Admin console | ✅ Live | User management, audit log, OAuth client management, support tickets — sections shown per the viewer's actual permissions |
+| OAuth 2.0 / OIDC provider | ✅ Live | This is what the next phase (connecting other NDJOYIT sites) builds on |
+| Support tickets | ✅ Live | Member submission + admin reply |
+| Automated tests | ✅ Live | 65 tests (unit + e2e) covering auth, RBAC, and dual-approval |
+| Connected Platforms | 🔜 Planned | UI in place, backend not yet built |
+| Object storage for Documents | 🔜 Planned | Currently generated on demand rather than stored |
+
 ## Roadmap
 
-1. Move sessions from `localStorage` to an httpOnly cookie set by the API —
-   the intended production security posture.
-2. Real object storage (S3/R2) for Documents once a bucket is provisioned.
-3. A Connected Platforms backend — currently the last page on mock data.
-4. Whatever the team decides on the crypto payment rail for the CRYNDY
+1. **Connect the wider NDJOYIT ecosystem** — the next phase. Register each
+   additional site as an OAuth client and integrate "Sign in with NDY
+   Passport" (see [Connecting another site](#connecting-another-site-as-an-oauth-client)),
+   so membership, CRYNDY/NDYBITS balance, and identity are consistent across
+   every property instead of siloed per-site.
+2. A Connected Platforms backend — currently the last page on mock data.
+3. Real object storage for Documents once volume justifies it beyond
+   generate-on-demand.
+4. Wire up permissions for Content/Partners roles once those features exist
+   to gate.
+5. Real membership tier pricing, replacing the current placeholder figures.
+6. Whatever the team decides on the crypto payment rail for the CRYNDY
    presale — a business decision, not an engineering one.
