@@ -17,6 +17,7 @@ existing NDY Passport instead of standing up separate accounts.
 ## Table of contents
 
 - [System architecture](#system-architecture)
+- [Design principles](#design-principles)
 - [Identity & access model](#identity--access-model)
 - [Core workflows](#core-workflows)
 - [Security posture](#security-posture)
@@ -88,6 +89,43 @@ of needing `SameSite=None` — the two apps live on different `vercel.app`
 subdomains, which browsers treat as genuinely different sites, and
 `SameSite=None` cookies are exactly what Safari/Firefox's cross-site tracking
 protections are increasingly aggressive about dropping.
+
+## Design principles
+
+The decisions that shape everything else in this document:
+
+- **One system of record.** The Core API is the only thing that ever writes
+  identity data. The dashboard, NDYAPPS, and every connected NDJOYIT site
+  read through it or act through it — never around it. There's no
+  reconciliation problem to solve later because there's nowhere else data
+  could have quietly diverged.
+- **Fail closed.** A route wired to the permission guard with no permission
+  declared throws rather than defaulting to open — a wiring mistake becomes
+  an error, not a silent hole. The same instinct runs through the rest of
+  the system: unlinking the last remaining sign-in method is refused
+  outright, not left as a "please don't do this" comment; approving a login
+  request requires an already-authenticated session with no fallback path.
+- **No single point of trust for irreversible actions.** Granting elevated
+  access is dual-approval by construction — the server itself rejects a
+  requester's attempt to approve their own request. It isn't a policy
+  someone has to remember to follow.
+- **Authorization is re-verified, not cached.** A role check queries the
+  database on every request instead of trusting a claim signed into an
+  access token. A revoked admin stops being an admin the moment the change
+  lands, not fifteen minutes later when their token happens to expire.
+- **Every privileged action leaves a permanent, attributable record** — who,
+  what, before/after, and why, written at the moment it happens, not
+  reconstructed from logs afterward.
+- **Security wins over convenience when the two conflict.** Sessions live in
+  httpOnly cookies specifically because that closes an XSS exfiltration path
+  a simpler `localStorage` implementation would leave open — even though it
+  meant solving a same-site cookie problem across two separately deployed
+  Vercel apps to do it properly, rather than reaching for a weaker cookie
+  policy to make the problem disappear.
+- **Tests target what actually breaks things, not a coverage percentage** —
+  the permission matrix, the auth guards, the dual-approval edge cases, and
+  the full cookie session lifecycle against a real database. Those are the
+  surfaces where a subtle bug is a security incident, not a bug report.
 
 ## Identity & access model
 
