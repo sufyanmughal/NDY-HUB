@@ -62,8 +62,8 @@ flowchart TB
     end
 
     Browser -->|HTTPS| Web
-    Web -->|"/api/* rewrite\n(same-origin, carries the\nhttpOnly session cookie)"| API
-    NDYAPPS -->|approve login request\nBearer token| API
+    Web -->|same-origin proxy, carries the session cookie| API
+    NDYAPPS -->|approve login request, Bearer token| API
     Web -.->|WebSocket, token-based| API
     API --> PG
     API --> Blob
@@ -71,7 +71,7 @@ flowchart TB
     API <--> Apple
     API <--> Stripe
     CRYNDY -->|signed webhook| API
-    SiteA -.->|OAuth 2.0 / OIDC\n"Sign in with NDY Passport"| API
+    SiteA -.->|OAuth 2.0 / OIDC| API
     SiteB -.->|OAuth 2.0 / OIDC| API
 ```
 
