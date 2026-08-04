@@ -17,7 +17,6 @@ import { useCryndySummary } from "@/lib/use-cryndy";
 import { useNdybitsSummary } from "@/lib/use-ndybits";
 import { useMembershipSummary } from "@/lib/use-membership";
 import { mockConnectedPlatformsCount } from "@/lib/mock-data";
-import { API_BASE_URL } from "@/lib/api";
 import { downloadPassportPdf } from "@/lib/passport-pdf";
 import { Avatar } from "@/components/avatar";
 
@@ -33,14 +32,16 @@ export default function PassportPage() {
 
   const ndyId = auth.status === "authenticated" ? auth.ndyId : null;
 
-  // Encodes the real, live public-passport API endpoint — scanning this
-  // resolves to actual JSON for this NDY ID today. A dedicated, nicely
-  // rendered public verification page at that URL is a natural follow-up,
-  // not something to fake a link to before it exists.
+  // Encodes the real, rendered public passport page (apps/web's own
+  // /passport/[ndyId] route) — this used to point at the raw JSON API
+  // endpoint directly, so scanning it just returned unformatted data
+  // instead of the actual card view a person scanning someone's passport
+  // should land on. window.location.origin (not API_BASE_URL) since this
+  // is the web app's own route, not the API's.
   useEffect(() => {
     if (!ndyId) return;
     let cancelled = false;
-    const publicPassportUrl = `${API_BASE_URL}/passport/${ndyId}`;
+    const publicPassportUrl = `${window.location.origin}/passport/${ndyId}`;
     QRCode.toDataURL(publicPassportUrl, { margin: 1, width: 240 }).then(
       (url) => {
         if (!cancelled) setQrDataUrl(url);

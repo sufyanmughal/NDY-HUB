@@ -189,6 +189,25 @@ The login request is single-use and expires after 90 seconds. Approval
 requires an already-authenticated NDYAPPS session — there is no path that
 lets an unauthenticated device approve a login for someone else.
 
+### NDY Passport — the public digital identity card
+
+Every account has a public, unauthenticated profile page at
+`/passport/:ndyId` — the actual destination the QR code on a member's own
+Passport page (and its downloadable PDF) encodes. It renders whatever the
+owner has chosen to make public: name, photo, verification badge, bio,
+country, website/social links, business info, member-since date, and a
+Share button. Fields the owner has toggled private are never sent to the
+client at all — the `*IsPublic` flags on `User` are enforced in the API
+response itself, not hidden client-side. A signed-out visitor sees a "Claim
+your own" call to action; a signed-in visitor sees a link back to their own
+dashboard instead.
+
+New accounts are prompted once, immediately after signup, to fill this in
+at `/passport/complete` — only full name is required (the rest is
+skippable, and editable any time from Settings). In practice this screen
+only appears for OAuth/passkey signups, since password registration's own
+form already collects a name.
+
 ### Connected accounts (Google/Apple linking)
 
 Linking a social identity to an *already signed-in* account is a distinct
@@ -289,6 +308,12 @@ Both apps deploy independently to Vercel, straight from this repo:
 Database migrations are hand-written SQL under
 `apps/api/prisma/migrations/`, applied with `prisma migrate deploy`.
 
+Both apps currently live on their default Vercel `*.vercel.app` domains —
+there is no dedicated subdomain (e.g. a future `passport.ndyhub.com` for
+public passport URLs) configured yet. That's a DNS/domain decision for
+whoever owns the `ndyhub.com` registration, not something this repo can
+set up on its own.
+
 ### Connecting another site as an OAuth client
 
 This is the mechanism the next phase relies on. Any NDJOYIT site can let
@@ -362,6 +387,7 @@ needed for local dev. `.env.example` files (in both `apps/api` and
 |---|---|---|
 | Registration, login, profile | ✅ Live | NDY ID generation is collision-safe and excludes visually ambiguous characters |
 | httpOnly-cookie sessions | ✅ Live | Rotating refresh tokens, reactive refresh-and-retry on the frontend |
+| NDY Passport digital card | ✅ Live | Public, unauthenticated card at `/passport/:ndyId` (photo, name, verification badge, bio, country, website/social links, business info) — QR code on the authenticated Passport page and the downloadable PDF both encode this page. Every optional field has its own public/private toggle in Settings, enforced server-side. New accounts complete this once at `/passport/complete` (only full name is required — the rest is skippable and editable later); the step is skipped automatically when a signup path (password) already collected a name, and only actually triggers for OAuth/passkey signups, which don't |
 | QR / deep-link login | ✅ Live | Real-time over WebSocket, 90-second single-use requests |
 | Two-factor authentication | ✅ Live | TOTP + backup codes |
 | Passkeys (WebAuthn) | ✅ Live | Passwordless sign-in |
@@ -376,7 +402,8 @@ needed for local dev. `.env.example` files (in both `apps/api` and
 | Documents | ✅ Live | Generated on demand from live data |
 | Profile photos | ✅ Live | Vercel Blob storage |
 | Admin console | ✅ Live | User management, audit log, OAuth client management, support tickets — sections shown per the viewer's actual permissions |
-| OAuth 2.0 / OIDC provider | ✅ Live | This is what the next phase (connecting other NDJOYIT sites) builds on |
+| Audit log | ⚙️ Live, narrow coverage | Covers admin-initiated privileged actions (suspend/unsuspend, role change propose/approve/reject, support replies) end-to-end, viewable in the admin console. Does not yet cover login events, OAuth token issuance, session revocations, or password/2FA changes — a real gap for a system meant to be the ecosystem's audit-of-record, deliberately left as a follow-up rather than rushed |
+| OAuth 2.0 / OIDC provider | ✅ Live, unproven with a real client yet | Full spec-shaped authorization server: `/oauth/authorize` (PKCE S256, exact redirect_uri match, scope validation), `/oauth/token` (authorization_code + refresh_token grants), `/oauth/userinfo` (scope-filtered claims, including NDJOYIT-specific `membership`/`cryndy_available_balance`), `/.well-known/openid-configuration` + `/.well-known/jwks.json` (RS256, real JWKS for key rotation). This is what the next phase (connecting other NDJOYIT sites, including NDYAPPS) builds on — no site has actually completed this flow yet, so treat it as needing a real integration test with a first real client before fully trusting it in production. **NDYAPPS today does not use this** — it authenticates through NDY HUB's own `/auth` endpoints directly and approves QR/deep-link login requests with its own Bearer token (see [QR / deep-link login](#qr--deep-link-login)), which is a narrower, NDYAPPS-specific mechanism, not the general OIDC path other future sites are expected to use |
 | Support tickets | ✅ Live | Member submission + admin reply |
 | Automated tests | ✅ Live | 65 tests (unit + e2e) covering auth, RBAC, and dual-approval |
 | Connected Platforms | 🔜 Planned | UI in place, backend not yet built |
@@ -384,16 +411,35 @@ needed for local dev. `.env.example` files (in both `apps/api` and
 
 ## Roadmap
 
-1. **Connect the wider NDJOYIT ecosystem** — the next phase. Register each
+1. **Prove the OAuth/OIDC provider with a real first client.** The
+   authorization server is fully built (see [feature matrix](#feature-matrix))
+   but has never been exercised end-to-end by an actual site — register a
+   real client, drive the full authorize → consent → token → userinfo flow
+   once, and fix whatever that surfaces before treating it as production-ready.
+2. **Migrate NDYAPPS from its own `/auth` + Bearer-approval mechanism onto
+   the OIDC path** — the integration doc for this already flags it as the
+   intended direction (`NDYAPPS-INTEGRATION.md`), not yet done.
+3. **Connect the wider NDJOYIT ecosystem** beyond NDYAPPS. Register each
    additional site as an OAuth client and integrate "Sign in with NDY
    Passport" (see [Connecting another site](#connecting-another-site-as-an-oauth-client)),
    so membership, CRYNDY/NDYBITS balance, and identity are consistent across
    every property instead of siloed per-site.
-2. A Connected Platforms backend — currently the last page on mock data.
-3. Real object storage for Documents once volume justifies it beyond
+4. **Widen audit-log coverage** to login events, OAuth grants/token
+   issuance, session revocations, and password/2FA changes — today it only
+   covers admin-initiated privileged actions.
+5. **Multiple NDY Passport card designs** (the digital-business-card vision
+   — currently one layout, both on-screen and in the downloadable PDF) plus
+   a Contact/Connect action between two users, and eventually NFC/Apple
+   Wallet/Google Wallet support using the same public passport URL.
+6. A move toward multi-role support (a user simultaneously "Verified +
+   Member + Business Verified," etc.) rather than today's single `role`
+   column, if the product actually needs roles to compose rather than being
+   mutually exclusive.
+7. A Connected Platforms backend — currently the last page on mock data.
+8. Real object storage for Documents once volume justifies it beyond
    generate-on-demand.
-4. Wire up permissions for Content/Partners roles once those features exist
+9. Wire up permissions for Content/Partners roles once those features exist
    to gate.
-5. Real membership tier pricing, replacing the current placeholder figures.
-6. Whatever the team decides on the crypto payment rail for the CRYNDY
-   presale — a business decision, not an engineering one.
+10. Real membership tier pricing, replacing the current placeholder figures.
+11. Whatever the team decides on the crypto payment rail for the CRYNDY
+    presale — a business decision, not an engineering one.
