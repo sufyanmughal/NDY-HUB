@@ -34,7 +34,7 @@ export interface NavItem {
 const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/passport", label: "NDY Passport", icon: IdCard },
-  { href: "/memberships", label: "Memberships", icon: Users },
+  { href: "/memberships/manage", label: "Memberships", icon: Users },
   { href: "/cryndy", label: "CRYNDY", icon: Coins },
   { href: "/ndybits", label: "NDYBITS", icon: Boxes },
   { href: "/platforms", label: "Connected Platforms", icon: Link2 },
