@@ -135,6 +135,17 @@ export function logoutSession(): Promise<void> {
   return apiFetch<void>("/auth/logout", { method: "POST" });
 }
 
+export interface PublicPassportSocials {
+  linkedin: string | null;
+  instagram: string | null;
+  x: string | null;
+}
+
+export interface PublicPassportBusiness {
+  name: string | null;
+  role: string | null;
+}
+
 export interface PublicPassport {
   ndyId: string;
   fullName: string | null;
@@ -142,6 +153,15 @@ export interface PublicPassport {
   verificationLevel: string;
   ndyappsConnected: boolean;
   memberSince: string;
+  // Each null either because the owner never set it, or chose to keep it
+  // private (getPublicPassport on the API applies the *IsPublic flags
+  // before this ever reaches the client — there's no way to tell the two
+  // cases apart from here, by design).
+  bio: string | null;
+  country: string | null;
+  website: string | null;
+  socials: PublicPassportSocials | null;
+  business: PublicPassportBusiness | null;
 }
 
 export function getPublicPassport(ndyId: string): Promise<PublicPassport> {
@@ -381,18 +401,49 @@ export interface MeProfile {
   twoFactorEnabled: boolean;
   role: UserRole;
   createdAt: string;
+  bio: string | null;
+  country: string | null;
+  website: string | null;
+  linkedinUrl: string | null;
+  instagramUrl: string | null;
+  xUrl: string | null;
+  businessName: string | null;
+  businessRole: string | null;
+  bioIsPublic: boolean;
+  countryIsPublic: boolean;
+  websiteIsPublic: boolean;
+  socialsIsPublic: boolean;
+  businessIsPublic: boolean;
+  // Only fullName gates the dashboard — see DashboardGate. Every other
+  // Passport Card field is optional and editable any time from Settings.
+  passportComplete: boolean;
 }
 
 export function getMe(): Promise<MeProfile> {
   return authedFetch<MeProfile>("/auth/me");
 }
 
-export function updateProfile(updates: {
+export interface UpdateProfileInput {
   fullName?: string;
   profilePhotoUrl?: string;
-}): Promise<
-  Pick<MeProfile, "ndyId" | "email" | "fullName" | "profilePhotoUrl">
-> {
+  bio?: string;
+  country?: string;
+  website?: string;
+  linkedinUrl?: string;
+  instagramUrl?: string;
+  xUrl?: string;
+  businessName?: string;
+  businessRole?: string;
+  bioIsPublic?: boolean;
+  countryIsPublic?: boolean;
+  websiteIsPublic?: boolean;
+  socialsIsPublic?: boolean;
+  businessIsPublic?: boolean;
+}
+
+export function updateProfile(
+  updates: UpdateProfileInput,
+): Promise<Omit<MeProfile, "id" | "verificationLevel" | "ndyappsConnected" | "twoFactorEnabled" | "role" | "createdAt">> {
   return authedFetch("/auth/me", {
     method: "PATCH",
     body: JSON.stringify(updates),

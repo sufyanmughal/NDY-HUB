@@ -72,11 +72,17 @@ export function Topbar() {
         >
           Log out
         </button>
-        <Avatar
-          photoUrl={passport?.profilePhotoUrl}
-          name={displayName}
-          size={32}
-        />
+        <Link
+          href="/passport"
+          aria-label="View your NDY Passport"
+          className="shrink-0 rounded-full ring-offset-2 ring-offset-surface hover:ring-2 hover:ring-accent"
+        >
+          <Avatar
+            photoUrl={passport?.profilePhotoUrl}
+            name={displayName}
+            size={32}
+          />
+        </Link>
       </div>
     </header>
   );

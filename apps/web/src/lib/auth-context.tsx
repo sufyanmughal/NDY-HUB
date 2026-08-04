@@ -12,7 +12,7 @@ import { ApiError, getMe, logoutSession } from "./api";
 type AuthState =
   | { status: "loading" }
   | { status: "unauthenticated" }
-  | { status: "authenticated"; ndyId: string };
+  | { status: "authenticated"; ndyId: string; passportComplete: boolean };
 
 interface AuthContextValue {
   auth: AuthState;
@@ -38,7 +38,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const resolveAuth = useCallback(async (): Promise<AuthState> => {
     try {
       const me = await getMe();
-      return { status: "authenticated", ndyId: me.ndyId };
+      return {
+        status: "authenticated",
+        ndyId: me.ndyId,
+        passportComplete: me.passportComplete,
+      };
     } catch (err) {
       // A visitor with no session at all fails here twice over: /auth/me
       // 401s (no access token cookie), and authedFetch's own reactive

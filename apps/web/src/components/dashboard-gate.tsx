@@ -12,6 +12,13 @@ import { useAuth } from "@/lib/auth-context";
  * before this can know loading vs. logged-out. This gate waits for that,
  * then bounces to /login once it's sure there's no valid session, instead
  * of flashing real content first.
+ *
+ * It also gates on passportComplete (== fullName is set) — every signup
+ * path (password, OAuth, passkey) lands here, and this is the single
+ * chokepoint that sends anyone who hasn't finished the post-signup
+ * "Complete Your Passport" step there instead of into the dashboard.
+ * Re-checked on every mount (not just once at signup) so it's self-healing
+ * regardless of how the session was established.
  */
 export function DashboardGate({ children }: { children: React.ReactNode }) {
   const { auth } = useAuth();
@@ -20,15 +27,19 @@ export function DashboardGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (auth.status === "unauthenticated") {
       router.replace("/login");
+    } else if (auth.status === "authenticated" && !auth.passportComplete) {
+      router.replace("/passport/complete");
     }
-  }, [auth.status, router]);
+  }, [auth, router]);
 
-  if (auth.status !== "authenticated") {
+  const ready = auth.status === "authenticated" && auth.passportComplete;
+
+  if (!ready) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-foreground-muted">
         {auth.status === "loading"
           ? "Checking your session…"
-          : "Redirecting to login…"}
+          : "Redirecting…"}
       </div>
     );
   }

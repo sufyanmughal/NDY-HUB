@@ -118,6 +118,22 @@ export class AuthService {
       twoFactorEnabled: Boolean(user.totpEnabledAt),
       role: user.role,
       createdAt: user.createdAt,
+      bio: user.bio,
+      country: user.country,
+      website: user.website,
+      linkedinUrl: user.linkedinUrl,
+      instagramUrl: user.instagramUrl,
+      xUrl: user.xUrl,
+      businessName: user.businessName,
+      businessRole: user.businessRole,
+      bioIsPublic: user.bioIsPublic,
+      countryIsPublic: user.countryIsPublic,
+      websiteIsPublic: user.websiteIsPublic,
+      socialsIsPublic: user.socialsIsPublic,
+      businessIsPublic: user.businessIsPublic,
+      // Only fullName gates the dashboard (see DashboardGate) — every other
+      // Passport Card field is optional and skippable at signup.
+      passportComplete: Boolean(user.fullName),
     };
   }
 
@@ -128,6 +144,20 @@ export class AuthService {
       email: user.email,
       fullName: user.fullName,
       profilePhotoUrl: user.profilePhotoUrl,
+      bio: user.bio,
+      country: user.country,
+      website: user.website,
+      linkedinUrl: user.linkedinUrl,
+      instagramUrl: user.instagramUrl,
+      xUrl: user.xUrl,
+      businessName: user.businessName,
+      businessRole: user.businessRole,
+      bioIsPublic: user.bioIsPublic,
+      countryIsPublic: user.countryIsPublic,
+      websiteIsPublic: user.websiteIsPublic,
+      socialsIsPublic: user.socialsIsPublic,
+      businessIsPublic: user.businessIsPublic,
+      passportComplete: Boolean(user.fullName),
     };
   }
 

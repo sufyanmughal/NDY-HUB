@@ -63,6 +63,33 @@ model User {
   passwordHash      String?           // null for users who only ever sign in via Google/Apple/NDYAPPS
   fullName          String?
   profilePhotoUrl   String?
+
+  // Passport Card fields — the data behind the public-facing digital
+  // business card at /passport/:ndyId. All optional (collected via the
+  // post-signup "Complete Your Passport" step, skippable, editable later
+  // from Settings) except fullName above, which is the only field that
+  // gates dashboard access (see DashboardGate + AuthService.getMe's
+  // passportComplete). Flat fields rather than a nested JSON blob to
+  // match every other field on this model and keep them individually
+  // validatable/indexable.
+  bio               String?
+  country           String?
+  website           String?
+  linkedinUrl       String?
+  instagramUrl      String?
+  xUrl              String?
+  businessName      String?
+  businessRole      String?
+  // Per-field visibility for the public passport view — a genuinely new
+  // pattern on this model (nothing else here has a visibility toggle).
+  // Default true so these columns existing doesn't silently blank out
+  // anything for users who never touch the new settings.
+  bioIsPublic       Boolean @default(true)
+  countryIsPublic   Boolean @default(true)
+  websiteIsPublic   Boolean @default(true)
+  socialsIsPublic   Boolean @default(true)
+  businessIsPublic  Boolean @default(true)
+
   verificationLevel VerificationLevel @default(LEVEL_0)
   emailVerifiedAt   DateTime?
   phoneVerifiedAt   DateTime?

@@ -84,6 +84,19 @@ function ProfileForm({
   onSaved: (profile: MeProfile) => void;
 }) {
   const [fullName, setFullName] = useState(profile.fullName ?? "");
+  const [bio, setBio] = useState(profile.bio ?? "");
+  const [country, setCountry] = useState(profile.country ?? "");
+  const [website, setWebsite] = useState(profile.website ?? "");
+  const [linkedinUrl, setLinkedinUrl] = useState(profile.linkedinUrl ?? "");
+  const [instagramUrl, setInstagramUrl] = useState(profile.instagramUrl ?? "");
+  const [xUrl, setXUrl] = useState(profile.xUrl ?? "");
+  const [businessName, setBusinessName] = useState(profile.businessName ?? "");
+  const [businessRole, setBusinessRole] = useState(profile.businessRole ?? "");
+  const [bioIsPublic, setBioIsPublic] = useState(profile.bioIsPublic);
+  const [countryIsPublic, setCountryIsPublic] = useState(profile.countryIsPublic);
+  const [websiteIsPublic, setWebsiteIsPublic] = useState(profile.websiteIsPublic);
+  const [socialsIsPublic, setSocialsIsPublic] = useState(profile.socialsIsPublic);
+  const [businessIsPublic, setBusinessIsPublic] = useState(profile.businessIsPublic);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{
     kind: "good" | "critical";
@@ -99,7 +112,22 @@ function ProfileForm({
     setBusy(true);
     setMessage(null);
     try {
-      const updated = await updateProfile({ fullName });
+      const updated = await updateProfile({
+        fullName,
+        bio: bio.trim() || undefined,
+        country: country || undefined,
+        website: website.trim() || undefined,
+        linkedinUrl: linkedinUrl.trim() || undefined,
+        instagramUrl: instagramUrl.trim() || undefined,
+        xUrl: xUrl.trim() || undefined,
+        businessName: businessName.trim() || undefined,
+        businessRole: businessRole.trim() || undefined,
+        bioIsPublic,
+        countryIsPublic,
+        websiteIsPublic,
+        socialsIsPublic,
+        businessIsPublic,
+      });
       onSaved({ ...profile, ...updated });
       setMessage({ kind: "good", text: "Profile updated." });
     } catch (err) {
@@ -189,6 +217,104 @@ function ProfileForm({
         className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
       />
 
+      <div className="mt-6 border-t border-border pt-4">
+        <h3 className="text-sm font-medium text-foreground-muted">
+          Passport Card
+        </h3>
+        <p className="mt-1 text-xs text-foreground-muted">
+          Shown on your public NDY Passport at /passport/{profile.ndyId}.
+          Toggle a field off to keep it private — it stays saved here, just
+          hidden from anyone else who views your passport.
+        </p>
+
+        <FieldWithVisibility
+          label="Bio"
+          isPublic={bioIsPublic}
+          onTogglePublic={setBioIsPublic}
+        >
+          <textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            maxLength={280}
+            rows={3}
+            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          />
+        </FieldWithVisibility>
+
+        <FieldWithVisibility
+          label="Country"
+          isPublic={countryIsPublic}
+          onTogglePublic={setCountryIsPublic}
+        >
+          <input
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          />
+        </FieldWithVisibility>
+
+        <FieldWithVisibility
+          label="Website"
+          isPublic={websiteIsPublic}
+          onTogglePublic={setWebsiteIsPublic}
+        >
+          <input
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            placeholder="https://"
+            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          />
+        </FieldWithVisibility>
+
+        <FieldWithVisibility
+          label="Social links"
+          isPublic={socialsIsPublic}
+          onTogglePublic={setSocialsIsPublic}
+        >
+          <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <input
+              value={linkedinUrl}
+              onChange={(e) => setLinkedinUrl(e.target.value)}
+              placeholder="LinkedIn URL"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+            <input
+              value={instagramUrl}
+              onChange={(e) => setInstagramUrl(e.target.value)}
+              placeholder="Instagram URL"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+            <input
+              value={xUrl}
+              onChange={(e) => setXUrl(e.target.value)}
+              placeholder="X / Twitter URL"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+          </div>
+        </FieldWithVisibility>
+
+        <FieldWithVisibility
+          label="Business info"
+          isPublic={businessIsPublic}
+          onTogglePublic={setBusinessIsPublic}
+        >
+          <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <input
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              placeholder="Business name"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+            <input
+              value={businessRole}
+              onChange={(e) => setBusinessRole(e.target.value)}
+              placeholder="Role / Title"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+          </div>
+        </FieldWithVisibility>
+      </div>
+
       {message && (
         <p
           className={`mt-3 text-sm ${message.kind === "good" ? "text-good" : "text-critical"}`}
@@ -205,6 +331,42 @@ function ProfileForm({
         {busy ? "Saving…" : "Save changes"}
       </button>
     </form>
+  );
+}
+
+/** One Passport Card field + its own "show on my public passport" toggle —
+ * every optional field in ProfileForm pairs a value with an *IsPublic flag
+ * (see UpdateProfileInput in @/lib/api), so this is the one place that
+ * layout is defined instead of repeating it five times. */
+function FieldWithVisibility({
+  label,
+  isPublic,
+  onTogglePublic,
+  children,
+}: {
+  label: string;
+  isPublic: boolean;
+  onTogglePublic: (next: boolean) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mt-4">
+      <div className="flex items-center justify-between">
+        <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+          {label}
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-foreground-muted">
+          <input
+            type="checkbox"
+            checked={isPublic}
+            onChange={(e) => onTogglePublic(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-border"
+          />
+          Public
+        </label>
+      </div>
+      {children}
+    </div>
   );
 }
 

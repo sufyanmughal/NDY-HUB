@@ -74,7 +74,23 @@ export class IdentityService {
 
   async updateProfile(
     userId: string,
-    updates: { fullName?: string; profilePhotoUrl?: string },
+    updates: {
+      fullName?: string;
+      profilePhotoUrl?: string;
+      bio?: string;
+      country?: string;
+      website?: string;
+      linkedinUrl?: string;
+      instagramUrl?: string;
+      xUrl?: string;
+      businessName?: string;
+      businessRole?: string;
+      bioIsPublic?: boolean;
+      countryIsPublic?: boolean;
+      websiteIsPublic?: boolean;
+      socialsIsPublic?: boolean;
+      businessIsPublic?: boolean;
+    },
   ) {
     return this.prisma.user.update({ where: { id: userId }, data: updates });
   }
