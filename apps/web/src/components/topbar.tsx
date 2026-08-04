@@ -1,6 +1,8 @@
 "use client";
 
-import { Search, Bell, Menu } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Search, Bell, Menu, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { usePassport } from "@/lib/use-passport";
 import { useMobileNav } from "@/lib/mobile-nav-context";
@@ -10,20 +12,36 @@ export function Topbar() {
   const { auth, logout } = useAuth();
   const passport = usePassport();
   const { toggle } = useMobileNav();
+  const pathname = usePathname();
 
   if (auth.status !== "authenticated") return null;
 
   const displayName = passport?.fullName ?? auth.ndyId;
+  // The sidebar/mobile drawer covers "go anywhere," but there was no direct
+  // "take me back to the dashboard" affordance from a page like Security or
+  // Admin — this is that, shown everywhere except the dashboard itself.
+  const showBack = pathname !== "/dashboard";
 
   return (
     <header className="flex items-center gap-3 border-b border-border bg-surface px-4 py-4 md:justify-between md:px-6">
-      <button
-        onClick={toggle}
-        aria-label="Open menu"
-        className="shrink-0 rounded-md p-1.5 text-foreground-muted hover:bg-surface-2 hover:text-foreground md:hidden"
-      >
-        <Menu size={20} strokeWidth={2} />
-      </button>
+      <div className="flex shrink-0 items-center gap-0.5 md:hidden">
+        {showBack && (
+          <Link
+            href="/dashboard"
+            aria-label="Back to dashboard"
+            className="rounded-md p-1.5 text-foreground-muted hover:bg-surface-2 hover:text-foreground"
+          >
+            <ArrowLeft size={20} strokeWidth={2} />
+          </Link>
+        )}
+        <button
+          onClick={toggle}
+          aria-label="Open menu"
+          className="rounded-md p-1.5 text-foreground-muted hover:bg-surface-2 hover:text-foreground"
+        >
+          <Menu size={20} strokeWidth={2} />
+        </button>
+      </div>
       <div className="relative hidden w-full max-w-xs md:block">
         <Search
           size={16}
