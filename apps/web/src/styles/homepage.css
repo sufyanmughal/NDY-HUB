@@ -5,6 +5,14 @@
    don't leak into the rest of the app's theme. */
 
 .ndy-homepage {
+  /* Sits inside flex containers on both consuming pages (the dashboard
+     shell's flex column, the landing page's flex body) — without this,
+     flex's default min-width:auto lets this subtree's own min-content
+     width (driven by the least-shrinkable thing inside it, e.g. the
+     token card's fixed-width sparkline) push every ancestor wider than
+     the viewport instead of wrapping/clipping in place. */
+  min-width: 0;
+
   --hp-bg: #05070d;
   --hp-surface: #10141fcc;
   --hp-surface-2: #171c2b;
@@ -361,6 +369,19 @@
   flex-shrink: 0;
 }
 
+/* Grid/flex items default to min-width:auto, which refuses to shrink
+   below content size — the exact bug this file had. Let every card/item
+   shrink with its track instead of forcing the track (and everything
+   above it) wider than the viewport. */
+.ndy-homepage .hp-card,
+.ndy-homepage .hp-stat,
+.ndy-homepage .hp-token-card,
+.ndy-homepage .hp-eco-item,
+.ndy-homepage .hp-token-name,
+.ndy-homepage .hp-token-sub {
+  min-width: 0;
+}
+
 /* ---------- ecosystem ---------- */
 .ndy-homepage .hp-eco-title {
   text-align: center;
@@ -552,5 +573,26 @@
   }
   .ndy-homepage footer.hp-footer {
     padding: 22px 20px;
+  }
+}
+@media (max-width: 480px) {
+  .ndy-homepage .hp-hero h1 {
+    font-size: 26px;
+  }
+  .ndy-homepage .hp-hero p {
+    font-size: 14.5px;
+  }
+  /* The sparkline is a fixed 130px and was the thing actually forcing
+     the whole page wider on narrow phones (see the min-width:0 note
+     above) — drop it here rather than let it get clipped mid-chart. */
+  .ndy-homepage .hp-token-chart {
+    display: none;
+  }
+  .ndy-homepage .hp-token-card {
+    padding: 16px 18px;
+    gap: 12px;
+  }
+  .ndy-homepage .hp-token-price-block {
+    margin-left: auto;
   }
 }
