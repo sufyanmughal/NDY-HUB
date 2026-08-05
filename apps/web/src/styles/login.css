@@ -36,11 +36,27 @@
      to center within. */
   min-height: 100%;
 }
+/* homepage.css's .hp-earth/.hp-stars rules (including position: absolute)
+   are scoped under .hp-hero, which this panel isn't — .login-hero reuses
+   the same two elements for the same backdrop effect, so it needs its own
+   full positioning rules, not just the size/offset overrides that assumed
+   .hp-hero's position: absolute base rule would still apply. Without
+   position: absolute here, .hp-earth rendered as a static 760px-tall flex
+   item and pushed the rest of the hero content down instead of acting as
+   a decorative background layer. */
 .ndy-homepage .login-hero .hp-earth {
+  position: absolute;
   top: -420px;
   left: -320px;
   width: 760px;
   height: 760px;
+  border-radius: 50%;
+  z-index: -2;
+}
+.ndy-homepage .login-hero .hp-stars {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
 }
 .ndy-homepage .login-hero-brand {
   display: flex;
