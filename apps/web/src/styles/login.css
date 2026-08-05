@@ -1,0 +1,151 @@
+/* Styles for the redesigned /login page. Layered on homepage.css like
+   membership.css — assumes it's always loaded alongside it inside a
+   `.ndy-homepage` wrapper, inheriting the --hp-* custom properties.
+   Split layout: a hero/brand panel on the left (desktop) and the actual
+   auth card on the right, collapsing to a single centered column on
+   mobile since most traffic here is expected to be mobile. */
+
+.ndy-homepage .login-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 900px) {
+  .ndy-homepage .login-shell {
+    grid-template-columns: 1.1fr 1fr;
+  }
+}
+
+/* ---------- left: hero panel ---------- */
+.ndy-homepage .login-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px 40px;
+}
+.ndy-homepage .login-hero .hp-earth {
+  top: -420px;
+  left: -320px;
+  width: 760px;
+  height: 760px;
+}
+.ndy-homepage .login-hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 40px;
+}
+.ndy-homepage .login-hero h1 {
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 800;
+  line-height: 1.12;
+  margin: 0 0 14px;
+  letter-spacing: -0.01em;
+}
+.ndy-homepage .login-hero h1 .hp-grad {
+  background: linear-gradient(90deg, var(--hp-accent), var(--hp-accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.ndy-homepage .login-hero p.login-hero-lead {
+  color: var(--hp-fg-muted);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 440px;
+  margin: 0 0 32px;
+}
+.ndy-homepage .login-hero-features {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 420px;
+}
+.ndy-homepage .login-hero-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.ndy-homepage .login-hero-feature-icon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--card-c, var(--hp-accent)) 16%, transparent);
+  color: var(--card-c, var(--hp-accent));
+}
+.ndy-homepage .login-hero-feature-icon svg {
+  width: 17px;
+  height: 17px;
+}
+.ndy-homepage .login-hero-feature strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+.ndy-homepage .login-hero-feature span {
+  display: block;
+  font-size: 13px;
+  color: var(--hp-fg-muted);
+  margin-top: 2px;
+}
+
+@media (max-width: 899px) {
+  .ndy-homepage .login-hero {
+    padding: 40px 24px 24px;
+    text-align: center;
+    align-items: center;
+  }
+  .ndy-homepage .login-hero-brand {
+    justify-content: center;
+  }
+  .ndy-homepage .login-hero p.login-hero-lead {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .ndy-homepage .login-hero-features {
+    display: none; /* keep the mobile hero short so the form isn't pushed far down */
+  }
+}
+
+/* ---------- right: form panel ---------- */
+.ndy-homepage .login-form-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px 56px;
+  position: relative;
+}
+@media (min-width: 900px) {
+  .ndy-homepage .login-form-panel {
+    padding: 48px 40px;
+    border-left: 1px solid var(--hp-border);
+    background: color-mix(in srgb, var(--hp-surface) 60%, transparent);
+  }
+}
+
+.ndy-homepage .login-divider {
+  display: flex;
+  width: 100%;
+  max-width: 384px;
+  align-items: center;
+  gap: 12px;
+  color: var(--hp-fg-muted);
+  font-size: 12px;
+  margin: 20px 0;
+}
+.ndy-homepage .login-divider::before,
+.ndy-homepage .login-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--hp-border);
+}
