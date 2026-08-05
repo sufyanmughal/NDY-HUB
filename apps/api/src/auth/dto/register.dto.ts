@@ -16,20 +16,23 @@ export class RegisterDto {
   @MinLength(8)
   password!: string;
 
-  // Full name is the only passport field that's actually required — it's
-  // what gates DashboardGate's passportComplete check (see auth.service's
-  // getMe()). Kept optional here at the DTO level only because OAuth/passkey
-  // signups (social-auth.service.ts) can't collect it upfront and route
-  // through /passport/complete afterwards instead; the password registration
-  // form on the client always sends it.
+  // fullName, country, and (uploaded separately right after registration,
+  // since file upload needs a session that doesn't exist until this call
+  // returns) a photo are the required Passport fields — enforced by
+  // isPassportComplete() in auth.service.ts and by DashboardGate routing
+  // anyone missing one to /passport/complete. Kept @IsOptional() here at
+  // the DTO level (not @IsNotEmpty) only because OAuth/passkey signups
+  // (social-auth.service.ts) can't collect either field upfront and
+  // route through /passport/complete regardless; the password
+  // registration form on the client always sends both.
   @IsOptional()
   @IsString()
   @MaxLength(100)
   fullName?: string;
 
   // --- Passport Card fields, collected up front by the real registration
-  // form (components/register-form.tsx) so users fill these in once, at
-  // account creation, instead of being routed through a separate step
+  // form (components/password-auth-form.tsx) so users fill these in once,
+  // at account creation, instead of being routed through a separate step
   // later. All still optional here since OAuth/passkey signups skip this
   // form entirely and fill these in later via /passport/complete or
   // Settings. Mirrors UpdateProfileDto exactly. ---

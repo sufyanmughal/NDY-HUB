@@ -24,9 +24,14 @@ export function PasswordAuthForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  // Passport Card fields — collected here, at account creation, instead of
-  // a separate step afterwards. All optional except full name.
-  const [showPassportFields, setShowPassportFields] = useState(false);
+  // Passport Card fields — collected here, permanently, at account
+  // creation, per the user's explicit "every user must add these
+  // details" direction. Required: fullName, country (photo is required
+  // too, but can't be collected here — file upload needs a session that
+  // doesn't exist until registration returns, so DashboardGate routes new
+  // accounts to /passport/complete for that one field). Optional/
+  // skippable: bio, linkedin, instagram, x. Website/business stay
+  // optional — not every user has one.
   const [bio, setBio] = useState("");
   const [country, setCountry] = useState("");
   const [website, setWebsite] = useState("");
@@ -73,6 +78,10 @@ export function PasswordAuthForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (mode === "register" && !country) {
+      setError("Country is required.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -141,11 +150,12 @@ export function PasswordAuthForm() {
         {mode === "register" && (
           <div>
             <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-              Full name
+              Full name <span className="text-critical">*</span>
             </label>
             <input
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              required
               className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             />
           </div>
@@ -190,127 +200,120 @@ export function PasswordAuthForm() {
         )}
 
         {mode === "register" && (
-          <div className="rounded-md border border-border">
-            <button
-              type="button"
-              onClick={() => setShowPassportFields((v) => !v)}
-              className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-foreground-muted hover:text-foreground"
-            >
-              <span>
-                Add your NDY Passport details{" "}
-                <span className="font-normal text-foreground-muted/70">
-                  (optional — can add later)
-                </span>
-              </span>
-              <span>{showPassportFields ? "−" : "+"}</span>
-            </button>
+          <div className="space-y-3 rounded-md border border-border p-3">
+            <div className="text-xs font-medium text-foreground-muted">
+              Your NDY Passport details
+            </div>
 
-            {showPassportFields && (
-              <div className="space-y-3 border-t border-border p-3">
-                <div>
-                  <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-                    Bio
-                  </label>
-                  <textarea
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    maxLength={280}
-                    rows={2}
-                    placeholder="A short line about who you are."
-                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  />
-                </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                Country <span className="text-critical">*</span>
+              </label>
+              <select
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                required
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              >
+                <option value="" disabled>
+                  Select a country…
+                </option>
+                {COUNTRIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                <div>
-                  <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-                    Country
-                  </label>
-                  <select
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="">Prefer not to say</option>
-                    {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                Bio <span className="normal-case text-foreground-muted/70">(optional)</span>
+              </label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                maxLength={280}
+                rows={2}
+                placeholder="A short line about who you are."
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
 
-                <div>
-                  <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-                    Website
-                  </label>
-                  <input
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    placeholder="https://"
-                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  />
-                </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                Website <span className="normal-case text-foreground-muted/70">(optional)</span>
+              </label>
+              <input
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="https://"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div>
-                    <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-                      LinkedIn
-                    </label>
-                    <input
-                      value={linkedinUrl}
-                      onChange={(e) => setLinkedinUrl(e.target.value)}
-                      placeholder="https://linkedin.com/in/…"
-                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-                      Instagram
-                    </label>
-                    <input
-                      value={instagramUrl}
-                      onChange={(e) => setInstagramUrl(e.target.value)}
-                      placeholder="https://instagram.com/…"
-                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-                      X / Twitter
-                    </label>
-                    <input
-                      value={xUrl}
-                      onChange={(e) => setXUrl(e.target.value)}
-                      placeholder="https://x.com/…"
-                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-                      Business name
-                    </label>
-                    <input
-                      value={businessName}
-                      onChange={(e) => setBusinessName(e.target.value)}
-                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-                      Role / Title
-                    </label>
-                    <input
-                      value={businessRole}
-                      onChange={(e) => setBusinessRole(e.target.value)}
-                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                    />
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                  LinkedIn <span className="normal-case text-foreground-muted/70">(optional)</span>
+                </label>
+                <input
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                  placeholder="https://linkedin.com/in/…"
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
               </div>
-            )}
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                  Instagram <span className="normal-case text-foreground-muted/70">(optional)</span>
+                </label>
+                <input
+                  value={instagramUrl}
+                  onChange={(e) => setInstagramUrl(e.target.value)}
+                  placeholder="https://instagram.com/…"
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                  X / Twitter <span className="normal-case text-foreground-muted/70">(optional)</span>
+                </label>
+                <input
+                  value={xUrl}
+                  onChange={(e) => setXUrl(e.target.value)}
+                  placeholder="https://x.com/…"
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                  Business name <span className="normal-case text-foreground-muted/70">(optional)</span>
+                </label>
+                <input
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                  Role / Title <span className="normal-case text-foreground-muted/70">(optional)</span>
+                </label>
+                <input
+                  value={businessRole}
+                  onChange={(e) => setBusinessRole(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <p className="text-xs text-foreground-muted">
+              You&rsquo;ll be asked to add a profile photo right after creating your account.
+            </p>
           </div>
         )}
 

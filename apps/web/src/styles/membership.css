@@ -560,31 +560,23 @@
 }
 
 /* ---------- embedded tier grid on /memberships/manage ---------- */
-/* The dashboard shell's own container is already narrow (max-w-3xl) and
-   padded, unlike the full-bleed marketing page these .mem-* rules were
-   designed for — override the grid/toggle/compare-table's own padding and
-   column count here instead of fighting the dashboard's padding twice. */
-.mem-manage-tiers {
+/* The dashboard shell's <main> has its own p-6 padding; this section
+   breaks out of the page's max-w-3xl column via a -mx-6 wrapper (see the
+   page component) to reach full width like the public page's tier grid
+   does, then re-adds its own horizontal padding here so content doesn't
+   touch the viewport edge. Column counts match .mem-tiers/.mem-why-grid's
+   own responsive breakpoints elsewhere in this file at full width — no
+   override needed there anymore now that this section isn't artificially
+   narrowed. */
+.mem-manage-tiers-heading {
+  padding: 0 40px;
   margin-top: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--hp-fg-muted);
 }
-.mem-manage-tiers .mem-toggle,
-.mem-manage-tiers .mem-tiers,
-.mem-manage-tiers .mem-compare {
-  padding-left: 0;
-  padding-right: 0;
-  margin-left: 0;
-  margin-right: 0;
-}
-.mem-manage-tiers .mem-tiers {
-  grid-template-columns: repeat(2, 1fr);
-  padding-top: 16px;
-}
-.mem-manage-tiers .mem-compare {
-  grid-template-columns: repeat(2, 1fr);
-}
-@media (max-width: 640px) {
-  .mem-manage-tiers .mem-tiers,
-  .mem-manage-tiers .mem-compare {
-    grid-template-columns: 1fr;
+@media (max-width: 900px) {
+  .mem-manage-tiers-heading {
+    padding: 0 20px;
   }
 }

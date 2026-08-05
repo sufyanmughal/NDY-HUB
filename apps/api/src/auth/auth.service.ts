@@ -144,9 +144,11 @@ export class AuthService {
       websiteIsPublic: user.websiteIsPublic,
       socialsIsPublic: user.socialsIsPublic,
       businessIsPublic: user.businessIsPublic,
-      // Only fullName gates the dashboard (see DashboardGate) — every other
-      // Passport Card field is optional and skippable at signup.
-      passportComplete: Boolean(user.fullName),
+      // fullName, country, and a photo are the required Passport fields
+      // (see DashboardGate) — bio/website/socials/business stay optional
+      // and skippable. Widened from fullName-only per the user's explicit
+      // "these details must be required" direction.
+      passportComplete: isPassportComplete(user),
     };
   }
 
@@ -170,7 +172,7 @@ export class AuthService {
       websiteIsPublic: user.websiteIsPublic,
       socialsIsPublic: user.socialsIsPublic,
       businessIsPublic: user.businessIsPublic,
-      passportComplete: Boolean(user.fullName),
+      passportComplete: isPassportComplete(user),
     };
   }
 
@@ -540,6 +542,21 @@ export class AuthService {
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+/**
+ * Full name, country, and a profile photo are the required Passport
+ * fields — DashboardGate routes anyone missing one of these to
+ * /passport/complete. Bio, website, socials, and business info stay
+ * optional/skippable. A single source of truth so getMe/updateProfile
+ * can't drift on what "complete" means.
+ */
+function isPassportComplete(user: {
+  fullName: string | null;
+  country: string | null;
+  profilePhotoUrl: string | null;
+}): boolean {
+  return Boolean(user.fullName && user.country && user.profilePhotoUrl);
 }
 
 export { LoginRequestMethod };

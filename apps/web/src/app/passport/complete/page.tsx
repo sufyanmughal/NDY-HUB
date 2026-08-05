@@ -1,22 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { getMe, updateProfile, type MeProfile } from "@/lib/api";
+import {
+  getMe,
+  updateProfile,
+  uploadProfilePhoto,
+  type MeProfile,
+} from "@/lib/api";
 import { COUNTRIES } from "@/lib/countries";
+import { Avatar } from "@/components/avatar";
+
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 /** Runs immediately after the OAuth/passkey signup paths (password signup
  * now collects everything up front in the registration form itself — see
- * components/password-auth-form.tsx — so it never needs this step;
- * DashboardGate is the single chokepoint that routes here whenever
- * passportComplete is false). Also reachable any time afterwards as the
- * general "complete/edit your Passport" entry point — linked from the
- * dashboard and Settings — since editing here uses the exact same
- * fields/endpoint as Settings' ProfileForm. Deliberately outside
- * (dashboard) so it isn't itself gated by the check it satisfies; guards
- * itself with useAuth() directly instead of DashboardGate. Full name is
- * the only required field. */
+ * components/password-auth-form.tsx — so it never needs this step for
+ * name/country/etc; it still needs this step for the photo, since photo
+ * upload requires a session that doesn't exist until registration
+ * returns). DashboardGate is the single chokepoint that routes here
+ * whenever passportComplete is false. Also reachable any time afterwards
+ * as the general "complete/edit your Passport" entry point. Required:
+ * full name, country, photo. Skippable: bio, website, socials, business —
+ * matches isPassportComplete() in auth.service.ts exactly. */
 
 export default function CompletePassportPage() {
   const { auth } = useAuth();
@@ -32,9 +40,12 @@ export default function CompletePassportPage() {
   const [xUrl, setXUrl] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [businessRole, setBusinessRole] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   useEffect(() => {
     if (auth.status === "unauthenticated") {
@@ -56,6 +67,7 @@ export default function CompletePassportPage() {
         setXUrl(me.xUrl ?? "");
         setBusinessName(me.businessName ?? "");
         setBusinessRole(me.businessRole ?? "");
+        setPhotoUrl(me.profilePhotoUrl);
       })
       .catch((err) => setError((err as Error).message));
   }, [auth.status]);
@@ -69,33 +81,34 @@ export default function CompletePassportPage() {
   // through the dashboard).
   const isEditing = profile.passportComplete;
 
-  async function finish() {
-    // Any already-complete field (e.g. fullName from OAuth) stays as-is;
-    // DashboardGate re-checks passportComplete on the next /auth/me call
-    // triggered by the redirect below landing on a fresh mount.
-    router.replace(isEditing ? "/passport" : "/dashboard");
-  }
-
-  async function handleSkip() {
-    if (!fullName.trim()) {
-      setError("Full name is required — everything else can be skipped.");
+  async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      setError("Photo must be a JPEG, PNG, or WEBP image.");
       return;
     }
-    if (fullName.trim() === (profile!.fullName ?? "")) {
-      // Nothing changed beyond what's already saved — no need to call the API.
-      await finish();
+    if (file.size > MAX_PHOTO_SIZE_BYTES) {
+      setError("Photo must be smaller than 5MB.");
       return;
     }
-    setBusy(true);
+    setPhotoBusy(true);
     setError(null);
     try {
-      await updateProfile({ fullName: fullName.trim() });
-      await finish();
+      const { profilePhotoUrl } = await uploadProfilePhoto(file);
+      setPhotoUrl(profilePhotoUrl);
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setBusy(false);
+      setPhotoBusy(false);
     }
+  }
+
+  async function finish() {
+    // DashboardGate re-checks passportComplete on the next /auth/me call
+    // triggered by the redirect below landing on a fresh mount.
+    router.replace(isEditing ? "/passport" : "/dashboard");
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -104,13 +117,21 @@ export default function CompletePassportPage() {
       setError("Full name is required.");
       return;
     }
+    if (!country) {
+      setError("Country is required.");
+      return;
+    }
+    if (!photoUrl) {
+      setError("A profile photo is required.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       await updateProfile({
         fullName: fullName.trim(),
+        country,
         bio: bio.trim() || undefined,
-        country: country || undefined,
         website: website.trim() || undefined,
         linkedinUrl: linkedinUrl.trim() || undefined,
         instagramUrl: instagramUrl.trim() || undefined,
@@ -139,7 +160,7 @@ export default function CompletePassportPage() {
           <p className="mt-1 text-sm text-foreground-muted">
             {isEditing
               ? "Update your digital identity card. Changes here also update your public passport page."
-              : "This becomes your digital identity card across the ecosystem. Only your name is required — everything else can be added later from Settings."}
+              : "This becomes your digital identity card across the ecosystem. Fields marked * are required — the rest can be added any time from Settings."}
           </p>
         </div>
 
@@ -148,6 +169,38 @@ export default function CompletePassportPage() {
           className="mt-6 rounded-lg border border-border bg-surface p-5"
         >
           <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+            Photo *
+          </label>
+          <div className="mt-2 flex items-center gap-4">
+            <Avatar
+              photoUrl={photoUrl}
+              name={fullName || "?"}
+              size={64}
+              className="text-xl ring-2 ring-surface-2"
+            />
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ALLOWED_PHOTO_TYPES.join(",")}
+                onChange={handlePhotoSelected}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={photoBusy}
+                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {photoBusy ? "Uploading…" : photoUrl ? "Change photo" : "Upload photo"}
+              </button>
+              <p className="mt-1 text-xs text-foreground-muted">
+                JPEG, PNG, or WEBP — up to 5MB.
+              </p>
+            </div>
+          </div>
+
+          <label className="mt-4 block text-xs uppercase tracking-wide text-foreground-muted">
             Full name *
           </label>
           <input
@@ -158,26 +211,17 @@ export default function CompletePassportPage() {
           />
 
           <label className="mt-4 block text-xs uppercase tracking-wide text-foreground-muted">
-            Bio
-          </label>
-          <textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            maxLength={280}
-            rows={3}
-            placeholder="A short line about who you are."
-            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          />
-
-          <label className="mt-4 block text-xs uppercase tracking-wide text-foreground-muted">
-            Country
+            Country *
           </label>
           <select
             value={country}
             onChange={(e) => setCountry(e.target.value)}
+            required
             className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
           >
-            <option value="">Prefer not to say</option>
+            <option value="" disabled>
+              Select a country…
+            </option>
             {COUNTRIES.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -194,42 +238,6 @@ export default function CompletePassportPage() {
             placeholder="https://"
             className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
           />
-
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-                LinkedIn
-              </label>
-              <input
-                value={linkedinUrl}
-                onChange={(e) => setLinkedinUrl(e.target.value)}
-                placeholder="https://linkedin.com/in/…"
-                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-                Instagram
-              </label>
-              <input
-                value={instagramUrl}
-                onChange={(e) => setInstagramUrl(e.target.value)}
-                placeholder="https://instagram.com/…"
-                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-                X / Twitter
-              </label>
-              <input
-                value={xUrl}
-                onChange={(e) => setXUrl(e.target.value)}
-                placeholder="https://x.com/…"
-                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
@@ -254,23 +262,59 @@ export default function CompletePassportPage() {
             </div>
           </div>
 
+          <label className="mt-4 block text-xs uppercase tracking-wide text-foreground-muted">
+            Bio <span className="normal-case text-foreground-muted/70">(optional)</span>
+          </label>
+          <textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            maxLength={280}
+            rows={3}
+            placeholder="A short line about who you are."
+            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          />
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                LinkedIn <span className="normal-case text-foreground-muted/70">(optional)</span>
+              </label>
+              <input
+                value={linkedinUrl}
+                onChange={(e) => setLinkedinUrl(e.target.value)}
+                placeholder="https://linkedin.com/in/…"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                Instagram <span className="normal-case text-foreground-muted/70">(optional)</span>
+              </label>
+              <input
+                value={instagramUrl}
+                onChange={(e) => setInstagramUrl(e.target.value)}
+                placeholder="https://instagram.com/…"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                X / Twitter <span className="normal-case text-foreground-muted/70">(optional)</span>
+              </label>
+              <input
+                value={xUrl}
+                onChange={(e) => setXUrl(e.target.value)}
+                placeholder="https://x.com/…"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
           {error && (
             <p className="mt-3 text-sm text-critical">{error}</p>
           )}
 
-          <div className="mt-5 flex items-center justify-between gap-3">
-            {isEditing ? (
-              <span />
-            ) : (
-              <button
-                type="button"
-                onClick={handleSkip}
-                disabled={busy}
-                className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Skip for now
-              </button>
-            )}
+          <div className="mt-5 flex items-center justify-end gap-3">
             <button
               type="submit"
               disabled={busy}
