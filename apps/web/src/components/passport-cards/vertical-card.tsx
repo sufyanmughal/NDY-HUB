@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Camera, MapPin, Mail, Globe, Phone, ShieldCheck, Wifi, Check } from "lucide-react";
+import { Camera, MapPin, Mail, Globe, Phone, ShieldCheck, Wifi } from "lucide-react";
 import type { PassportCardData } from "./types";
 
 /** "Passport" design — rebuilt to match the user's passportcard.jpeg
@@ -89,9 +89,13 @@ export function VerticalPassportCard({ data }: { data: PassportCardData }) {
               </div>
             </div>
             {data.verified && (
-              <div className="absolute right-0 bottom-0 flex h-7 w-7 items-center justify-center rounded-full bg-[#2b8fff] ring-[3px] ring-[#010a19]">
-                <Check className="h-4 w-4 text-white" strokeWidth={3} />
-              </div>
+              <Image
+                src="/verified-badge.png"
+                alt="Verified"
+                width={32}
+                height={32}
+                className="absolute -right-0.5 -bottom-0.5 h-8 w-8"
+              />
             )}
           </div>
 
