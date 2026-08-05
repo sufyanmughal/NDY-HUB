@@ -53,8 +53,17 @@ export default function CompletePassportPage() {
     }
   }, [auth.status, router]);
 
+  // Populates the form from the server exactly once. Deliberately NOT
+  // re-run on every auth.status flicker (a stale-cookie 401 immediately
+  // after a fresh registration, followed by a retry, was observed to
+  // trigger a second GET /auth/me here) — a second populate firing after
+  // the user has already uploaded a photo or edited a field would silently
+  // clobber that local state with the pre-upload/pre-edit server snapshot,
+  // which is exactly what caused "Save & Continue" to wrongly claim no
+  // photo was set right after a successful upload.
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   useEffect(() => {
-    if (auth.status !== "authenticated") return;
+    if (auth.status !== "authenticated" || hasLoadedOnce) return;
     getMe()
       .then((me) => {
         setProfile(me);
@@ -68,9 +77,14 @@ export default function CompletePassportPage() {
         setBusinessName(me.businessName ?? "");
         setBusinessRole(me.businessRole ?? "");
         setPhotoUrl(me.profilePhotoUrl);
+        // Only latched on success — a failed attempt (e.g. the stale-cookie
+        // 401 right after a fresh registration) is allowed to retry on the
+        // next auth.status change instead of permanently stranding the page
+        // with profile still null.
+        setHasLoadedOnce(true);
       })
       .catch((err) => setError((err as Error).message));
-  }, [auth.status]);
+  }, [auth.status, hasLoadedOnce]);
 
   if (auth.status !== "authenticated" || !profile) return null;
 
