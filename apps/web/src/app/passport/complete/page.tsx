@@ -27,7 +27,7 @@ const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
  * matches isPassportComplete() in auth.service.ts exactly. */
 
 export default function CompletePassportPage() {
-  const { auth } = useAuth();
+  const { auth, login } = useAuth();
   const router = useRouter();
 
   const [profile, setProfile] = useState<MeProfile | null>(null);
@@ -120,8 +120,15 @@ export default function CompletePassportPage() {
   }
 
   async function finish() {
-    // DashboardGate re-checks passportComplete on the next /auth/me call
-    // triggered by the redirect below landing on a fresh mount.
+    // DashboardGate reads passportComplete off the AuthProvider context's
+    // already-in-memory auth state, not a fresh server call — without
+    // this, it was bouncing straight back here on the very next render
+    // because the context still held the pre-completion `false` from
+    // whenever the session was first resolved. login() re-runs the same
+    // /auth/me lookup this page itself just used and updates that shared
+    // state before navigating, so DashboardGate sees the true, current
+    // value the moment the target route mounts.
+    await login();
     router.replace(isEditing ? "/passport" : "/dashboard");
   }
 
