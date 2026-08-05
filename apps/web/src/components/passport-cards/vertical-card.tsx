@@ -1,22 +1,28 @@
-import { IdCard, MapPin, Mail, Globe, Phone, ShieldCheck, Wifi, BadgeCheck } from "lucide-react";
+import Image from "next/image";
+import { Camera, MapPin, Mail, Globe, Phone, ShieldCheck, Wifi, Check } from "lucide-react";
 import type { PassportCardData } from "./types";
 
-/** "Passport" design — ported verbatim (same Tailwind classes, same
- * gradients, same layout) from the user's own hand-built reference
- * implementation at C:\Users\n8n\projects\ndy-passport-card
- * (app/components/PassportCard.tsx), which is itself a pixel-accurate
- * build of their passportcard.jpeg mockup. Only the data plumbing
- * changed: their standalone `photoUrl`/`qrValue`/`tier` props are now
- * pulled from the shared PassportCardData shape so this renders real
- * account data on both the dashboard self-view (shows email/phone) and
- * the public /passport/[ndyId] page (doesn't — see PassportCardData's
- * doc comments on those two fields). The reference used next/image +
- * qrcode.react; this uses a plain <img> for the photo (Avatar's
- * initials-fallback isn't used here since the reference always shows a
- * photo — an accountless placeholder image below covers that case
- * instead) and the data: URL PNG this app's `qrcode` package already
- * produces everywhere else, rather than adding qrcode.react as a second
- * QR dependency for one design. */
+/** "Passport" design — rebuilt to match the user's passportcard.jpeg
+ * reference pixel-for-pixel (not the simplified Next.js demo build that
+ * came before it, which used a different header/layout/palette). Every
+ * measurement, color, and icon choice below was sampled directly off the
+ * reference image (crops + pixel sampling), not guessed:
+ * - Header: "ND / NDJOYIT / HUB" logo lockup (left), "PASSPORT / DIGITAL
+ *   BUSINESS CARD" heading (center), NFC glyph (right) — see LogoLockup
+ *   below. The ND glyph is the existing clean transparent asset
+ *   (public/logo-mark.png);
+ *   "NDJOYIT"/"HUB" are real gradient-clipped text, not a raster cutout —
+ *   the source JPEG's soft glow/drop-shadow blends into its background
+ *   with no clean edge to key out, so text renders crisper at any size
+ *   than a fringed cutout would.
+ * - Body: photo/name/role/bio in a left column, a vertical divider, then
+ *   icon-led contact rows (camera/pin/envelope/globe/phone — all outline
+ *   icons in solid purple, no background chip) in a right column.
+ * - Footer: a bordered "Verified Member / <tier>" badge with a shield
+ *   icon on its own right edge, and a white QR panel with a dark
+ *   "ND" gradient roundel over its center.
+ * - Bottom-left corner: a dotted particle-mesh sweep (SVG), purple/blue
+ *   glow — kept from the closest earlier attempt, matches the reference. */
 export function VerticalPassportCard({ data }: { data: PassportCardData }) {
   const title = [data.businessRole, data.businessName].filter(Boolean).join(" | ");
   const photoSrc =
@@ -25,115 +31,89 @@ export function VerticalPassportCard({ data }: { data: PassportCardData }) {
 
   return (
     <div
-      className="relative w-full max-w-[420px] overflow-hidden rounded-[28px] p-6 shadow-[0_25px_60px_-15px_rgba(79,70,229,0.45)] ring-1 ring-white/10"
-      style={{
-        background:
-          "radial-gradient(120% 140% at 100% 0%, #171335 0%, #0a0a17 45%, #050509 100%)",
-      }}
+      className="relative w-full max-w-[420px] overflow-hidden rounded-[28px] p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] ring-1 ring-white/10"
+      style={{ background: "#010a19" }}
     >
-      {/* decorative bottom-left glow / mesh */}
-      <div
-        className="pointer-events-none absolute -bottom-16 -left-20 h-56 w-72 rotate-[8deg] opacity-70"
-        style={{
-          background:
-            "radial-gradient(closest-side, rgba(99,102,241,0.45), transparent 70%)",
-          filter: "blur(4px)",
-        }}
-      />
+      {/* bottom-left dotted mesh sweep */}
       <svg
-        className="pointer-events-none absolute bottom-0 left-0 h-40 w-64 opacity-50"
-        viewBox="0 0 300 160"
+        className="pointer-events-none absolute bottom-0 left-0 h-24 w-48"
+        viewBox="0 0 240 110"
         fill="none"
       >
         <defs>
-          <linearGradient id="meshFade" x1="0" y1="1" x2="1" y2="0">
-            <stop offset="0%" stopColor="#818cf8" stopOpacity="0.9" />
-            <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
-          </linearGradient>
+          <radialGradient id="pcMeshFade" cx="0%" cy="100%" r="110%">
+            <stop offset="0%" stopColor="#a78bfa" stopOpacity="1" />
+            <stop offset="55%" stopColor="#818cf8" stopOpacity="0.75" />
+            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+          </radialGradient>
         </defs>
-        {Array.from({ length: 8 }).map((_, i) => (
-          <path
-            key={i}
-            d={`M -20 ${160 - i * 14} Q 100 ${140 - i * 18} 300 ${20 - i * 6}`}
-            stroke="url(#meshFade)"
-            strokeWidth="0.6"
-          />
-        ))}
+        {Array.from({ length: 7 }).map((_, row) =>
+          Array.from({ length: 13 - row }).map((_, col) => (
+            <circle
+              key={`${row}-${col}`}
+              cx={col * 13 + row * 9}
+              cy={110 - row * 13}
+              r={1.4}
+              fill="url(#pcMeshFade)"
+            />
+          )),
+        )}
       </svg>
 
-      {/* Header */}
-      <div className="relative flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span
-              className="text-2xl font-black tracking-tight"
-              style={{
-                backgroundImage:
-                  "linear-gradient(90deg, #818cf8, #a78bfa, #6366f1)",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                color: "transparent",
-              }}
-            >
-              NDY
-            </span>
-            <span className="text-2xl font-bold tracking-tight text-white">
-              PASSPORT
-            </span>
-          </div>
-          <div className="mt-1 text-[11px] font-medium tracking-[0.18em] text-slate-400 uppercase">
-            Digital Business Card
+      {/* Header: logo lockup, PASSPORT heading, NFC glyph */}
+      <div className="relative flex items-start justify-between gap-3">
+        <LogoLockup />
+        <div className="flex-1 pt-1">
+          <div className="text-[21px] font-extrabold tracking-tight text-white">PASSPORT</div>
+          <div className="mt-0.5 text-[12px] font-semibold tracking-tight">
+            <span className="text-violet-400">DIGITAL BUSINESS</span>{" "}
+            <span className="text-sky-300">CARD</span>
           </div>
         </div>
-        <Wifi className="h-6 w-6 rotate-90 text-white/90" strokeWidth={2} />
+        <Wifi className="mt-1 h-5 w-5 shrink-0 rotate-90 text-white/80" strokeWidth={2} />
       </div>
 
-      {/* Body: photo/name column + details column */}
-      <div className="relative mt-6 grid grid-cols-[auto_1fr] gap-5">
+      {/* Body: photo/name/bio column | vertical divider | contact rows column */}
+      <div className="relative mt-6 grid grid-cols-[1fr_auto_1fr] gap-4">
         <div>
-          <div className="relative h-[104px] w-[104px]">
+          <div className="relative h-[116px] w-[116px]">
             <div
-              className="absolute inset-0 rounded-full p-[2px]"
-              style={{
-                background:
-                  "linear-gradient(135deg, #818cf8, #a78bfa, #38bdf8)",
-              }}
+              className="absolute inset-0 rounded-full p-[2.5px]"
+              style={{ background: "linear-gradient(135deg, #38bdf8, #a78bfa, #ec4899)" }}
             >
               <div className="h-full w-full overflow-hidden rounded-full bg-black">
                 {/* eslint-disable-next-line @next/next/no-img-element -- data:/remote photoUrl, not a static asset next/image can optimize */}
                 <img
                   src={photoSrc}
                   alt={data.displayName}
-                  width={104}
-                  height={104}
+                  width={116}
+                  height={116}
                   className="h-full w-full object-cover"
                 />
               </div>
             </div>
             {data.verified && (
-              <div className="absolute -right-1 -bottom-1 flex h-7 w-7 items-center justify-center rounded-full bg-indigo-500 ring-4 ring-[#0a0a17]">
-                <BadgeCheck className="h-4 w-4 text-white" strokeWidth={2.5} />
+              <div className="absolute right-0 bottom-0 flex h-7 w-7 items-center justify-center rounded-full bg-[#2b8fff] ring-[3px] ring-[#010a19]">
+                <Check className="h-4 w-4 text-white" strokeWidth={3} />
               </div>
             )}
           </div>
 
-          <h2 className="mt-4 text-[26px] leading-tight font-bold text-white">
+          <h2 className="mt-3 text-[22px] leading-tight font-bold text-white">
             {data.displayName}
           </h2>
-          {title && (
-            <p className="mt-1 text-sm font-medium whitespace-nowrap text-indigo-200/90">
-              {title}
-            </p>
-          )}
+          {title && <p className="mt-1 text-[13px] font-medium text-slate-400">{title}</p>}
           {data.bio && (
-            <p className="mt-3 max-w-[220px] text-[13px] leading-snug text-slate-400">
+            <p className="mt-2.5 max-w-[210px] text-[12.5px] leading-snug text-fuchsia-300/90">
               {data.bio}
             </p>
           )}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-4 pt-1">
-          <DetailRow icon={IdCard} label="NDY ID" value={data.ndyId} />
+        <div className="w-px self-stretch bg-white/10" />
+
+        <div className="flex min-w-0 flex-col gap-3.5">
+          <DetailRow icon={Camera} label="NDY ID" value={data.ndyId} />
           {data.country && <DetailRow icon={MapPin} label="Location" value={data.country} />}
           {data.email && <DetailRow icon={Mail} label="Email" value={data.email} />}
           {data.website && (
@@ -143,57 +123,103 @@ export function VerticalPassportCard({ data }: { data: PassportCardData }) {
         </div>
       </div>
 
-      {/* Footer: verified member + QR */}
-      <div className="relative mt-6 flex items-end justify-between gap-4">
-        <div className="flex-1 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5 backdrop-blur-sm">
-          <div className="text-[10px] font-medium tracking-[0.14em] text-slate-400 uppercase">
-            {data.verified ? "Verified Member" : "Not Verified"}
-          </div>
-          <div className="mt-1 flex items-center gap-2">
-            <span
-              className="text-xl font-bold tracking-tight"
-              style={{
-                backgroundImage: "linear-gradient(90deg, #a78bfa, #818cf8)",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                color: "transparent",
-              }}
-            >
-              {data.membershipTierLabel ?? "NDY HUB"}
-            </span>
-            <ShieldCheck className="h-5 w-5 text-indigo-300" strokeWidth={1.75} />
+      {/* Footer: verified/tier badge (left) + QR (right) */}
+      <div className="relative mt-5 flex items-start justify-between gap-4">
+        <div className="flex-1 rounded-2xl border border-violet-400/25 px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-medium tracking-[0.12em] text-slate-400 uppercase">
+                Verified Member
+              </div>
+              <div
+                className="mt-1 text-lg font-bold tracking-tight"
+                style={{
+                  backgroundImage: "linear-gradient(90deg, #a78bfa, #818cf8)",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  color: "transparent",
+                }}
+              >
+                {data.membershipTierLabel ?? "NDY HUB"}
+              </div>
+            </div>
+            <ShieldCheck className="h-7 w-7 shrink-0 text-violet-300" strokeWidth={1.5} />
           </div>
         </div>
 
-        <div className="flex flex-col items-center gap-2">
-          <div className="rounded-xl bg-white p-2.5 shadow-lg">
-            <div className="relative flex h-[104px] w-[104px] items-center justify-center">
+        <div className="flex flex-col items-center gap-1.5">
+          <div className="rounded-2xl bg-white p-2 shadow-lg">
+            <div className="relative flex h-[92px] w-[92px] items-center justify-center">
               {data.qrDataUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- data: URL, not a static asset
-                <img src={data.qrDataUrl} alt="Scan to connect" width={104} height={104} />
+                <img src={data.qrDataUrl} alt="Scan to connect" width={92} height={92} />
               ) : (
                 <span className="text-[9px] text-black/40">…</span>
               )}
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-white ring-2 ring-white">
+                <div
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0b1220]"
+                  style={{ boxShadow: "0 0 0 3px rgba(255,255,255,0.9), 0 0 10px 2px rgba(139,92,246,0.55)" }}
+                >
                   <span
-                    className="text-[10px] font-black tracking-tight"
+                    className="text-[11px] font-black tracking-tight"
                     style={{
-                      backgroundImage:
-                        "linear-gradient(90deg, #6366f1, #a78bfa)",
+                      backgroundImage: "linear-gradient(90deg, #ec4899, #a78bfa, #38bdf8)",
                       WebkitBackgroundClip: "text",
                       backgroundClip: "text",
                       color: "transparent",
                     }}
                   >
-                    NDY
+                    ND
                   </span>
                 </div>
               </div>
             </div>
           </div>
-          <span className="text-[11px] text-slate-400">Scan to connect</span>
+          <span className="text-[10.5px] text-slate-400">Scan to connect</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Full "ND / NDJOYIT / HUB" lockup — the ND glyph is the existing clean
+ * transparent crop (public/logo-mark.png); the wordmark below it is real
+ * text with a CSS gradient matching the reference's magenta→cyan (for
+ * "NDJOYIT") and magenta→indigo→blue (for "HUB") sweeps, sampled directly
+ * from ndjoyitlogo.jpeg. */
+function LogoLockup() {
+  return (
+    <div className="leading-none">
+      <Image
+        src="/logo-mark.png"
+        alt=""
+        width={112}
+        height={62}
+        className="h-[46px] w-auto"
+        priority
+      />
+      <div
+        className="mt-1 text-[19px] font-black tracking-tight"
+        style={{
+          backgroundImage: "linear-gradient(90deg, #e600f0, #ffffff 55%, #38bdf8)",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
+          color: "transparent",
+        }}
+      >
+        NDJOYIT
+      </div>
+      <div
+        className="-mt-1.5 text-[22px] font-black tracking-tight"
+        style={{
+          backgroundImage: "linear-gradient(90deg, #e600f0, #8b5cf6 55%, #38bdf8)",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
+          color: "transparent",
+        }}
+      >
+        HUB
       </div>
     </div>
   );
@@ -209,13 +235,13 @@ function DetailRow({
   value: string;
 }) {
   return (
-    <div className="flex min-w-0 items-start gap-3">
-      <Icon className="mt-0.5 h-5 w-5 shrink-0 text-indigo-300" strokeWidth={1.75} />
+    <div className="flex min-w-0 items-start gap-2.5">
+      <Icon className="mt-0.5 h-[18px] w-[18px] shrink-0 text-violet-400" strokeWidth={1.75} />
       <div className="min-w-0 flex-1 leading-tight">
-        <div className="text-[10px] font-medium tracking-[0.14em] text-slate-400 uppercase">
+        <div className="text-[10px] font-medium tracking-[0.1em] text-slate-400 uppercase">
           {label}
         </div>
-        <div className="truncate text-[15px] font-medium text-slate-100" title={value}>
+        <div className="truncate text-[14px] font-medium text-slate-100" title={value}>
           {value}
         </div>
       </div>
