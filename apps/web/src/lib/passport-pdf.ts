@@ -16,6 +16,22 @@ const COLORS = {
   critical: "#f0605a",
 };
 
+// The Passport design's own palette — matches the user's reference
+// component (C:\Users\n8n\projects\ndy-passport-card) exactly, which uses
+// indigo/violet rather than this app's blue/purple COLORS.accent/accent2.
+// Kept separate rather than repointing COLORS since the Business Card and
+// Minimal designs below still use the app-wide palette.
+const PASSPORT_COLORS = {
+  bgTop: "#171335",
+  bgBottom: "#050509",
+  indigo: "#818cf8",
+  violet: "#a78bfa",
+  sky: "#38bdf8",
+  slateMuted: "#94a3b8",
+  slateBody: "#f1f5f9",
+  slateBio: "#94a3b8",
+};
+
 /** Which on-screen card design (components/passport-cards/) the PDF
  * should match — kept as a plain string union rather than importing
  * PassportCardDesignId from components/passport-cards/types.ts, since
@@ -57,6 +73,8 @@ export interface PassportPdfData {
    * Passport design (matches the on-screen card, which also only shows
    * this on the authenticated /passport page, never the public one). */
   email?: string | null;
+  /** Same self-view-only treatment as email. */
+  phone?: string | null;
 }
 
 /**
@@ -78,158 +96,169 @@ export function buildPassportPdf(
 }
 
 // ============================================================
-// "Passport" design — pixel-accurate clone of the passportcard.jpeg
-// reference mockup: ND wordmark + "PASSPORT / Digital Business Card"
-// header with an NFC glyph, photo+name+role+bio on the left, icon-led
-// contact rows (NDY ID/Location/Email/Website) on the right, and a
-// footer row pairing a "Verified Member / <tier>" badge with a QR.
-// Matches components/passport-cards/vertical-card.tsx +
-// styles/passport-card.css.
+// "Passport" design — ported from the user's own reference component
+// (C:\Users\n8n\projects\ndy-passport-card, app/components/PassportCard.tsx):
+// "NDY PASSPORT / Digital Business Card" header with an NFC glyph,
+// photo+name+title+bio in a left column, icon-led contact rows (NDY ID/
+// Location/Email/Website/Phone) beside it, and a footer row pairing a
+// "Verified Member / <tier>" badge with a QR (NDY badge overlaid at its
+// center, matching the reference). Matches
+// components/passport-cards/vertical-card.tsx exactly in structure/order;
+// PASSPORT_COLORS mirrors that component's indigo/violet palette.
 // ============================================================
 
-const PAGE_WIDTH = 440;
-const PAGE_HEIGHT = 620;
-const MARGIN = 28;
+const PAGE_WIDTH = 460;
+const PAGE_HEIGHT = 640;
+const MARGIN = 30;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
 function buildPassportCardPdf(data: PassportPdfData): jsPDF {
   const doc = new jsPDF({ unit: "pt", format: [PAGE_WIDTH, PAGE_HEIGHT] });
 
-  doc.setFillColor(COLORS.background);
-  doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, "F");
-  doc.setDrawColor(COLORS.border);
-  doc.setLineWidth(1);
-  doc.roundedRect(14, 14, PAGE_WIDTH - 28, PAGE_HEIGHT - 28, 18, 18, "D");
+  doc.setFillColor(PASSPORT_COLORS.bgBottom);
+  doc.roundedRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 22, 22, "F");
+  // radial-gradient stand-in: jsPDF has no true radial fill, so a soft
+  // top-right wash approximates the reference's 120%/140% radial glow.
+  doc.setGState(new GState({ opacity: 0.5 }));
+  doc.setFillColor(PASSPORT_COLORS.bgTop);
+  doc.roundedRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT * 0.55, 22, 22, "F");
+  doc.setGState(new GState({ opacity: 1 }));
 
-  // Header: ND wordmark left, "PASSPORT / Digital Business Card" right
-  let y = MARGIN + 20;
+  // Header: "NDY PASSPORT" left, NFC glyph right
+  let y = MARGIN + 22;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(17);
-  doc.setTextColor(COLORS.foreground);
+  doc.setFontSize(19);
+  doc.setTextColor(PASSPORT_COLORS.indigo);
   doc.text("NDY ", MARGIN, y);
   const ndyWidth = doc.getTextWidth("NDY ");
-  doc.setTextColor(COLORS.accent);
-  doc.text("HUB", MARGIN + ndyWidth, y);
+  doc.setTextColor("#ffffff");
+  doc.text("PASSPORT", MARGIN + ndyWidth, y);
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.setTextColor(COLORS.foreground);
-  const titleWidth = doc.getTextWidth("PASSPORT");
-  doc.text("PASSPORT", PAGE_WIDTH - MARGIN - titleWidth, y - 4);
+  y += 15;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(COLORS.accent2);
-  const subWidth = doc.getTextWidth("DIGITAL BUSINESS CARD");
-  doc.text("DIGITAL BUSINESS CARD", PAGE_WIDTH - MARGIN - subWidth, y + 11);
+  doc.setFontSize(8.5);
+  doc.setTextColor(PASSPORT_COLORS.slateMuted);
+  doc.text("DIGITAL BUSINESS CARD", MARGIN, y);
 
-  y += 26;
-  doc.setDrawColor(COLORS.border);
-  doc.setLineWidth(1);
-  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
+  drawNfcGlyph(doc, PAGE_WIDTH - MARGIN - 10, MARGIN + 8);
 
-  // Body: two columns — identity (left), contact rows (right)
-  const colGap = 22;
-  const leftColWidth = CONTENT_WIDTH * 0.5 - colGap / 2;
-  const rightColX = MARGIN + leftColWidth + colGap;
-  const rightColWidth = CONTENT_WIDTH - leftColWidth - colGap;
-  const bodyTop = y + 30;
-
-  const avatarR = 34;
+  // Body: photo/name/bio column (left) + icon rows column (right)
+  const bodyTop = y + 34;
+  const avatarR = 30;
   const avatarCx = MARGIN + avatarR;
-  const avatarCy = bodyTop;
-  drawAvatar(doc, data, avatarCx, avatarCy, avatarR, 22);
+  const avatarCy = bodyTop + avatarR;
+  drawAvatar(doc, data, avatarCx, avatarCy, avatarR, 20);
+  if (data.verified) {
+    doc.setFillColor(PASSPORT_COLORS.indigo);
+    doc.circle(avatarCx + avatarR - 3, avatarCy + avatarR - 3, 8, "F");
+    doc.setTextColor("#ffffff");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    centerText(doc, "\u2713", avatarCx + avatarR - 3, avatarCy + avatarR);
+  }
 
+  const leftColWidth = CONTENT_WIDTH * 0.44;
   let leftY = avatarCy + avatarR + 22;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(COLORS.foreground);
+  doc.setFontSize(15);
+  doc.setTextColor("#ffffff");
   doc.text(truncateToWidth(doc, data.fullName, leftColWidth), MARGIN, leftY);
 
-  const roleLine = [data.businessRole, data.businessName].filter(Boolean).join(" | ");
-  if (roleLine) {
-    leftY += 16;
+  const titleLine = [data.businessRole, data.businessName].filter(Boolean).join(" | ");
+  if (titleLine) {
+    leftY += 15;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9.5);
-    doc.setTextColor(COLORS.foregroundMuted);
-    doc.text(truncateToWidth(doc, roleLine, leftColWidth), MARGIN, leftY);
+    doc.setTextColor(PASSPORT_COLORS.violet);
+    doc.text(truncateToWidth(doc, titleLine, leftColWidth), MARGIN, leftY);
   }
   if (data.bio) {
-    leftY += 18;
+    leftY += 16;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(COLORS.accent2);
+    doc.setFontSize(8.5);
+    doc.setTextColor(PASSPORT_COLORS.slateBio);
     const bioLines = doc.splitTextToSize(data.bio, leftColWidth) as string[];
     doc.text(bioLines.slice(0, 3), MARGIN, leftY);
-    leftY += bioLines.slice(0, 3).length * 12;
+    leftY += bioLines.slice(0, 3).length * 11;
   }
 
-  // Right column: icon-style label/value rows
-  const infoRows: ["id" | "location" | "email" | "website", string, string][] = [
+  // Right column: icon-led label/value rows
+  const rightColX = MARGIN + leftColWidth + 20;
+  const rightColWidth = CONTENT_WIDTH - leftColWidth - 20;
+  const infoRows: ["id" | "location" | "email" | "website" | "phone", string, string][] = [
     ["id", "NDY ID", data.ndyId],
     ...(data.country ? [["location", "Location", data.country] as ["location", string, string]] : []),
     ...(data.email ? [["email", "Email", data.email] as ["email", string, string]] : []),
     ...(data.website
       ? [["website", "Website", data.website.replace(/^https?:\/\//, "")] as ["website", string, string]]
       : []),
+    ...(data.phone ? [["phone", "Phone", data.phone] as ["phone", string, string]] : []),
   ];
-  let rowY = bodyTop - avatarR + 8;
+  let rowY = bodyTop + 4;
   for (const [kind, label, value] of infoRows) {
-    doc.setFillColor(COLORS.accent);
-    doc.setGState(new GState({ opacity: 0.16 }));
-    doc.roundedRect(rightColX, rowY - 9, 20, 20, 5, 5, "F");
-    doc.setGState(new GState({ opacity: 1 }));
-    drawInfoIcon(doc, kind, rightColX + 10, rowY + 1);
+    drawInfoIcon(doc, kind, rightColX + 8, rowY + 6, PASSPORT_COLORS.indigo);
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(COLORS.foregroundMuted);
-    doc.text(label.toUpperCase(), rightColX + 28, rowY - 3);
+    doc.setFontSize(7);
+    doc.setTextColor(PASSPORT_COLORS.slateMuted);
+    doc.text(label.toUpperCase(), rightColX + 22, rowY + 2);
 
     doc.setFont(label === "NDY ID" ? "courier" : "helvetica", "normal");
     doc.setFontSize(10.5);
-    doc.setTextColor(COLORS.foreground);
-    doc.text(truncateToWidth(doc, value, rightColWidth - 28), rightColX + 28, rowY + 10);
+    doc.setTextColor(PASSPORT_COLORS.slateBody);
+    doc.text(truncateToWidth(doc, value, rightColWidth - 22), rightColX + 22, rowY + 15);
 
-    rowY += 34;
+    rowY += 30;
   }
 
-  const bodyBottom = Math.max(leftY, rowY) + 20;
+  const bodyBottom = Math.max(leftY, rowY) + 18;
 
-  // Footer: badge (left) + QR (right)
-  doc.setDrawColor(COLORS.border);
-  doc.setLineWidth(1);
-  doc.line(MARGIN, bodyBottom, PAGE_WIDTH - MARGIN, bodyBottom);
+  // Footer: badge (left) + QR with center NDY badge (right)
+  const qrSize = 78;
+  const qrX = PAGE_WIDTH - MARGIN - qrSize;
+  const footerTop = bodyBottom;
+  const badgeWidth = qrX - MARGIN - 16;
 
-  const footerY = bodyBottom + 22;
+  doc.setDrawColor("#ffffff");
+  doc.setGState(new GState({ opacity: 0.1 }));
+  doc.roundedRect(MARGIN, footerTop, badgeWidth, qrSize, 14, 14, "D");
+  doc.setFillColor("#ffffff");
+  doc.setGState(new GState({ opacity: 0.03 }));
+  doc.roundedRect(MARGIN, footerTop, badgeWidth, qrSize, 14, 14, "F");
+  doc.setGState(new GState({ opacity: 1 }));
+
   const badgeLabel = data.verified ? "VERIFIED MEMBER" : "NOT VERIFIED";
   const badgeValue = data.membershipTierLabel ?? "NDY HUB";
-  doc.setFillColor(COLORS.accent);
-  doc.setGState(new GState({ opacity: 0.07 }));
-  doc.roundedRect(MARGIN, footerY, 150, 46, 10, 10, "F");
-  doc.setGState(new GState({ opacity: 1 }));
-  doc.setDrawColor(COLORS.border);
-  doc.roundedRect(MARGIN, footerY, 150, 46, 10, 10, "D");
-
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
-  doc.setTextColor(COLORS.foregroundMuted);
-  doc.text(badgeLabel, MARGIN + 12, footerY + 18);
+  doc.setTextColor(PASSPORT_COLORS.slateMuted);
+  doc.text(badgeLabel, MARGIN + 14, footerTop + 24);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(COLORS.accent2);
-  doc.text(truncateToWidth(doc, badgeValue, 126), MARGIN + 12, footerY + 34);
+  doc.setFontSize(15);
+  doc.setTextColor(PASSPORT_COLORS.violet);
+  doc.text(truncateToWidth(doc, badgeValue, badgeWidth - 28), MARGIN + 14, footerTop + 44);
 
-  const qrSize = 68;
-  const qrX = PAGE_WIDTH - MARGIN - qrSize;
   doc.setFillColor("#ffffff");
-  doc.roundedRect(qrX - 6, footerY - 4, qrSize + 12, qrSize + 12, 8, 8, "F");
-  doc.addImage(data.qrDataUrl, "PNG", qrX, footerY + 2, qrSize, qrSize);
-  doc.setFont("helvetica", "normal");
+  doc.roundedRect(qrX - 6, footerTop, qrSize + 12, qrSize + 12, 10, 10, "F");
+  doc.addImage(data.qrDataUrl, "PNG", qrX, footerTop + 6, qrSize, qrSize);
+  // center "NDY" badge overlay, matching the reference
+  const badgeR = 12;
+  doc.setFillColor("#ffffff");
+  doc.roundedRect(qrX + qrSize / 2 - badgeR, footerTop + 6 + qrSize / 2 - badgeR, badgeR * 2, badgeR * 2, 4, 4, "F");
+  doc.setDrawColor(PASSPORT_COLORS.indigo);
+  doc.setLineWidth(1.5);
+  doc.roundedRect(qrX + qrSize / 2 - badgeR, footerTop + 6 + qrSize / 2 - badgeR, badgeR * 2, badgeR * 2, 4, 4, "D");
+  doc.setFont("helvetica", "black");
   doc.setFontSize(7.5);
-  doc.setTextColor(COLORS.foregroundMuted);
-  centerText(doc, "Scan to connect", qrX + qrSize / 2, footerY + qrSize + 22);
+  doc.setTextColor(PASSPORT_COLORS.indigo);
+  centerText(doc, "NDY", qrX + qrSize / 2, footerTop + 6 + qrSize / 2 + 2.5);
 
-  drawFooter(doc, MARGIN, PAGE_HEIGHT - 22);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(PASSPORT_COLORS.slateMuted);
+  centerText(doc, "Scan to connect", qrX + qrSize / 2, footerTop + qrSize + 26);
+
+  drawFooter(doc, MARGIN, PAGE_HEIGHT - 20);
 
   return doc;
 }
@@ -481,19 +510,21 @@ function drawStatusPill(
  * icon's own center. */
 function drawInfoIcon(
   doc: jsPDF,
-  kind: "id" | "location" | "email" | "website",
+  kind: "id" | "location" | "email" | "website" | "phone",
   cx: number,
   cy: number,
+  color: string = COLORS.accent2,
 ): void {
-  doc.setDrawColor(COLORS.accent2);
-  doc.setFillColor(COLORS.accent2);
+  doc.setDrawColor(color);
+  doc.setFillColor(color);
   doc.setLineWidth(0.9);
 
   if (kind === "id") {
-    // fingerprint stand-in: three concentric arcs
-    doc.circle(cx, cy, 4.2, "D");
-    doc.circle(cx, cy, 2.4, "D");
-    doc.circle(cx, cy, 0.6, "F");
+    // ID-card stand-in: rounded rect with a small dot (IdCard glyph)
+    doc.roundedRect(cx - 5, cy - 3.5, 10, 7, 1.2, 1.2, "D");
+    doc.circle(cx - 2, cy, 1, "F");
+    doc.line(cx + 0.5, cy - 1, cx + 3.5, cy - 1);
+    doc.line(cx + 0.5, cy + 1, cx + 3.5, cy + 1);
   } else if (kind === "location") {
     // pin stand-in: circle over a downward point
     doc.circle(cx, cy - 1, 3, "D");
@@ -503,12 +534,29 @@ function drawInfoIcon(
     doc.roundedRect(cx - 5, cy - 3.5, 10, 7, 1, 1, "D");
     doc.line(cx - 4.5, cy - 3, cx, cy + 0.5);
     doc.line(cx, cy + 0.5, cx + 4.5, cy - 3);
+  } else if (kind === "phone") {
+    // handset stand-in: rounded rect rotated via two overlapping shapes
+    doc.roundedRect(cx - 3.5, cy - 5, 7, 10, 3, 3, "D");
   } else {
     // globe stand-in: circle + horizontal/vertical meridian lines
     doc.circle(cx, cy, 4.2, "D");
     doc.line(cx - 4.2, cy, cx + 4.2, cy);
     doc.ellipse(cx, cy, 1.8, 4.2, "D");
   }
+}
+
+/** Rotated Wifi/NFC glyph stand-in (three concentric arcs), matching the
+ * reference component's `<Wifi className="rotate-90" />` in the top-right
+ * corner of the header. cx/cy is the glyph's own anchor point (top-right
+ * of its bounding box, same as where the reference visually sits). */
+function drawNfcGlyph(doc: jsPDF, cx: number, cy: number): void {
+  doc.setDrawColor("#ffffff");
+  doc.setGState(new GState({ opacity: 0.9 }));
+  doc.setLineWidth(1.1);
+  doc.circle(cx, cy, 3, "D");
+  doc.circle(cx, cy, 6.5, "D");
+  doc.circle(cx, cy, 10, "D");
+  doc.setGState(new GState({ opacity: 1 }));
 }
 
 function drawFooter(doc: jsPDF, x: number, y: number): void {

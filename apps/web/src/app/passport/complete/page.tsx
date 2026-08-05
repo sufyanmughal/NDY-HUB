@@ -35,6 +35,7 @@ export default function CompletePassportPage() {
   const [bio, setBio] = useState("");
   const [country, setCountry] = useState("");
   const [website, setWebsite] = useState("");
+  const [phone, setPhone] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
   const [xUrl, setXUrl] = useState("");
@@ -71,6 +72,7 @@ export default function CompletePassportPage() {
         setBio(me.bio ?? "");
         setCountry(me.country ?? "");
         setWebsite(me.website ?? "");
+        setPhone(me.phone ?? "");
         setLinkedinUrl(me.linkedinUrl ?? "");
         setInstagramUrl(me.instagramUrl ?? "");
         setXUrl(me.xUrl ?? "");
@@ -154,6 +156,7 @@ export default function CompletePassportPage() {
         country,
         bio: bio.trim() || undefined,
         website: website.trim() || undefined,
+        phone: phone.trim() || undefined,
         linkedinUrl: linkedinUrl.trim() || undefined,
         instagramUrl: instagramUrl.trim() || undefined,
         xUrl: xUrl.trim() || undefined,
@@ -250,15 +253,30 @@ export default function CompletePassportPage() {
             ))}
           </select>
 
-          <label className="mt-4 block text-xs uppercase tracking-wide text-foreground-muted">
-            Website
-          </label>
-          <input
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-            placeholder="https://"
-            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          />
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                Website
+              </label>
+              <input
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="https://"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                Phone
+              </label>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+31 6 12345678"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>

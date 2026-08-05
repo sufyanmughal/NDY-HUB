@@ -160,6 +160,7 @@ export interface PublicPassport {
   bio: string | null;
   country: string | null;
   website: string | null;
+  phone: string | null;
   socials: PublicPassportSocials | null;
   business: PublicPassportBusiness | null;
 }
@@ -416,11 +417,13 @@ export interface MeProfile {
   xUrl: string | null;
   businessName: string | null;
   businessRole: string | null;
+  phone: string | null;
   bioIsPublic: boolean;
   countryIsPublic: boolean;
   websiteIsPublic: boolean;
   socialsIsPublic: boolean;
   businessIsPublic: boolean;
+  phoneIsPublic: boolean;
   // Only fullName gates the dashboard — see DashboardGate. Every other
   // Passport Card field is optional and editable any time from Settings.
   passportComplete: boolean;
@@ -441,11 +444,13 @@ export interface UpdateProfileInput {
   xUrl?: string;
   businessName?: string;
   businessRole?: string;
+  phone?: string;
   bioIsPublic?: boolean;
   countryIsPublic?: boolean;
   websiteIsPublic?: boolean;
   socialsIsPublic?: boolean;
   businessIsPublic?: boolean;
+  phoneIsPublic?: boolean;
 }
 
 export function updateProfile(

@@ -35,6 +35,7 @@ export function PasswordAuthForm() {
   const [bio, setBio] = useState("");
   const [country, setCountry] = useState("");
   const [website, setWebsite] = useState("");
+  const [phone, setPhone] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
   const [xUrl, setXUrl] = useState("");
@@ -92,6 +93,7 @@ export function PasswordAuthForm() {
               bio: bio.trim() || undefined,
               country: country || undefined,
               website: website.trim() || undefined,
+              phone: phone.trim() || undefined,
               linkedinUrl: linkedinUrl.trim() || undefined,
               instagramUrl: instagramUrl.trim() || undefined,
               xUrl: xUrl.trim() || undefined,
@@ -240,16 +242,29 @@ export function PasswordAuthForm() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-                Website <span className="normal-case text-foreground-muted/70">(optional)</span>
-              </label>
-              <input
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                placeholder="https://"
-                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                  Website <span className="normal-case text-foreground-muted/70">(optional)</span>
+                </label>
+                <input
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="https://"
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                  Phone <span className="normal-case text-foreground-muted/70">(optional)</span>
+                </label>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+31 6 12345678"
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

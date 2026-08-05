@@ -21,11 +21,13 @@ export type PassportProfileFields = {
   xUrl?: string;
   businessName?: string;
   businessRole?: string;
+  phone?: string;
   bioIsPublic?: boolean;
   countryIsPublic?: boolean;
   websiteIsPublic?: boolean;
   socialsIsPublic?: boolean;
   businessIsPublic?: boolean;
+  phoneIsPublic?: boolean;
 };
 
 @Injectable()
@@ -68,11 +70,13 @@ export class IdentityService {
             xUrl: params.xUrl,
             businessName: params.businessName,
             businessRole: params.businessRole,
+            phone: params.phone,
             bioIsPublic: params.bioIsPublic,
             countryIsPublic: params.countryIsPublic,
             websiteIsPublic: params.websiteIsPublic,
             socialsIsPublic: params.socialsIsPublic,
             businessIsPublic: params.businessIsPublic,
+            phoneIsPublic: params.phoneIsPublic,
           },
         });
       } catch (err: unknown) {

@@ -101,6 +101,7 @@ export default function PublicPassportPage({
         businessName: passport.business?.name,
         businessRole: passport.business?.role,
         email: null,
+        phone: passport.phone,
         membershipTierLabel: null,
         qrDataUrl,
       }

@@ -55,6 +55,11 @@ export class UpdateProfileDto {
   businessRole?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  phone?: string;
+
+  @IsOptional()
   @IsBoolean()
   bioIsPublic?: boolean;
 
@@ -73,4 +78,8 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsBoolean()
   businessIsPublic?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  phoneIsPublic?: boolean;
 }

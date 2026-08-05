@@ -80,6 +80,12 @@ model User {
   xUrl              String?
   businessName      String?
   businessRole      String?
+  // Contact phone shown on the Passport card's info rows — distinct from
+  // phoneVerifiedAt below (that's a leftover timestamp column for a phone
+  // *verification* feature that was never finished; no number was ever
+  // actually stored anywhere until this field). Same optional/skippable/
+  // editable-later treatment as every other Passport Card field.
+  phone             String?
   // Per-field visibility for the public passport view — a genuinely new
   // pattern on this model (nothing else here has a visibility toggle).
   // Default true so these columns existing doesn't silently blank out
@@ -89,6 +95,7 @@ model User {
   websiteIsPublic   Boolean @default(true)
   socialsIsPublic   Boolean @default(true)
   businessIsPublic  Boolean @default(true)
+  phoneIsPublic     Boolean @default(true)
 
   verificationLevel VerificationLevel @default(LEVEL_0)
   emailVerifiedAt   DateTime?

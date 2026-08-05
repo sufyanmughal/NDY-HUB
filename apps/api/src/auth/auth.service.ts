@@ -68,11 +68,13 @@ export class AuthService {
       xUrl: dto.xUrl,
       businessName: dto.businessName,
       businessRole: dto.businessRole,
+      phone: dto.phone,
       bioIsPublic: dto.bioIsPublic,
       countryIsPublic: dto.countryIsPublic,
       websiteIsPublic: dto.websiteIsPublic,
       socialsIsPublic: dto.socialsIsPublic,
       businessIsPublic: dto.businessIsPublic,
+      phoneIsPublic: dto.phoneIsPublic,
     });
     await this.issueAndSendVerificationEmail(user.id, user.email);
     return this.sessions.issueSession(user.id, user.ndyId, meta);
@@ -139,11 +141,13 @@ export class AuthService {
       xUrl: user.xUrl,
       businessName: user.businessName,
       businessRole: user.businessRole,
+      phone: user.phone,
       bioIsPublic: user.bioIsPublic,
       countryIsPublic: user.countryIsPublic,
       websiteIsPublic: user.websiteIsPublic,
       socialsIsPublic: user.socialsIsPublic,
       businessIsPublic: user.businessIsPublic,
+      phoneIsPublic: user.phoneIsPublic,
       // fullName, country, and a photo are the required Passport fields
       // (see DashboardGate) — bio/website/socials/business stay optional
       // and skippable. Widened from fullName-only per the user's explicit
@@ -167,11 +171,13 @@ export class AuthService {
       xUrl: user.xUrl,
       businessName: user.businessName,
       businessRole: user.businessRole,
+      phone: user.phone,
       bioIsPublic: user.bioIsPublic,
       countryIsPublic: user.countryIsPublic,
       websiteIsPublic: user.websiteIsPublic,
       socialsIsPublic: user.socialsIsPublic,
       businessIsPublic: user.businessIsPublic,
+      phoneIsPublic: user.phoneIsPublic,
       passportComplete: isPassportComplete(user),
     };
   }

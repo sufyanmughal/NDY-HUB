@@ -15,6 +15,10 @@ export interface PassportCardData {
   businessName: string | null | undefined;
   businessRole: string | null | undefined;
   email: string | null | undefined;
+  /** Self-view only, same treatment as email — the public /passport/[ndyId]
+   * page only shows this when the owner has phoneIsPublic set (handled by
+   * the API's public projection, not here). */
+  phone: string | null | undefined;
   /** e.g. "Legacy" / "Founder" — the current membership tier label, shown
    * in the Passport design's bottom-left badge (matching the mockup's
    * "VERIFIED MEMBER / LEGACY" badge). Self-view only: the public

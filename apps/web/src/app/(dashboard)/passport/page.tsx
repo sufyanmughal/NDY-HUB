@@ -115,6 +115,7 @@ export default function PassportPage() {
     businessName: passport?.business?.name,
     businessRole: passport?.business?.role,
     email,
+    phone: passport?.phone,
     membershipTierLabel: membership?.current?.tierLabel,
     qrDataUrl,
   };
@@ -143,6 +144,7 @@ export default function PassportPage() {
           businessRole: passport.business?.role,
           membershipTierLabel: membership?.current?.tierLabel,
           email,
+          phone: passport.phone,
         },
         design,
       );

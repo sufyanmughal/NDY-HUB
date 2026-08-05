@@ -87,6 +87,7 @@ function ProfileForm({
   const [bio, setBio] = useState(profile.bio ?? "");
   const [country, setCountry] = useState(profile.country ?? "");
   const [website, setWebsite] = useState(profile.website ?? "");
+  const [phone, setPhone] = useState(profile.phone ?? "");
   const [linkedinUrl, setLinkedinUrl] = useState(profile.linkedinUrl ?? "");
   const [instagramUrl, setInstagramUrl] = useState(profile.instagramUrl ?? "");
   const [xUrl, setXUrl] = useState(profile.xUrl ?? "");
@@ -95,6 +96,7 @@ function ProfileForm({
   const [bioIsPublic, setBioIsPublic] = useState(profile.bioIsPublic);
   const [countryIsPublic, setCountryIsPublic] = useState(profile.countryIsPublic);
   const [websiteIsPublic, setWebsiteIsPublic] = useState(profile.websiteIsPublic);
+  const [phoneIsPublic, setPhoneIsPublic] = useState(profile.phoneIsPublic);
   const [socialsIsPublic, setSocialsIsPublic] = useState(profile.socialsIsPublic);
   const [businessIsPublic, setBusinessIsPublic] = useState(profile.businessIsPublic);
   const [busy, setBusy] = useState(false);
@@ -117,6 +119,7 @@ function ProfileForm({
         bio: bio.trim() || undefined,
         country: country || undefined,
         website: website.trim() || undefined,
+        phone: phone.trim() || undefined,
         linkedinUrl: linkedinUrl.trim() || undefined,
         instagramUrl: instagramUrl.trim() || undefined,
         xUrl: xUrl.trim() || undefined,
@@ -125,6 +128,7 @@ function ProfileForm({
         bioIsPublic,
         countryIsPublic,
         websiteIsPublic,
+        phoneIsPublic,
         socialsIsPublic,
         businessIsPublic,
       });
@@ -262,6 +266,19 @@ function ProfileForm({
             value={website}
             onChange={(e) => setWebsite(e.target.value)}
             placeholder="https://"
+            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          />
+        </FieldWithVisibility>
+
+        <FieldWithVisibility
+          label="Phone"
+          isPublic={phoneIsPublic}
+          onTogglePublic={setPhoneIsPublic}
+        >
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+31 6 12345678"
             className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
           />
         </FieldWithVisibility>

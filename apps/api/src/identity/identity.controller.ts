@@ -26,6 +26,7 @@ export class IdentityController {
       bio: user.bioIsPublic ? user.bio : null,
       country: user.countryIsPublic ? user.country : null,
       website: user.websiteIsPublic ? user.website : null,
+      phone: user.phoneIsPublic ? user.phone : null,
       socials:
         user.socialsIsPublic && hasSocials
           ? {
