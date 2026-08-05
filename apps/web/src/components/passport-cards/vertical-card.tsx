@@ -7,10 +7,10 @@ import type { PassportCardData } from "./types";
  * came before it, which used a different header/layout/palette). Every
  * measurement, color, and icon choice below was sampled directly off the
  * reference image (crops + pixel sampling), not guessed:
- * - Header: ND monogram (left, public/logo-mark.png — cropped from the
- *   user's own pre-cut transparent PNG, no "NDJOYIT HUB" text underneath
- *   per their direction), "PASSPORT / DIGITAL BUSINESS CARD" heading
- *   (center), NFC glyph (right).
+ * - Header: full "ND / NDJOYIT / HUB" logo lockup (left, public/
+ *   logo-mark.png — the user's own pre-cut transparent PNG, used in full),
+ *   "PASSPORT / DIGITAL BUSINESS CARD" heading (center), NFC glyph
+ *   (right).
  * - Body: photo/name/role/bio in a left column, a vertical divider, then
  *   icon-led contact rows (camera/pin/envelope/globe/phone — all outline
  *   icons in solid purple, no background chip) in a right column.
@@ -183,19 +183,18 @@ export function VerticalPassportCard({ data }: { data: PassportCardData }) {
   );
 }
 
-/** ND monogram only — public/logo-mark.png, re-cropped from the user's
- * clean pre-cut ndjoyitlogo-removebg-preview.png (replacing the earlier
- * hand-keyed cutout of the original JPEG). No "NDJOYIT HUB" wordmark
- * underneath per the user's explicit "remove the text under the logo"
- * direction — the ND glyph alone carries the brand here. */
+/** Full "ND / NDJOYIT / HUB" lockup, used exactly as the user's own
+ * pre-cut transparent PNG (Downloads/ndjoyitlogo-removebg-preview.png →
+ * public/logo-mark.png, only auto-trimmed of its transparent margin —
+ * not re-cropped, no text removed, no color changes). */
 function LogoLockup() {
   return (
     <Image
       src="/logo-mark.png"
-      alt="ND"
-      width={112}
-      height={52}
-      className="h-11 w-auto"
+      alt="NDJOYIT HUB"
+      width={521}
+      height={432}
+      className="h-[76px] w-auto"
       priority
     />
   );
