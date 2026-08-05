@@ -1,0 +1,356 @@
+/* Styles for the public passport page (/passport/[ndyId]). Layered on
+   homepage.css like membership.css/login.css — assumes it's always loaded
+   inside a `.ndy-homepage` wrapper. Built to match the "digital business
+   card" reference mockup: a wide card with photo+bio on the left, an
+   icon-led contact-info list on the right, a verified/tier badge and QR
+   code along the bottom, and a subtle mesh-gradient decoration in the
+   corner. */
+
+.ndy-homepage .pp-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.ndy-homepage .pp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 40px;
+}
+
+.ndy-homepage .pp-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px 56px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.ndy-homepage .pp-main .hp-earth {
+  position: absolute;
+  top: -480px;
+  right: -380px;
+  left: auto;
+  width: 820px;
+  height: 820px;
+  border-radius: 50%;
+  z-index: -2;
+}
+.ndy-homepage .pp-main .hp-stars {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+/* ---------- the card ---------- */
+.ndy-homepage .pp-card {
+  width: 100%;
+  max-width: 640px;
+  border-radius: 20px;
+  border: 1px solid var(--hp-border);
+  background: linear-gradient(160deg, var(--hp-surface-2) 0%, var(--hp-surface) 60%);
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.6);
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Mesh/wave decoration, bottom-left, matching the reference mockup —
+   a soft diagonal glow rather than an actual mesh texture asset. */
+.ndy-homepage .pp-card::before {
+  content: "";
+  position: absolute;
+  left: -60px;
+  bottom: -80px;
+  width: 320px;
+  height: 200px;
+  background: radial-gradient(ellipse at 30% 70%, color-mix(in srgb, var(--hp-accent-2) 45%, transparent), transparent 70%);
+  filter: blur(6px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.ndy-homepage .pp-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.ndy-homepage .pp-card-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.ndy-homepage .pp-card-brand-tag {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hp-fg-muted);
+}
+.ndy-homepage .pp-card-subtitle {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hp-fg-dim);
+  margin: 0 0 24px;
+}
+.ndy-homepage .pp-nfc-icon {
+  color: var(--hp-fg-muted);
+  transform: rotate(90deg);
+}
+
+.ndy-homepage .pp-card-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+}
+@media (min-width: 620px) {
+  .ndy-homepage .pp-card-body {
+    grid-template-columns: 1.1fr 1fr;
+  }
+}
+
+.ndy-homepage .pp-avatar-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 16px;
+}
+.ndy-homepage .pp-avatar-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--hp-accent), var(--hp-accent-2));
+  z-index: -1;
+}
+.ndy-homepage .pp-verified-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--hp-accent);
+  border: 3px solid var(--hp-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.ndy-homepage .pp-name {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+.ndy-homepage .pp-role {
+  font-size: 14px;
+  color: var(--hp-accent);
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+.ndy-homepage .pp-bio {
+  font-size: 13.5px;
+  color: var(--hp-fg-muted);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 320px;
+}
+
+.ndy-homepage .pp-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ndy-homepage .pp-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.ndy-homepage .pp-info-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--hp-accent) 14%, transparent);
+  color: var(--hp-accent);
+}
+.ndy-homepage .pp-info-icon svg {
+  width: 15px;
+  height: 15px;
+}
+.ndy-homepage .pp-info-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hp-fg-dim);
+  margin: 0 0 2px;
+}
+.ndy-homepage .pp-info-value {
+  font-size: 13.5px;
+  font-weight: 500;
+  word-break: break-word;
+}
+.ndy-homepage .pp-info-value a {
+  color: inherit;
+  text-decoration: none;
+}
+.ndy-homepage .pp-info-value a:hover {
+  text-decoration: underline;
+}
+
+.ndy-homepage .pp-social-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.ndy-homepage .pp-social-link {
+  display: flex;
+  height: 30px;
+  width: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--hp-border);
+  color: var(--hp-fg-muted);
+}
+.ndy-homepage .pp-social-link svg {
+  width: 14px;
+  height: 14px;
+}
+.ndy-homepage .pp-social-link:hover {
+  color: var(--hp-fg);
+  border-color: var(--hp-fg-muted);
+}
+
+.ndy-homepage .pp-card-footer {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hp-border);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ndy-homepage .pp-badge {
+  border-radius: 12px;
+  border: 1px solid var(--hp-border);
+  background: color-mix(in srgb, var(--hp-surface-2) 60%, transparent);
+  padding: 12px 18px;
+}
+.ndy-homepage .pp-badge-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hp-fg-dim);
+  margin: 0 0 4px;
+}
+.ndy-homepage .pp-badge-value {
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ndy-homepage .pp-badge-value.pp-verified {
+  color: var(--hp-good);
+}
+.ndy-homepage .pp-badge-value.pp-unverified {
+  color: var(--hp-fg-muted);
+}
+
+.ndy-homepage .pp-qr-block {
+  text-align: center;
+}
+.ndy-homepage .pp-qr-frame {
+  width: 92px;
+  height: 92px;
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ndy-homepage .pp-qr-caption {
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--hp-fg-dim);
+}
+
+.ndy-homepage .pp-ndyid-line {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--hp-fg-dim);
+}
+.ndy-homepage .pp-ndyid-line strong {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--hp-fg-muted);
+  font-weight: 600;
+}
+
+.ndy-homepage .pp-actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 640px;
+}
+.ndy-homepage .pp-share-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--hp-border);
+  background: color-mix(in srgb, var(--hp-surface) 70%, transparent);
+  color: var(--hp-fg);
+  padding: 12px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ndy-homepage .pp-share-btn:hover {
+  background: var(--hp-surface-2);
+}
+
+.ndy-homepage .pp-claim-note {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--hp-fg-muted);
+  max-width: 480px;
+}
+.ndy-homepage .pp-claim-note a {
+  color: var(--hp-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.ndy-homepage .pp-claim-note a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 619px) {
+  .ndy-homepage .pp-card {
+    padding: 24px 20px;
+  }
+  .ndy-homepage .pp-header {
+    padding: 18px 20px;
+  }
+}
