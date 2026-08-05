@@ -11,9 +11,17 @@ const COLORS = {
   foreground: "#eef1f8",
   foregroundMuted: "#8891a8",
   accent: "#4f7cff",
+  accent2: "#8b5cf6",
   good: "#22c58b",
   critical: "#f0605a",
 };
+
+/** Which on-screen card design (components/passport-cards/) the PDF
+ * should match — kept as a plain string union rather than importing
+ * PassportCardDesignId from components/passport-cards/types.ts, since
+ * that file assumes a browser/React environment and this module is also
+ * usable from a plain Node script (see the module doc comment below). */
+export type PassportPdfDesign = "passport" | "business" | "minimal";
 
 export interface PassportPdfData {
   ndyId: string;
@@ -32,7 +40,37 @@ export interface PassportPdfData {
    * Optional/nullable — falls back to the initials avatar when absent
    * (no photo set, or the fetch/crop failed for any reason). */
   photoDataUrl?: string | null;
+  // --- Business Card design fields — all optional; that design's layout
+  // simply omits a row when the field is absent, same as the on-screen
+  // BusinessPassportCard. Unused by the "passport"/"minimal" designs. ---
+  bio?: string | null;
+  country?: string | null;
+  website?: string | null;
+  businessName?: string | null;
+  businessRole?: string | null;
 }
+
+/**
+ * Builds the passport PDF in memory — pure, no DOM or download side
+ * effects, so it works from the browser (downloadPassportPdf below) and
+ * from a plain Node script for testing alike. Dispatches to one of three
+ * layout builders below, matching the three on-screen card designs
+ * (components/passport-cards/vertical-card.tsx, business-card.tsx,
+ * minimal-card.tsx) so "Download PDF" always produces whichever design
+ * is currently selected on screen instead of always the original layout.
+ */
+export function buildPassportPdf(
+  data: PassportPdfData,
+  design: PassportPdfDesign = "passport",
+): jsPDF {
+  if (design === "business") return buildBusinessCardPdf(data);
+  if (design === "minimal") return buildMinimalCardPdf(data);
+  return buildPassportCardPdf(data);
+}
+
+// ============================================================
+// "NDY Passport" design — the original vertical layout.
+// ============================================================
 
 const PAGE_WIDTH = 400;
 const PAGE_HEIGHT = 760;
@@ -57,12 +95,7 @@ const CARD_HEIGHT = PILL_TOP + PILL_HEIGHT + 24;
 
 const DETAIL_ROW_HEIGHT = 26;
 
-/**
- * Builds the passport PDF in memory — pure, no DOM or download side
- * effects, so it works from the browser (downloadPassportPdf below) and
- * from a plain Node script for testing alike.
- */
-export function buildPassportPdf(data: PassportPdfData): jsPDF {
+function buildPassportCardPdf(data: PassportPdfData): jsPDF {
   const doc = new jsPDF({ unit: "pt", format: [PAGE_WIDTH, PAGE_HEIGHT] });
 
   doc.setFillColor(COLORS.background);
@@ -101,29 +134,7 @@ export function buildPassportPdf(data: PassportPdfData): jsPDF {
   // otherwise the same gradient-initial fallback the on-screen Avatar
   // component uses.
   const avatarCenterY = cardTop + CARD_PAD_TOP + AVATAR_R;
-  if (data.photoDataUrl) {
-    doc.saveGraphicsState();
-    doc.ellipse(CENTER_X, avatarCenterY, AVATAR_R, AVATAR_R, null);
-    doc.clip();
-    doc.discardPath();
-    doc.addImage(
-      data.photoDataUrl,
-      "PNG",
-      CENTER_X - AVATAR_R,
-      avatarCenterY - AVATAR_R,
-      AVATAR_R * 2,
-      AVATAR_R * 2,
-    );
-    doc.restoreGraphicsState();
-  } else {
-    doc.setFillColor(COLORS.accent);
-    doc.circle(CENTER_X, avatarCenterY, AVATAR_R, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(26);
-    doc.setTextColor("#ffffff");
-    const initial = (data.fullName.trim().charAt(0) || "N").toUpperCase();
-    centerText(doc, initial, CENTER_X, avatarCenterY + 9);
-  }
+  drawAvatar(doc, data, CENTER_X, avatarCenterY, AVATAR_R, 26);
 
   // Name
   doc.setFont("helvetica", "bold");
@@ -157,34 +168,8 @@ export function buildPassportPdf(data: PassportPdfData): jsPDF {
     QR_SIZE,
   );
 
-  // Status pill — filled at low opacity behind the text, the same visual
-  // idea as the app's `bg-good/15 text-good` badges, done with jsPDF's
-  // GState opacity support since there's no CSS alpha-channel shorthand here.
-  const statusColor = data.verified ? COLORS.good : COLORS.critical;
-  const statusText = data.verified ? "VERIFIED" : "NOT VERIFIED";
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  const statusWidth = doc.getTextWidth(statusText);
-  const pillWidth = statusWidth + 28;
-  const pillX = CENTER_X - pillWidth / 2;
-  const pillY = cardTop + PILL_TOP;
-
-  doc.saveGraphicsState();
-  doc.setGState(new GState({ opacity: 0.15 }));
-  doc.setFillColor(statusColor);
-  doc.roundedRect(
-    pillX,
-    pillY,
-    pillWidth,
-    PILL_HEIGHT,
-    PILL_HEIGHT / 2,
-    PILL_HEIGHT / 2,
-    "F",
-  );
-  doc.restoreGraphicsState();
-
-  doc.setTextColor(statusColor);
-  centerText(doc, statusText, CENTER_X, pillY + PILL_HEIGHT / 2 + 3);
+  // Status pill
+  drawStatusPill(doc, data.verified, CENTER_X, cardTop + PILL_TOP, PILL_HEIGHT);
 
   // Passport details
   const detailsTop = cardTop + CARD_HEIGHT + 28;
@@ -222,18 +207,259 @@ export function buildPassportPdf(data: PassportPdfData): jsPDF {
     rowY += DETAIL_ROW_HEIGHT;
   }
 
-  // Footer
-  const footerY = rowY + 20;
+  drawFooter(doc, MARGIN, rowY + 20);
+
+  return doc;
+}
+
+// ============================================================
+// "Business Card" design — horizontal layout matching
+// components/passport-cards/business-card.tsx: photo+name+role on the
+// left, contact rows below, QR top-right.
+// ============================================================
+
+const BIZ_WIDTH = 620;
+const BIZ_HEIGHT = 360;
+const BIZ_MARGIN = 34;
+
+function buildBusinessCardPdf(data: PassportPdfData): jsPDF {
+  const doc = new jsPDF({ unit: "pt", format: [BIZ_WIDTH, BIZ_HEIGHT] });
+
+  doc.setFillColor(COLORS.background);
+  doc.rect(0, 0, BIZ_WIDTH, BIZ_HEIGHT, "F");
+  doc.setFillColor(COLORS.surface);
+  doc.setDrawColor(COLORS.border);
+  doc.setLineWidth(1);
+  doc.roundedRect(16, 16, BIZ_WIDTH - 32, BIZ_HEIGHT - 32, 16, 16, "FD");
+
+  const left = BIZ_MARGIN;
+  const y = 60;
+
+  // Header wordmark
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(COLORS.foreground);
+  doc.text("NDY ", left, y);
+  const ndyWidth = doc.getTextWidth("NDY ");
+  doc.setTextColor(COLORS.accent);
+  doc.text("HUB", left + ndyWidth, y);
+
+  // Avatar
+  const avatarR = 44;
+  const avatarCx = left + avatarR;
+  const avatarCy = y + 50;
+  drawAvatar(doc, data, avatarCx, avatarCy, avatarR, 26);
+
+  // Name + role, right of avatar
+  const textX = avatarCx + avatarR + 20;
+  const textMaxWidth = BIZ_WIDTH - BIZ_MARGIN - textX;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(COLORS.foreground);
+  doc.text(truncateToWidth(doc, data.fullName, textMaxWidth), textX, avatarCy - 6);
+
+  const roleLine = [data.businessRole, data.businessName].filter(Boolean).join(" · ");
+  if (roleLine) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+    doc.setTextColor(COLORS.foregroundMuted);
+    doc.text(truncateToWidth(doc, roleLine, textMaxWidth), textX, avatarCy + 14);
+  }
+
+  drawStatusPill(doc, data.verified, textX + 46, avatarCy + 34, 18, true);
+
+  // Bio
+  let contentY = avatarCy + avatarR + 30;
+  if (data.bio) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(COLORS.foregroundMuted);
+    const bioLines = doc.splitTextToSize(data.bio, BIZ_WIDTH / 2 - BIZ_MARGIN * 1.5) as string[];
+    doc.text(bioLines.slice(0, 3), left, contentY);
+    contentY += bioLines.slice(0, 3).length * 13 + 8;
+  }
+
+  // Contact rows (country / website / membership)
+  const contactRows: [string, string][] = [
+    ...(data.country ? [["Location", data.country] as [string, string]] : []),
+    ...(data.website ? [["Website", data.website] as [string, string]] : []),
+    ["Membership", data.membershipLabel],
+  ];
+  doc.setDrawColor(COLORS.border);
+  doc.setLineWidth(0.5);
+  doc.line(left, contentY, BIZ_WIDTH / 2 - 10, contentY);
+  contentY += 18;
+  for (const [label, value] of contactRows) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(COLORS.foregroundMuted);
+    doc.text(label.toUpperCase(), left, contentY);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(COLORS.foreground);
+    doc.text(truncateToWidth(doc, value, BIZ_WIDTH / 2 - BIZ_MARGIN * 1.5), left, contentY + 13);
+    contentY += 30;
+  }
+
+  // QR + NDY ID, right column
+  const qrSize = 120;
+  const qrX = BIZ_WIDTH - BIZ_MARGIN - qrSize;
+  const qrY = 56;
+  doc.setFillColor("#ffffff");
+  doc.roundedRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 8, 8, "F");
+  doc.addImage(data.qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+
+  doc.setFont("courier", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(COLORS.foregroundMuted);
+  centerText(doc, data.ndyId, qrX + qrSize / 2, qrY + qrSize + 26);
+
+  drawFooter(doc, left, BIZ_HEIGHT - 24);
+
+  return doc;
+}
+
+// ============================================================
+// "Minimal Dark" design — matching
+// components/passport-cards/minimal-card.tsx: identity + QR only.
+// ============================================================
+
+const MIN_WIDTH = 360;
+const MIN_HEIGHT = 560;
+const MIN_MARGIN = 30;
+
+function buildMinimalCardPdf(data: PassportPdfData): jsPDF {
+  const doc = new jsPDF({ unit: "pt", format: [MIN_WIDTH, MIN_HEIGHT] });
+  const centerX = MIN_WIDTH / 2;
+
+  doc.setFillColor(COLORS.background);
+  doc.rect(0, 0, MIN_WIDTH, MIN_HEIGHT, "F");
+  doc.setDrawColor(COLORS.border);
+  doc.setLineWidth(1);
+  doc.roundedRect(14, 14, MIN_WIDTH - 28, MIN_HEIGHT - 28, 14, 14, "D");
+
+  let y = 56;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(COLORS.foreground);
+  doc.text("NDY ", MIN_MARGIN, y);
+  const ndyWidth = doc.getTextWidth("NDY ");
+  doc.setTextColor(COLORS.accent);
+  doc.text("HUB", MIN_MARGIN + ndyWidth, y);
+
+  // Verified dot, top-right
+  doc.setFillColor(data.verified ? COLORS.good : COLORS.foregroundMuted);
+  doc.circle(MIN_WIDTH - MIN_MARGIN - 5, y - 4, 4, "F");
+
+  y += 60;
+  const avatarR = 32;
+  drawAvatar(doc, data, MIN_MARGIN + avatarR, y, avatarR, 18);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(COLORS.foreground);
+  doc.text(
+    truncateToWidth(doc, data.fullName, MIN_WIDTH - MIN_MARGIN - (MIN_MARGIN + avatarR * 2 + 16)),
+    MIN_MARGIN + avatarR * 2 + 16,
+    y - 4,
+  );
+  doc.setFont("courier", "normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(COLORS.foregroundMuted);
+  doc.text(data.ndyId, MIN_MARGIN + avatarR * 2 + 16, y + 14);
+
+  // QR, centered
+  const qrSize = 190;
+  const qrTop = y + 70;
+  doc.setFillColor("#ffffff");
+  doc.roundedRect(centerX - qrSize / 2 - 8, qrTop - 8, qrSize + 16, qrSize + 16, 10, 10, "F");
+  doc.addImage(data.qrDataUrl, "PNG", centerX - qrSize / 2, qrTop, qrSize, qrSize);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(COLORS.foregroundMuted);
+  centerText(doc, "ONE IDENTITY. ONE PASSPORT. ONE ECOSYSTEM.", centerX, qrTop + qrSize + 34);
+
+  drawFooter(doc, MIN_MARGIN, MIN_HEIGHT - 26);
+
+  return doc;
+}
+
+// ============================================================
+// Shared drawing helpers
+// ============================================================
+
+function drawAvatar(
+  doc: jsPDF,
+  data: Pick<PassportPdfData, "photoDataUrl" | "fullName">,
+  cx: number,
+  cy: number,
+  r: number,
+  initialFontSize: number,
+): void {
+  if (data.photoDataUrl) {
+    doc.saveGraphicsState();
+    doc.ellipse(cx, cy, r, r, null);
+    doc.clip();
+    doc.discardPath();
+    doc.addImage(data.photoDataUrl, "PNG", cx - r, cy - r, r * 2, r * 2);
+    doc.restoreGraphicsState();
+  } else {
+    doc.setFillColor(COLORS.accent);
+    doc.circle(cx, cy, r, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(initialFontSize);
+    doc.setTextColor("#ffffff");
+    const initial = (data.fullName.trim().charAt(0) || "N").toUpperCase();
+    centerText(doc, initial, cx, cy + initialFontSize * 0.35);
+  }
+}
+
+/** Filled at low opacity behind the text, the same visual idea as the
+ * app's `bg-good/15 text-good` badges, done with jsPDF's GState opacity
+ * support since there's no CSS alpha-channel shorthand here. `leftAlign`
+ * draws the pill starting at x instead of centered on it (used by the
+ * Business Card design, where the pill sits next to text rather than
+ * centered on a column). */
+function drawStatusPill(
+  doc: jsPDF,
+  verified: boolean,
+  x: number,
+  y: number,
+  height: number,
+  leftAlign = false,
+): void {
+  const statusColor = verified ? COLORS.good : COLORS.critical;
+  const statusText = verified ? "VERIFIED" : "NOT VERIFIED";
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(height >= 20 ? 9 : 7.5);
+  const statusWidth = doc.getTextWidth(statusText);
+  const pillWidth = statusWidth + (height >= 20 ? 28 : 20);
+  const pillX = leftAlign ? x : x - pillWidth / 2;
+
+  doc.saveGraphicsState();
+  doc.setGState(new GState({ opacity: 0.15 }));
+  doc.setFillColor(statusColor);
+  doc.roundedRect(pillX, y, pillWidth, height, height / 2, height / 2, "F");
+  doc.restoreGraphicsState();
+
+  doc.setTextColor(statusColor);
+  if (leftAlign) {
+    doc.text(statusText, pillX + pillWidth / 2 - statusWidth / 2, y + height / 2 + 3);
+  } else {
+    centerText(doc, statusText, x, y + height / 2 + 3);
+  }
+}
+
+function drawFooter(doc: jsPDF, x: number, y: number): void {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(COLORS.foregroundMuted);
   doc.text(
     `Generated ${new Date().toLocaleDateString()} — this is a system-generated document, not a legal identity document.`,
-    MARGIN,
-    footerY,
+    x,
+    y,
   );
-
-  return doc;
 }
 
 /**
@@ -245,13 +471,14 @@ export function buildPassportPdf(data: PassportPdfData): jsPDF {
  */
 export async function downloadPassportPdf(
   data: Omit<PassportPdfData, "photoDataUrl"> & { photoUrl?: string | null },
+  design: PassportPdfDesign = "passport",
 ): Promise<void> {
   const { photoUrl, ...rest } = data;
   const photoDataUrl = photoUrl
     ? await loadSquarePhotoDataUrl(photoUrl, 256).catch(() => null)
     : null;
-  const doc = buildPassportPdf({ ...rest, photoDataUrl });
-  doc.save(`ndy-passport-${data.ndyId}.pdf`);
+  const doc = buildPassportPdf({ ...rest, photoDataUrl }, design);
+  doc.save(`ndy-passport-${design}-${data.ndyId}.pdf`);
 }
 
 /**

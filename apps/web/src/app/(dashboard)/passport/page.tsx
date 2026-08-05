@@ -136,18 +136,26 @@ export default function PassportPage() {
     setDownloadError(null);
     setDownloading(true);
     try {
-      await downloadPassportPdf({
-        ndyId: auth.ndyId,
-        fullName: displayName,
-        verified,
-        verificationLevelLabel,
-        membershipLabel,
-        cryndyBalanceLabel: cryndyLabel,
-        ndybitsBalanceLabel: ndybitsLabel,
-        connectedPlatformsLabel,
-        qrDataUrl,
-        photoUrl: passport.profilePhotoUrl,
-      });
+      await downloadPassportPdf(
+        {
+          ndyId: auth.ndyId,
+          fullName: displayName,
+          verified,
+          verificationLevelLabel,
+          membershipLabel,
+          cryndyBalanceLabel: cryndyLabel,
+          ndybitsBalanceLabel: ndybitsLabel,
+          connectedPlatformsLabel,
+          qrDataUrl,
+          photoUrl: passport.profilePhotoUrl,
+          bio: passport.bio,
+          country: passport.country,
+          website: passport.website,
+          businessName: passport.business?.name,
+          businessRole: passport.business?.role,
+        },
+        design,
+      );
     } catch (err) {
       setDownloadError((err as Error).message);
     } finally {
