@@ -7,14 +7,10 @@ import type { PassportCardData } from "./types";
  * came before it, which used a different header/layout/palette). Every
  * measurement, color, and icon choice below was sampled directly off the
  * reference image (crops + pixel sampling), not guessed:
- * - Header: "ND / NDJOYIT / HUB" logo lockup (left), "PASSPORT / DIGITAL
- *   BUSINESS CARD" heading (center), NFC glyph (right) — see LogoLockup
- *   below. The ND glyph is the existing clean transparent asset
- *   (public/logo-mark.png);
- *   "NDJOYIT"/"HUB" are real gradient-clipped text, not a raster cutout —
- *   the source JPEG's soft glow/drop-shadow blends into its background
- *   with no clean edge to key out, so text renders crisper at any size
- *   than a fringed cutout would.
+ * - Header: ND monogram (left, public/logo-mark.png — cropped from the
+ *   user's own pre-cut transparent PNG, no "NDJOYIT HUB" text underneath
+ *   per their direction), "PASSPORT / DIGITAL BUSINESS CARD" heading
+ *   (center), NFC glyph (right).
  * - Body: photo/name/role/bio in a left column, a vertical divider, then
  *   icon-led contact rows (camera/pin/envelope/globe/phone — all outline
  *   icons in solid purple, no background chip) in a right column.
@@ -79,7 +75,7 @@ export function VerticalPassportCard({ data }: { data: PassportCardData }) {
           <div className="relative h-[116px] w-[116px]">
             <div
               className="absolute inset-0 rounded-full p-[2.5px]"
-              style={{ background: "linear-gradient(135deg, #38bdf8, #a78bfa, #ec4899)" }}
+              style={{ background: "linear-gradient(135deg, #e600f0, #a855f7 50%, #38bdf8)" }}
             >
               <div className="h-full w-full overflow-hidden rounded-full bg-black">
                 {/* eslint-disable-next-line @next/next/no-img-element -- data:/remote photoUrl, not a static asset next/image can optimize */}
@@ -183,45 +179,21 @@ export function VerticalPassportCard({ data }: { data: PassportCardData }) {
   );
 }
 
-/** Full "ND / NDJOYIT / HUB" lockup — the ND glyph is the existing clean
- * transparent crop (public/logo-mark.png); the wordmark below it is real
- * text with a CSS gradient matching the reference's magenta→cyan (for
- * "NDJOYIT") and magenta→indigo→blue (for "HUB") sweeps, sampled directly
- * from ndjoyitlogo.jpeg. */
+/** ND monogram only — public/logo-mark.png, re-cropped from the user's
+ * clean pre-cut ndjoyitlogo-removebg-preview.png (replacing the earlier
+ * hand-keyed cutout of the original JPEG). No "NDJOYIT HUB" wordmark
+ * underneath per the user's explicit "remove the text under the logo"
+ * direction — the ND glyph alone carries the brand here. */
 function LogoLockup() {
   return (
-    <div className="leading-none">
-      <Image
-        src="/logo-mark.png"
-        alt=""
-        width={112}
-        height={62}
-        className="h-[46px] w-auto"
-        priority
-      />
-      <div
-        className="mt-1 text-[19px] font-black tracking-tight"
-        style={{
-          backgroundImage: "linear-gradient(90deg, #e600f0, #ffffff 55%, #38bdf8)",
-          WebkitBackgroundClip: "text",
-          backgroundClip: "text",
-          color: "transparent",
-        }}
-      >
-        NDJOYIT
-      </div>
-      <div
-        className="-mt-1.5 text-[22px] font-black tracking-tight"
-        style={{
-          backgroundImage: "linear-gradient(90deg, #e600f0, #8b5cf6 55%, #38bdf8)",
-          WebkitBackgroundClip: "text",
-          backgroundClip: "text",
-          color: "transparent",
-        }}
-      >
-        HUB
-      </div>
-    </div>
+    <Image
+      src="/logo-mark.png"
+      alt="ND"
+      width={112}
+      height={52}
+      className="h-11 w-auto"
+      priority
+    />
   );
 }
 
