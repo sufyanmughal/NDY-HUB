@@ -164,7 +164,7 @@ export function TierGrid({
                 <h3>{info.label}</h3>
                 <p className="mem-tier-tagline">{style.tagline}</p>
                 <div className="mem-tier-price">
-                  <span className="mem-price-amount">${(priceCents / 100).toFixed(0)}</span>
+                  <span className="mem-price-amount">€{(priceCents / 100).toFixed(0)}</span>
                   <span className="mem-price-period">
                     /{billingCycle === "ANNUAL" ? "yr" : "mo"}
                   </span>

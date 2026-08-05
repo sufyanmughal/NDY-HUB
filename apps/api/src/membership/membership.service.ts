@@ -84,7 +84,7 @@ export class MembershipService {
         line_items: [
           {
             price_data: {
-              currency: 'usd',
+              currency: 'eur',
               unit_amount: priceCents,
               recurring: {
                 interval:

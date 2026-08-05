@@ -136,7 +136,7 @@ function renderMembershipConfirmation(membership: {
     `Membership ID: ${membership.id}`,
     `Plan: ${tier.label}`,
     `Billing: ${membership.billingCycle === BillingCycle.ANNUAL ? 'Annual' : 'Monthly'}`,
-    `Price: $${(price / 100).toFixed(2)} ${membership.billingCycle === BillingCycle.ANNUAL ? '/yr' : '/mo'}`,
+    `Price: €${(price / 100).toFixed(2)} ${membership.billingCycle === BillingCycle.ANNUAL ? '/yr' : '/mo'}`,
     `Status: ${membership.status}`,
     `Started: ${membership.startedAt.toISOString()}`,
     `Current period ends: ${membership.currentPeriodEnd.toISOString()}`,
