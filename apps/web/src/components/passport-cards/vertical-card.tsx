@@ -183,17 +183,16 @@ export function VerticalPassportCard({ data }: { data: PassportCardData }) {
   );
 }
 
-/** Full "ND / NDJOYIT / HUB" lockup, used exactly as the user's own
- * pre-cut transparent PNG (Downloads/ndjoyitlogo-removebg-preview.png →
- * public/logo-mark.png, only auto-trimmed of its transparent margin —
- * not re-cropped, no text removed, no color changes). */
+/** Full "ND / NDJOYIT / HUB" lockup — public/logo-mark.png is the exact
+ * file the user provided (Downloads/ndjoyitlogo-removebg-preview.png),
+ * copied byte-for-byte with no crop, trim, or edit of any kind. */
 function LogoLockup() {
   return (
     <Image
       src="/logo-mark.png"
       alt="NDJOYIT HUB"
-      width={521}
-      height={432}
+      width={547}
+      height={457}
       className="h-[76px] w-auto"
       priority
     />
