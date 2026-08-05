@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# throwaway Playwright verification scripts (run against production during
+# a session, never meant to be committed)
+verify-tmp*.js
+shot-tmp*.js
+shot-*.js
