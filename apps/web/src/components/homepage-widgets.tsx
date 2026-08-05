@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { AreaSparkline } from "./area-sparkline";
+import { BrandMark } from "./logo";
 
 /** Shared between the public landing page (app/page.tsx) and the
  * authenticated dashboard home ((dashboard)/dashboard/page.tsx). Markup
@@ -589,32 +590,5 @@ export function HomepageFooter() {
 }
 
 function BrandMarkSmall() {
-  return (
-    <div
-      style={{
-        width: 30,
-        height: 30,
-        borderRadius: "50%",
-        background:
-          "radial-gradient(circle at 35% 30%, #6d8cff, #4f7cff 45%, #8b5cf6 100%)",
-        boxShadow: "0 0 18px rgba(79, 124, 255, 0.55)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#fff"
-        strokeWidth={1.6}
-        width={16}
-        height={16}
-      >
-        <circle cx="12" cy="12" r="9.5" />
-        <circle cx="12" cy="12" r="6" />
-        <circle cx="12" cy="12" r="2.2" fill="#fff" stroke="none" />
-      </svg>
-    </div>
-  );
+  return <BrandMark size={30} />;
 }

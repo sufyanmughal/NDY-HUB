@@ -1,37 +1,23 @@
-/** Transcribed exactly from the reference build: a radial-gradient circle
- * badge (not a flat icon) with a simple 3-ring mark on top, "NDY" + "HUB"
- * (accent-colored) beside it. Self-contained (inline styles, not a CSS
- * class) since it's used both inside the scoped .ndy-homepage sections and
- * in the dashboard sidebar/mobile-nav chrome outside that scope. */
+import Image from "next/image";
+
+/** The real brand mark — cropped from the user's NDJOYIT HUB brand image
+ * (public/logo-mark.png), replacing the earlier hand-drawn 3-ring SVG
+ * placeholder. Rendered via next/image so it's optimized/responsive
+ * automatically; width/height are the image's own aspect ratio (583x320)
+ * so it never stretches. Self-contained (no CSS class dependency) since
+ * it's used both inside the scoped .ndy-homepage sections and in the
+ * dashboard sidebar/mobile-nav chrome outside that scope. */
 export function BrandMark({ size = 38 }: { size?: number }) {
+  const width = Math.round(size * (583 / 320));
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background:
-          "radial-gradient(circle at 35% 30%, #6d8cff, #4f7cff 45%, #8b5cf6 100%)",
-        boxShadow: "0 0 18px rgba(79, 124, 255, 0.55)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-      }}
-    >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#fff"
-        strokeWidth={1.6}
-        width={size * 0.53}
-        height={size * 0.53}
-      >
-        <circle cx="12" cy="12" r="9.5" />
-        <circle cx="12" cy="12" r="6" />
-        <circle cx="12" cy="12" r="2.2" fill="#fff" stroke="none" />
-      </svg>
-    </div>
+    <Image
+      src="/logo-mark.png"
+      alt="NDY HUB"
+      width={width}
+      height={size}
+      priority
+      style={{ height: size, width: "auto", flexShrink: 0 }}
+    />
   );
 }
 
