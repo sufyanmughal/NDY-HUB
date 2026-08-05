@@ -66,6 +66,12 @@
 .pc-heading {
   text-align: right;
 }
+.pc-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .pc-heading-title {
   margin: 0;
   font-size: 19px;
@@ -89,7 +95,6 @@
   flex-shrink: 0;
   color: var(--pc-fg-muted);
   transform: rotate(90deg);
-  margin-top: 3px;
 }
 
 .pc-divider {

@@ -22,11 +22,13 @@ export function VerticalPassportCard({ data }: { data: PassportCardData }) {
           <BrandMark size={44} />
         </div>
         <div className="pc-heading">
-          <p className="pc-heading-title">PASSPORT</p>
+          <div className="pc-heading-row">
+            <p className="pc-heading-title">PASSPORT</p>
+            <Wifi size={18} strokeWidth={1.6} className="pc-nfc" />
+          </div>
           <p className="pc-heading-sub">Digital Business Card</p>
         </div>
       </div>
-      <Wifi size={20} strokeWidth={1.6} className="pc-nfc" style={{ position: "absolute", top: 26, right: 24 }} />
 
       <hr className="pc-divider" />
 
