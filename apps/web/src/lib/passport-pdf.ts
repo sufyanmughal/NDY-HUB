@@ -164,18 +164,21 @@ function buildPassportCardPdf(data: PassportPdfData): jsPDF {
   }
 
   // Right column: icon-style label/value rows
-  const infoRows: [string, string][] = [
-    ["NDY ID", data.ndyId],
-    ...(data.country ? [["Location", data.country] as [string, string]] : []),
-    ...(data.email ? [["Email", data.email] as [string, string]] : []),
-    ...(data.website ? [["Website", data.website.replace(/^https?:\/\//, "")] as [string, string]] : []),
+  const infoRows: ["id" | "location" | "email" | "website", string, string][] = [
+    ["id", "NDY ID", data.ndyId],
+    ...(data.country ? [["location", "Location", data.country] as ["location", string, string]] : []),
+    ...(data.email ? [["email", "Email", data.email] as ["email", string, string]] : []),
+    ...(data.website
+      ? [["website", "Website", data.website.replace(/^https?:\/\//, "")] as ["website", string, string]]
+      : []),
   ];
   let rowY = bodyTop - avatarR + 8;
-  for (const [label, value] of infoRows) {
+  for (const [kind, label, value] of infoRows) {
     doc.setFillColor(COLORS.accent);
     doc.setGState(new GState({ opacity: 0.16 }));
     doc.roundedRect(rightColX, rowY - 9, 20, 20, 5, 5, "F");
     doc.setGState(new GState({ opacity: 1 }));
+    drawInfoIcon(doc, kind, rightColX + 10, rowY + 1);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.5);
@@ -467,6 +470,44 @@ function drawStatusPill(
     doc.text(statusText, pillX + pillWidth / 2 - statusWidth / 2, y + height / 2 + 3);
   } else {
     centerText(doc, statusText, x, y + height / 2 + 3);
+  }
+}
+
+/** Small hand-drawn glyphs for the Passport design's icon-led info rows —
+ * jsPDF has no SVG/icon-font support, so these are simple vector
+ * approximations of the on-screen Lucide icons (Fingerprint/MapPin/Mail/
+ * Globe) rather than the real glyphs, just enough to read as "an icon" at
+ * this size rather than leaving the tinted square empty. cx/cy is the
+ * icon's own center. */
+function drawInfoIcon(
+  doc: jsPDF,
+  kind: "id" | "location" | "email" | "website",
+  cx: number,
+  cy: number,
+): void {
+  doc.setDrawColor(COLORS.accent2);
+  doc.setFillColor(COLORS.accent2);
+  doc.setLineWidth(0.9);
+
+  if (kind === "id") {
+    // fingerprint stand-in: three concentric arcs
+    doc.circle(cx, cy, 4.2, "D");
+    doc.circle(cx, cy, 2.4, "D");
+    doc.circle(cx, cy, 0.6, "F");
+  } else if (kind === "location") {
+    // pin stand-in: circle over a downward point
+    doc.circle(cx, cy - 1, 3, "D");
+    doc.triangle(cx - 2.4, cy + 0.6, cx + 2.4, cy + 0.6, cx, cy + 4.6, "F");
+  } else if (kind === "email") {
+    // envelope stand-in: rect + open flap lines
+    doc.roundedRect(cx - 5, cy - 3.5, 10, 7, 1, 1, "D");
+    doc.line(cx - 4.5, cy - 3, cx, cy + 0.5);
+    doc.line(cx, cy + 0.5, cx + 4.5, cy - 3);
+  } else {
+    // globe stand-in: circle + horizontal/vertical meridian lines
+    doc.circle(cx, cy, 4.2, "D");
+    doc.line(cx - 4.2, cy, cx + 4.2, cy);
+    doc.ellipse(cx, cy, 1.8, 4.2, "D");
   }
 }
 
