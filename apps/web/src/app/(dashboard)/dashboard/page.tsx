@@ -128,7 +128,9 @@ export default function DashboardPage() {
   return (
     <div className="ndy-homepage -mx-6 -mt-6">
       <div className="hp-page">
-        <EcosystemHero />
+        <EcosystemHero
+          idCard={me ? { ndyId: me.ndyId, memberSince: me.createdAt } : undefined}
+        />
 
         <FeatureCardGrid cards={cards} />
 

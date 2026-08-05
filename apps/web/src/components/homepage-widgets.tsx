@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
+import { motion } from "framer-motion";
 import { AreaSparkline } from "./area-sparkline";
 import { BrandMark } from "./logo";
 
@@ -168,8 +169,15 @@ export function LauncherCardView({ card }: { card: LauncherCard }) {
 export function FeatureCardGrid({ cards }: { cards: LauncherCard[] }) {
   return (
     <section className="hp-cards">
-      {cards.map((card) => (
-        <LauncherCardView key={card.title} card={card} />
+      {cards.map((card, i) => (
+        <motion.div
+          key={card.title}
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: i * 0.05 }}
+        >
+          <LauncherCardView card={card} />
+        </motion.div>
       ))}
     </section>
   );
@@ -528,26 +536,58 @@ export function EcosystemDirectory() {
 }
 
 // ---------- hero ----------
+/** idCard is optional and only passed by the authenticated dashboard —
+ * the public landing page's hero (app/page.tsx) has no logged-in user's
+ * NDY ID to show, so it keeps the original single-column centered
+ * layout. Matches the mobile mockup's "glowing ID card beside the
+ * headline" treatment. */
 export function EcosystemHero({
   eyebrow = "Welcome to NDY HUB",
+  idCard,
 }: {
   eyebrow?: string;
+  idCard?: { ndyId: string; memberSince: string };
 }) {
   return (
-    <section className="hp-hero">
+    <section className={`hp-hero ${idCard ? "hp-hero-split" : ""}`}>
       <div className="hp-earth" />
       <div className="hp-stars" />
-      <p className="hp-eyebrow">{eyebrow}</p>
-      <h1>
-        One Identity. One Passport.{" "}
-        <span className="hp-grad">One Ecosystem.</span>
-      </h1>
-      <p>
-        NDY HUB is your central gateway to everything in the NDJOYIT ecosystem —
-        manage your identity, connect platforms, and help build a global
-        ecosystem.
-      </p>
+      <div className="hp-hero-text">
+        <p className="hp-eyebrow">{eyebrow}</p>
+        <h1>
+          One Identity. One Passport.{" "}
+          <span className="hp-grad">One Ecosystem.</span>
+        </h1>
+        <p>
+          NDY HUB is your central gateway to everything in the NDJOYIT ecosystem —
+          manage your identity, connect platforms, and help build a global
+          ecosystem.
+        </p>
+      </div>
+      {idCard && <NdyIdCard ndyId={idCard.ndyId} memberSince={idCard.memberSince} />}
     </section>
+  );
+}
+
+function NdyIdCard({ ndyId, memberSince }: { ndyId: string; memberSince: string }) {
+  return (
+    <div className="hp-idcard">
+      <div className="hp-idcard-top">
+        <BrandMark size={28} />
+        <span className="hp-idcard-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
+            <path d="M12 2.5a5 5 0 0 0-5 5v2.3M7 13.5v.8a5 5 0 0 0 10 0v-4a5 5 0 0 0-1.2-3.3" />
+            <path d="M12 7.5a3 3 0 0 1 3 3v.8M9.5 21c.3-1.5.5-3.4.5-6.5M14.7 21c-.2-1-.4-2.6-.5-4.5" />
+            <path d="M4.5 18.5c1-2.5 1.5-5.3 1.5-8a6 6 0 0 1 1.2-3.6" />
+          </svg>
+        </span>
+      </div>
+      <p className="hp-idcard-label">NDY ID</p>
+      <p className="hp-idcard-value">{ndyId}</p>
+      <p className="hp-idcard-since">
+        Member since {new Date(memberSince).toLocaleDateString()}
+      </p>
+    </div>
   );
 }
 
