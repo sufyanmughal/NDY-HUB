@@ -4,6 +4,7 @@ import { MinimalPassportCard } from "./minimal-card";
 import type { PassportCardData, PassportCardDesignId } from "./types";
 
 export * from "./types";
+export { VerticalPassportCard } from "./vertical-card";
 
 const REGISTRY: Record<
   PassportCardDesignId,

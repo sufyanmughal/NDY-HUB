@@ -30,8 +30,10 @@ import {
 import { SharePanel } from "@/components/passport-cards/share-panel";
 import { NfcPanel } from "@/components/passport-cards/nfc-panel";
 
-const DESIGN_STORAGE_KEY = "ndy-passport-card-design";
-
+// No selectable "tabs" anymore — every design renders on the one page,
+// stacked, each with its own download button. This constant only exists
+// to track which download is currently in flight (so only that card's
+// button shows "Preparing…", not all three at once).
 export default function PassportPage() {
   const { auth } = useAuth();
   const passport = usePassport();
@@ -39,39 +41,24 @@ export default function PassportPage() {
   const ndybits = useNdybitsSummary();
   const membership = useMembershipSummary();
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState(false);
+  const [downloadingDesign, setDownloadingDesign] = useState<PassportCardDesignId | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
-  // Remembers the user's chosen card design across visits — purely a
-  // display preference, not worth a backend field/round trip for. Read
-  // once via a lazy initializer rather than an effect+setState (which
-  // would cause an extra render and trip the set-state-in-effect lint
-  // rule); typeof window guards the SSR pass, which has no localStorage.
-  const [design, setDesign] = useState<PassportCardDesignId>(() => {
-    if (typeof window === "undefined") return "passport";
-    const stored = localStorage.getItem(DESIGN_STORAGE_KEY) as PassportCardDesignId | null;
-    return stored && PASSPORT_CARD_DESIGNS.some((d) => d.id === stored) ? stored : "passport";
-  });
   const qrSectionRef = useRef<HTMLDivElement>(null);
 
   const ndyId = auth.status === "authenticated" ? auth.ndyId : null;
 
-  function selectDesign(next: PassportCardDesignId) {
-    setDesign(next);
-    localStorage.setItem(DESIGN_STORAGE_KEY, next);
-  }
-
   // getMe() (not usePassport(), which only returns the public-safe shape)
-  // is the only place the account's real email is available — used on the
-  // Business Card design, which is a self-view only, never rendered from
-  // the public /passport/[ndyId] page.
+  // is the only place the account's real email is available — shown on
+  // this self-view only, never rendered from the public /passport/[ndyId]
+  // page.
   useEffect(() => {
     if (auth.status !== "authenticated") return;
     getMe()
       .then((me) => setEmail(me.email))
       .catch(() => {
-        /* email is a nice-to-have on the Business Card design — not worth
-         * surfacing an error banner over */
+        /* email is a nice-to-have on the card — not worth surfacing an
+         * error banner over */
       });
   }, [auth.status]);
 
@@ -128,13 +115,14 @@ export default function PassportPage() {
     businessName: passport?.business?.name,
     businessRole: passport?.business?.role,
     email,
+    membershipTierLabel: membership?.current?.tierLabel,
     qrDataUrl,
   };
 
-  async function handleDownload() {
+  async function handleDownload(design: PassportCardDesignId) {
     if (!passport || !qrDataUrl || auth.status !== "authenticated") return;
     setDownloadError(null);
-    setDownloading(true);
+    setDownloadingDesign(design);
     try {
       await downloadPassportPdf(
         {
@@ -153,13 +141,15 @@ export default function PassportPage() {
           website: passport.website,
           businessName: passport.business?.name,
           businessRole: passport.business?.role,
+          membershipTierLabel: membership?.current?.tierLabel,
+          email,
         },
         design,
       );
     } catch (err) {
       setDownloadError((err as Error).message);
     } finally {
-      setDownloading(false);
+      setDownloadingDesign(null);
     }
   }
 
@@ -173,23 +163,13 @@ export default function PassportPage() {
             ecosystem.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Link
-            href="/passport/complete"
-            className="flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2"
-          >
-            <Pencil size={16} strokeWidth={2} />
-            Edit Passport
-          </Link>
-          <button
-            onClick={handleDownload}
-            disabled={!canDownload || downloading}
-            className="flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Download size={16} strokeWidth={2} />
-            {downloading ? "Preparing…" : "Download PDF"}
-          </button>
-        </div>
+        <Link
+          href="/passport/complete"
+          className="flex shrink-0 items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2"
+        >
+          <Pencil size={16} strokeWidth={2} />
+          Edit Passport
+        </Link>
       </div>
 
       {downloadError && (
@@ -198,31 +178,31 @@ export default function PassportPage() {
         </p>
       )}
 
-      {/* Design picker — matches the mockup's promise of multiple
-          selectable card styles. Purely a display choice; every design
-          renders the same underlying data. */}
-      <div className="mt-6 flex flex-wrap gap-2">
+      {/* Every card design, one page, no tabs — each with its own download
+          button so any of the three can be saved as a PDF independently. */}
+      <div className="mt-6 space-y-6" ref={qrSectionRef}>
         {PASSPORT_CARD_DESIGNS.map((d) => (
-          <button
-            key={d.id}
-            onClick={() => selectDesign(d.id)}
-            title={d.description}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-              design === d.id
-                ? "bg-accent text-white"
-                : "border border-border text-foreground-muted hover:text-foreground"
-            }`}
-          >
-            {d.label}
-          </button>
+          <div key={d.id}>
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold">{d.label}</h2>
+                <p className="text-xs text-foreground-muted">{d.description}</p>
+              </div>
+              <button
+                onClick={() => handleDownload(d.id)}
+                disabled={!canDownload || downloadingDesign !== null}
+                className="flex shrink-0 items-center gap-2 rounded-md bg-accent px-3.5 py-2 text-xs font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Download size={14} strokeWidth={2} />
+                {downloadingDesign === d.id ? "Preparing…" : "Download PDF"}
+              </button>
+            </div>
+            <PassportCard design={d.id} data={cardData} />
+          </div>
         ))}
       </div>
 
-      <div className="mt-4 grid gap-6 md:grid-cols-[1fr_1fr]" ref={qrSectionRef}>
-        <div className={design === "passport" ? "md:row-span-2" : ""}>
-          <PassportCard design={design} data={cardData} />
-        </div>
-
+      <div className="mt-8 grid gap-6 md:grid-cols-2">
         <div className="overflow-hidden rounded-xl border border-border bg-surface">
           <div className="border-b border-border bg-surface-2 px-5 py-3 text-xs font-medium uppercase tracking-wide text-foreground-muted">
             Passport Details

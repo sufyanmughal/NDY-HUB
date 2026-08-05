@@ -48,6 +48,15 @@ export interface PassportPdfData {
   website?: string | null;
   businessName?: string | null;
   businessRole?: string | null;
+  /** Self-view only — the current membership tier label, shown in the
+   * Passport design's footer badge (matches the on-screen
+   * VerticalPassportCard). Falls back to "NDY HUB" when absent, same as
+   * the on-screen card. */
+  membershipTierLabel?: string | null;
+  /** Real account email — self-view only, shown as an icon row on the
+   * Passport design (matches the on-screen card, which also only shows
+   * this on the authenticated /passport page, never the public one). */
+  email?: string | null;
 }
 
 /**
@@ -69,145 +78,155 @@ export function buildPassportPdf(
 }
 
 // ============================================================
-// "NDY Passport" design — the original vertical layout.
+// "Passport" design — pixel-accurate clone of the passportcard.jpeg
+// reference mockup: ND wordmark + "PASSPORT / Digital Business Card"
+// header with an NFC glyph, photo+name+role+bio on the left, icon-led
+// contact rows (NDY ID/Location/Email/Website) on the right, and a
+// footer row pairing a "Verified Member / <tier>" badge with a QR.
+// Matches components/passport-cards/vertical-card.tsx +
+// styles/passport-card.css.
 // ============================================================
 
-const PAGE_WIDTH = 400;
-const PAGE_HEIGHT = 760;
-const MARGIN = 32;
+const PAGE_WIDTH = 440;
+const PAGE_HEIGHT = 620;
+const MARGIN = 28;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-const CENTER_X = PAGE_WIDTH / 2;
-
-// Fixed offsets from the card's top edge — computed once, top to bottom, so
-// the panel height (drawn first, as the card's background) and every
-// element inside it (drawn after) agree on the same numbers instead of one
-// being inferred from where the other happened to land.
-const CARD_PAD_TOP = 36;
-const AVATAR_R = 40;
-const QR_SIZE = 130;
-const NAME_Y = CARD_PAD_TOP + AVATAR_R * 2 + 16;
-const LABEL_Y = NAME_Y + 20;
-const ID_Y = LABEL_Y + 14;
-const QR_TOP = ID_Y + 20;
-const PILL_TOP = QR_TOP + QR_SIZE + 20;
-const PILL_HEIGHT = 22;
-const CARD_HEIGHT = PILL_TOP + PILL_HEIGHT + 24;
-
-const DETAIL_ROW_HEIGHT = 26;
 
 function buildPassportCardPdf(data: PassportPdfData): jsPDF {
   const doc = new jsPDF({ unit: "pt", format: [PAGE_WIDTH, PAGE_HEIGHT] });
 
   doc.setFillColor(COLORS.background);
   doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, "F");
+  doc.setDrawColor(COLORS.border);
+  doc.setLineWidth(1);
+  doc.roundedRect(14, 14, PAGE_WIDTH - 28, PAGE_HEIGHT - 28, 18, 18, "D");
 
-  // Header wordmark
-  let y = 50;
+  // Header: ND wordmark left, "PASSPORT / Digital Business Card" right
+  let y = MARGIN + 20;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
+  doc.setFontSize(17);
   doc.setTextColor(COLORS.foreground);
   doc.text("NDY ", MARGIN, y);
   const ndyWidth = doc.getTextWidth("NDY ");
   doc.setTextColor(COLORS.accent);
   doc.text("HUB", MARGIN + ndyWidth, y);
 
-  y += 16;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(COLORS.foregroundMuted);
-  doc.text("One Identity. One Passport. One Ecosystem.", MARGIN, y);
-
-  // Card panel background
-  const cardTop = y + 24;
-  doc.setFillColor(COLORS.surface);
-  doc.setDrawColor(COLORS.border);
-  doc.setLineWidth(1);
-  doc.roundedRect(MARGIN, cardTop, CONTENT_WIDTH, CARD_HEIGHT, 12, 12, "FD");
-
-  // "NDY PASSPORT" card label
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(COLORS.foregroundMuted);
-  doc.text("NDY PASSPORT", MARGIN + 16, cardTop + 18);
-
-  // Avatar — the real photo, circle-clipped, when one loaded successfully;
-  // otherwise the same gradient-initial fallback the on-screen Avatar
-  // component uses.
-  const avatarCenterY = cardTop + CARD_PAD_TOP + AVATAR_R;
-  drawAvatar(doc, data, CENTER_X, avatarCenterY, AVATAR_R, 26);
-
-  // Name
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
   doc.setTextColor(COLORS.foreground);
-  centerText(
-    doc,
-    truncateToWidth(doc, data.fullName, CONTENT_WIDTH - 32),
-    CENTER_X,
-    cardTop + NAME_Y,
-  );
+  const titleWidth = doc.getTextWidth("PASSPORT");
+  doc.text("PASSPORT", PAGE_WIDTH - MARGIN - titleWidth, y - 4);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(COLORS.accent2);
+  const subWidth = doc.getTextWidth("DIGITAL BUSINESS CARD");
+  doc.text("DIGITAL BUSINESS CARD", PAGE_WIDTH - MARGIN - subWidth, y + 11);
 
-  // NDY ID label + value
+  y += 26;
+  doc.setDrawColor(COLORS.border);
+  doc.setLineWidth(1);
+  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
+
+  // Body: two columns — identity (left), contact rows (right)
+  const colGap = 22;
+  const leftColWidth = CONTENT_WIDTH * 0.5 - colGap / 2;
+  const rightColX = MARGIN + leftColWidth + colGap;
+  const rightColWidth = CONTENT_WIDTH - leftColWidth - colGap;
+  const bodyTop = y + 30;
+
+  const avatarR = 34;
+  const avatarCx = MARGIN + avatarR;
+  const avatarCy = bodyTop;
+  drawAvatar(doc, data, avatarCx, avatarCy, avatarR, 22);
+
+  let leftY = avatarCy + avatarR + 22;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(COLORS.foreground);
+  doc.text(truncateToWidth(doc, data.fullName, leftColWidth), MARGIN, leftY);
+
+  const roleLine = [data.businessRole, data.businessName].filter(Boolean).join(" | ");
+  if (roleLine) {
+    leftY += 16;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(COLORS.foregroundMuted);
+    doc.text(truncateToWidth(doc, roleLine, leftColWidth), MARGIN, leftY);
+  }
+  if (data.bio) {
+    leftY += 18;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(COLORS.accent2);
+    const bioLines = doc.splitTextToSize(data.bio, leftColWidth) as string[];
+    doc.text(bioLines.slice(0, 3), MARGIN, leftY);
+    leftY += bioLines.slice(0, 3).length * 12;
+  }
+
+  // Right column: icon-style label/value rows
+  const infoRows: [string, string][] = [
+    ["NDY ID", data.ndyId],
+    ...(data.country ? [["Location", data.country] as [string, string]] : []),
+    ...(data.email ? [["Email", data.email] as [string, string]] : []),
+    ...(data.website ? [["Website", data.website.replace(/^https?:\/\//, "")] as [string, string]] : []),
+  ];
+  let rowY = bodyTop - avatarR + 8;
+  for (const [label, value] of infoRows) {
+    doc.setFillColor(COLORS.accent);
+    doc.setGState(new GState({ opacity: 0.16 }));
+    doc.roundedRect(rightColX, rowY - 9, 20, 20, 5, 5, "F");
+    doc.setGState(new GState({ opacity: 1 }));
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(COLORS.foregroundMuted);
+    doc.text(label.toUpperCase(), rightColX + 28, rowY - 3);
+
+    doc.setFont(label === "NDY ID" ? "courier" : "helvetica", "normal");
+    doc.setFontSize(10.5);
+    doc.setTextColor(COLORS.foreground);
+    doc.text(truncateToWidth(doc, value, rightColWidth - 28), rightColX + 28, rowY + 10);
+
+    rowY += 34;
+  }
+
+  const bodyBottom = Math.max(leftY, rowY) + 20;
+
+  // Footer: badge (left) + QR (right)
+  doc.setDrawColor(COLORS.border);
+  doc.setLineWidth(1);
+  doc.line(MARGIN, bodyBottom, PAGE_WIDTH - MARGIN, bodyBottom);
+
+  const footerY = bodyBottom + 22;
+  const badgeLabel = data.verified ? "VERIFIED MEMBER" : "NOT VERIFIED";
+  const badgeValue = data.membershipTierLabel ?? "NDY HUB";
+  doc.setFillColor(COLORS.accent);
+  doc.setGState(new GState({ opacity: 0.07 }));
+  doc.roundedRect(MARGIN, footerY, 150, 46, 10, 10, "F");
+  doc.setGState(new GState({ opacity: 1 }));
+  doc.setDrawColor(COLORS.border);
+  doc.roundedRect(MARGIN, footerY, 150, 46, 10, 10, "D");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(COLORS.foregroundMuted);
+  doc.text(badgeLabel, MARGIN + 12, footerY + 18);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(COLORS.accent2);
+  doc.text(truncateToWidth(doc, badgeValue, 126), MARGIN + 12, footerY + 34);
+
+  const qrSize = 68;
+  const qrX = PAGE_WIDTH - MARGIN - qrSize;
+  doc.setFillColor("#ffffff");
+  doc.roundedRect(qrX - 6, footerY - 4, qrSize + 12, qrSize + 12, 8, 8, "F");
+  doc.addImage(data.qrDataUrl, "PNG", qrX, footerY + 2, qrSize, qrSize);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(COLORS.foregroundMuted);
-  centerText(doc, "NDY ID", CENTER_X, cardTop + LABEL_Y);
+  centerText(doc, "Scan to connect", qrX + qrSize / 2, footerY + qrSize + 22);
 
-  doc.setFont("courier", "normal");
-  doc.setFontSize(12);
-  doc.setTextColor(COLORS.foreground);
-  centerText(doc, data.ndyId, CENTER_X, cardTop + ID_Y);
-
-  // QR code
-  doc.addImage(
-    data.qrDataUrl,
-    "PNG",
-    CENTER_X - QR_SIZE / 2,
-    cardTop + QR_TOP,
-    QR_SIZE,
-    QR_SIZE,
-  );
-
-  // Status pill
-  drawStatusPill(doc, data.verified, CENTER_X, cardTop + PILL_TOP, PILL_HEIGHT);
-
-  // Passport details
-  const detailsTop = cardTop + CARD_HEIGHT + 28;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(COLORS.foregroundMuted);
-  doc.text("PASSPORT DETAILS", MARGIN, detailsTop);
-
-  const rows: [string, string][] = [
-    ["Membership", data.membershipLabel],
-    ["CRYNDY Holdings", data.cryndyBalanceLabel],
-    ["NDYBITS", data.ndybitsBalanceLabel],
-    ["Connected Platforms", data.connectedPlatformsLabel],
-    ["Verification Level", data.verificationLevelLabel],
-  ];
-
-  let rowY = detailsTop + 22;
-  for (const [label, value] of rows) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(COLORS.foregroundMuted);
-    doc.text(label, MARGIN, rowY);
-
-    doc.setFont("courier", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(COLORS.foreground);
-    const valueText = truncateToWidth(doc, value, CONTENT_WIDTH * 0.55);
-    const valueWidth = doc.getTextWidth(valueText);
-    doc.text(valueText, PAGE_WIDTH - MARGIN - valueWidth, rowY);
-
-    doc.setDrawColor(COLORS.border);
-    doc.setLineWidth(0.5);
-    doc.line(MARGIN, rowY + 8, PAGE_WIDTH - MARGIN, rowY + 8);
-
-    rowY += DETAIL_ROW_HEIGHT;
-  }
-
-  drawFooter(doc, MARGIN, rowY + 20);
+  drawFooter(doc, MARGIN, PAGE_HEIGHT - 22);
 
   return doc;
 }

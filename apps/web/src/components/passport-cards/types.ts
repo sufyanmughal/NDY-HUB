@@ -15,6 +15,13 @@ export interface PassportCardData {
   businessName: string | null | undefined;
   businessRole: string | null | undefined;
   email: string | null | undefined;
+  /** e.g. "Legacy" / "Founder" — the current membership tier label, shown
+   * in the Passport design's bottom-left badge (matching the mockup's
+   * "VERIFIED MEMBER / LEGACY" badge). Self-view only: the public
+   * /passport/[ndyId] page has no endpoint exposing a stranger's paid
+   * tier, so this stays undefined there and the badge falls back to
+   * "NDY HUB" as its second line instead of a tier name. */
+  membershipTierLabel: string | null | undefined;
   qrDataUrl: string | null;
 }
 
