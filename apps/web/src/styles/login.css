@@ -26,6 +26,15 @@
   flex-direction: column;
   justify-content: center;
   padding: 48px 40px;
+  /* Without an explicit height, a flex column's justify-content: center
+     only centers within its own content height — this grid cell's row
+     height is dictated by the taller sibling (the form panel), so the
+     hero's content was sitting flush at the row's natural top instead of
+     centering in the visually taller cell. min-height: 100% (the grid
+     row's height, since .login-shell already has min-height: 100vh)
+     makes this panel actually fill the cell so centering has somewhere
+     to center within. */
+  min-height: 100%;
 }
 .ndy-homepage .login-hero .hp-earth {
   top: -420px;
