@@ -8,6 +8,26 @@ import { generateNdyId } from '../common/ndy-id.util';
 
 const MAX_NDY_ID_ATTEMPTS = 5;
 
+// Shared with updateProfile below — the same passport fields can be sent
+// either up front at registration (password signup form) or edited later
+// via Settings/passport-complete. Kept as one type so the two call sites
+// can't silently drift apart.
+export type PassportProfileFields = {
+  bio?: string;
+  country?: string;
+  website?: string;
+  linkedinUrl?: string;
+  instagramUrl?: string;
+  xUrl?: string;
+  businessName?: string;
+  businessRole?: string;
+  bioIsPublic?: boolean;
+  countryIsPublic?: boolean;
+  websiteIsPublic?: boolean;
+  socialsIsPublic?: boolean;
+  businessIsPublic?: boolean;
+};
+
 @Injectable()
 export class IdentityService {
   constructor(private readonly prisma: PrismaService) {}
@@ -17,11 +37,13 @@ export class IdentityService {
    * Collisions are astronomically rare at this alphabet/length, but we still
    * retry on the unique-constraint error rather than trusting probability.
    */
-  async createUser(params: {
-    email: string;
-    passwordHash?: string;
-    fullName?: string;
-  }) {
+  async createUser(
+    params: {
+      email: string;
+      passwordHash?: string;
+      fullName?: string;
+    } & PassportProfileFields,
+  ) {
     const existing = await this.prisma.user.findUnique({
       where: { email: params.email },
     });
@@ -38,6 +60,19 @@ export class IdentityService {
             email: params.email,
             passwordHash: params.passwordHash,
             fullName: params.fullName,
+            bio: params.bio,
+            country: params.country,
+            website: params.website,
+            linkedinUrl: params.linkedinUrl,
+            instagramUrl: params.instagramUrl,
+            xUrl: params.xUrl,
+            businessName: params.businessName,
+            businessRole: params.businessRole,
+            bioIsPublic: params.bioIsPublic,
+            countryIsPublic: params.countryIsPublic,
+            websiteIsPublic: params.websiteIsPublic,
+            socialsIsPublic: params.socialsIsPublic,
+            businessIsPublic: params.businessIsPublic,
           },
         });
       } catch (err: unknown) {
@@ -77,20 +112,7 @@ export class IdentityService {
     updates: {
       fullName?: string;
       profilePhotoUrl?: string;
-      bio?: string;
-      country?: string;
-      website?: string;
-      linkedinUrl?: string;
-      instagramUrl?: string;
-      xUrl?: string;
-      businessName?: string;
-      businessRole?: string;
-      bioIsPublic?: boolean;
-      countryIsPublic?: boolean;
-      websiteIsPublic?: boolean;
-      socialsIsPublic?: boolean;
-      businessIsPublic?: boolean;
-    },
+    } & PassportProfileFields,
   ) {
     return this.prisma.user.update({ where: { id: userId }, data: updates });
   }

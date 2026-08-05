@@ -60,6 +60,19 @@ export class AuthService {
       email: dto.email,
       passwordHash,
       fullName: dto.fullName,
+      bio: dto.bio,
+      country: dto.country,
+      website: dto.website,
+      linkedinUrl: dto.linkedinUrl,
+      instagramUrl: dto.instagramUrl,
+      xUrl: dto.xUrl,
+      businessName: dto.businessName,
+      businessRole: dto.businessRole,
+      bioIsPublic: dto.bioIsPublic,
+      countryIsPublic: dto.countryIsPublic,
+      websiteIsPublic: dto.websiteIsPublic,
+      socialsIsPublic: dto.socialsIsPublic,
+      businessIsPublic: dto.businessIsPublic,
     });
     await this.issueAndSendVerificationEmail(user.id, user.email);
     return this.sessions.issueSession(user.id, user.ndyId, meta);

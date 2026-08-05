@@ -1,24 +1,35 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import {
   getMyMembership,
+  getMembershipTiers,
+  subscribeToTier,
   cancelMembership,
   type MembershipSummary,
+  type TierInfo,
+  type MembershipTier,
+  type BillingCycle,
 } from "@/lib/api";
+import { TierGrid, TIER_ORDER } from "@/components/tier-grid";
+import "@/styles/homepage.css";
+import "@/styles/membership.css";
 
 /** Account-management view for an existing membership — current plan,
- * billing dates, cancellation, and history. Tier browsing/subscribing
- * lives at the public /memberships marketing page instead of here, so
- * this page stays a simple account screen (same shape as Security/
- * Settings) rather than re-rendering the full premium tier grid. */
+ * billing dates, cancellation, history, AND full tier browsing/upgrading
+ * (via the shared TierGrid, same component the public /memberships page
+ * uses) so a member can move to a higher tier without ever leaving the
+ * dashboard shell. Previously this just linked out to the public marketing
+ * page for that, which drops the sidebar entirely — jarring for someone
+ * already inside the app. */
 export default function ManageMembershipPage() {
   const { auth } = useAuth();
   const [summary, setSummary] = useState<MembershipSummary | null>(null);
+  const [tiers, setTiers] = useState<Record<MembershipTier, TierInfo> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [busyTier, setBusyTier] = useState<MembershipTier | null>(null);
 
   const refresh = useCallback(() => {
     if (auth.status !== "authenticated") return;
@@ -30,6 +41,15 @@ export default function ManageMembershipPage() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    getMembershipTiers()
+      .then(setTiers)
+      .catch(() => {
+        /* tier grid just stays empty — the plan/history sections above
+           still work without it */
+      });
+  }, []);
 
   if (auth.status !== "authenticated") return null;
 
@@ -46,21 +66,42 @@ export default function ManageMembershipPage() {
     }
   }
 
+  async function handleSubscribe(tier: MembershipTier, billingCycle: BillingCycle) {
+    setBusyTier(tier);
+    setError(null);
+    try {
+      const result = await subscribeToTier(tier, billingCycle);
+      if (result.mode === "checkout") {
+        window.location.assign(result.checkoutUrl);
+        return;
+      }
+      refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusyTier(null);
+    }
+  }
+
+  const currentTier = summary?.current?.tier ?? null;
+
+  // Frames the CTA as "Upgrade"/"Downgrade" relative to the current tier
+  // instead of a flat "Subscribe" for every card, once a plan is active.
+  function ctaLabelForTier(tier: MembershipTier, isCurrent: boolean): string {
+    if (isCurrent) return "Current plan";
+    if (!currentTier) return "Subscribe";
+    const currentIndex = TIER_ORDER.indexOf(currentTier);
+    const tierIndex = TIER_ORDER.indexOf(tier);
+    return tierIndex > currentIndex ? "Upgrade" : "Switch plan";
+  }
+
   return (
-    <div className="max-w-2xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Membership</h1>
-          <p className="mt-1 text-sm text-foreground-muted">
-            Your current plan, billing, and membership history.
-          </p>
-        </div>
-        <Link
-          href="/memberships"
-          className="shrink-0 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
-        >
-          Browse all tiers
-        </Link>
+    <div className="max-w-3xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Membership</h1>
+        <p className="mt-1 text-sm text-foreground-muted">
+          Your current plan, billing, and membership history.
+        </p>
       </div>
 
       {error && (
@@ -76,14 +117,9 @@ export default function ManageMembershipPage() {
       {summary && !summary.current && (
         <div className="rounded-lg border border-border bg-surface p-6 text-center">
           <p className="text-sm text-foreground-muted">
-            You don&rsquo;t have an active membership yet.
+            You don&rsquo;t have an active membership yet — choose a tier below to
+            get started.
           </p>
-          <Link
-            href="/memberships"
-            className="mt-4 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
-          >
-            Explore membership tiers
-          </Link>
         </div>
       )}
 
@@ -169,6 +205,27 @@ export default function ManageMembershipPage() {
           </ul>
         </div>
       )}
+
+      {/* All tiers, right here — so upgrading (or picking a first plan)
+          never has to leave the dashboard. Wrapped in .ndy-homepage so it
+          picks up the same --hp-* custom properties the tier cards are
+          styled against, scoped to just this section rather than the
+          whole authenticated shell. */}
+      <div className="ndy-homepage">
+        <div className="mem-manage-tiers">
+          <h2 className="text-sm font-medium text-foreground-muted">
+            {summary?.current ? "Change your plan" : "Choose a plan"}
+          </h2>
+          <TierGrid
+            tiers={tiers}
+            currentTier={currentTier}
+            isAuthenticated
+            busyTier={busyTier}
+            onSubscribe={handleSubscribe}
+            ctaLabelForTier={ctaLabelForTier}
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -7,6 +7,31 @@
    and the static hover/focus states (glow, border) so the page still
    looks right with JS disabled or before motion kicks in. */
 
+/* ---------- authenticated-only "back to dashboard" bar ---------- */
+/* Only rendered for logged-in visitors (see memberships/page.tsx) — a
+   thin, unmissable strip above the marketing header so someone who
+   navigated here from inside the dashboard (e.g. /memberships/manage's
+   "Browse all tiers") never feels stranded outside the app shell. */
+.ndy-homepage .mem-back-bar {
+  border-bottom: 1px solid var(--hp-border);
+  background: color-mix(in srgb, var(--hp-accent) 8%, transparent);
+}
+.ndy-homepage .mem-back-bar-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 10px 32px;
+  color: var(--hp-accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.ndy-homepage .mem-back-bar-link:hover {
+  text-decoration: underline;
+}
+
 /* ---------- hero variant (adds a CTA button under the shared hero) ---------- */
 .ndy-homepage .mem-hero {
   padding-bottom: 8px;
@@ -531,5 +556,35 @@
   .ndy-homepage .mem-cta-secondary {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* ---------- embedded tier grid on /memberships/manage ---------- */
+/* The dashboard shell's own container is already narrow (max-w-3xl) and
+   padded, unlike the full-bleed marketing page these .mem-* rules were
+   designed for — override the grid/toggle/compare-table's own padding and
+   column count here instead of fighting the dashboard's padding twice. */
+.mem-manage-tiers {
+  margin-top: 8px;
+}
+.mem-manage-tiers .mem-toggle,
+.mem-manage-tiers .mem-tiers,
+.mem-manage-tiers .mem-compare {
+  padding-left: 0;
+  padding-right: 0;
+  margin-left: 0;
+  margin-right: 0;
+}
+.mem-manage-tiers .mem-tiers {
+  grid-template-columns: repeat(2, 1fr);
+  padding-top: 16px;
+}
+.mem-manage-tiers .mem-compare {
+  grid-template-columns: repeat(2, 1fr);
+}
+@media (max-width: 640px) {
+  .mem-manage-tiers .mem-tiers,
+  .mem-manage-tiers .mem-compare {
+    grid-template-columns: 1fr;
   }
 }

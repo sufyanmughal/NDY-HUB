@@ -4,26 +4,19 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getMe, updateProfile, type MeProfile } from "@/lib/api";
+import { COUNTRIES } from "@/lib/countries";
 
-/** Runs immediately after every signup path (password, OAuth, passkey —
- * DashboardGate is the single chokepoint that routes here) and any time an
- * existing user without a full name reaches the dashboard. Deliberately
- * outside (dashboard) so it isn't itself gated by the check it satisfies;
- * guards itself with useAuth() directly instead of DashboardGate. Full
- * name is the only required field (already collected at signup in most
- * cases) — everything else is skippable and editable later from Settings,
- * using the exact same fields/endpoint (ProfileForm in
- * (dashboard)/settings/page.tsx). */
-const COUNTRIES = [
-  "United States", "United Kingdom", "Canada", "Australia", "Germany",
-  "France", "Netherlands", "Spain", "Italy", "Portugal", "Ireland",
-  "Sweden", "Norway", "Denmark", "Finland", "Switzerland", "Austria",
-  "Belgium", "Poland", "United Arab Emirates", "Saudi Arabia", "Qatar",
-  "India", "Pakistan", "Bangladesh", "Singapore", "Malaysia", "Indonesia",
-  "Philippines", "Japan", "South Korea", "China", "Hong Kong", "Vietnam",
-  "Thailand", "New Zealand", "South Africa", "Nigeria", "Kenya", "Egypt",
-  "Turkey", "Brazil", "Mexico", "Argentina", "Chile", "Colombia",
-].sort();
+/** Runs immediately after the OAuth/passkey signup paths (password signup
+ * now collects everything up front in the registration form itself — see
+ * components/password-auth-form.tsx — so it never needs this step;
+ * DashboardGate is the single chokepoint that routes here whenever
+ * passportComplete is false). Also reachable any time afterwards as the
+ * general "complete/edit your Passport" entry point — linked from the
+ * dashboard and Settings — since editing here uses the exact same
+ * fields/endpoint as Settings' ProfileForm. Deliberately outside
+ * (dashboard) so it isn't itself gated by the check it satisfies; guards
+ * itself with useAuth() directly instead of DashboardGate. Full name is
+ * the only required field. */
 
 export default function CompletePassportPage() {
   const { auth } = useAuth();
@@ -69,11 +62,18 @@ export default function CompletePassportPage() {
 
   if (auth.status !== "authenticated" || !profile) return null;
 
+  // Two ways to land here: DashboardGate forcing a genuinely-incomplete
+  // passport (profile.passportComplete was false on load — go on to the
+  // dashboard once fixed), or an already-complete user clicking "Edit
+  // Passport" from the Passport page (go back there instead of detouring
+  // through the dashboard).
+  const isEditing = profile.passportComplete;
+
   async function finish() {
     // Any already-complete field (e.g. fullName from OAuth) stays as-is;
     // DashboardGate re-checks passportComplete on the next /auth/me call
     // triggered by the redirect below landing on a fresh mount.
-    router.replace("/dashboard");
+    router.replace(isEditing ? "/passport" : "/dashboard");
   }
 
   async function handleSkip() {
@@ -134,12 +134,12 @@ export default function CompletePassportPage() {
             NDY <span className="text-accent">HUB</span>
           </span>
           <h1 className="mt-3 text-2xl font-semibold">
-            Complete Your NDY Passport
+            {isEditing ? "Edit Your NDY Passport" : "Complete Your NDY Passport"}
           </h1>
           <p className="mt-1 text-sm text-foreground-muted">
-            This becomes your digital identity card across the ecosystem.
-            Only your name is required — everything else can be added later
-            from Settings.
+            {isEditing
+              ? "Update your digital identity card. Changes here also update your public passport page."
+              : "This becomes your digital identity card across the ecosystem. Only your name is required — everything else can be added later from Settings."}
           </p>
         </div>
 
@@ -259,20 +259,24 @@ export default function CompletePassportPage() {
           )}
 
           <div className="mt-5 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={handleSkip}
-              disabled={busy}
-              className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Skip for now
-            </button>
+            {isEditing ? (
+              <span />
+            ) : (
+              <button
+                type="button"
+                onClick={handleSkip}
+                disabled={busy}
+                className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Skip for now
+              </button>
+            )}
             <button
               type="submit"
               disabled={busy}
               className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {busy ? "Saving…" : "Save & Continue"}
+              {busy ? "Saving…" : isEditing ? "Save Changes" : "Save & Continue"}
             </button>
           </div>
         </form>

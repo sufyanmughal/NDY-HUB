@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import QRCode from "qrcode";
 import {
   Download,
+  Pencil,
   Users,
   Coins,
   Boxes,
@@ -18,7 +20,17 @@ import { useNdybitsSummary } from "@/lib/use-ndybits";
 import { useMembershipSummary } from "@/lib/use-membership";
 import { mockConnectedPlatformsCount } from "@/lib/mock-data";
 import { downloadPassportPdf } from "@/lib/passport-pdf";
-import { Avatar } from "@/components/avatar";
+import { getMe } from "@/lib/api";
+import {
+  PassportCard,
+  PASSPORT_CARD_DESIGNS,
+  type PassportCardData,
+  type PassportCardDesignId,
+} from "@/components/passport-cards";
+import { SharePanel } from "@/components/passport-cards/share-panel";
+import { NfcPanel } from "@/components/passport-cards/nfc-panel";
+
+const DESIGN_STORAGE_KEY = "ndy-passport-card-design";
 
 export default function PassportPage() {
   const { auth } = useAuth();
@@ -29,8 +41,39 @@ export default function PassportPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+  // Remembers the user's chosen card design across visits — purely a
+  // display preference, not worth a backend field/round trip for. Read
+  // once via a lazy initializer rather than an effect+setState (which
+  // would cause an extra render and trip the set-state-in-effect lint
+  // rule); typeof window guards the SSR pass, which has no localStorage.
+  const [design, setDesign] = useState<PassportCardDesignId>(() => {
+    if (typeof window === "undefined") return "passport";
+    const stored = localStorage.getItem(DESIGN_STORAGE_KEY) as PassportCardDesignId | null;
+    return stored && PASSPORT_CARD_DESIGNS.some((d) => d.id === stored) ? stored : "passport";
+  });
+  const qrSectionRef = useRef<HTMLDivElement>(null);
 
   const ndyId = auth.status === "authenticated" ? auth.ndyId : null;
+
+  function selectDesign(next: PassportCardDesignId) {
+    setDesign(next);
+    localStorage.setItem(DESIGN_STORAGE_KEY, next);
+  }
+
+  // getMe() (not usePassport(), which only returns the public-safe shape)
+  // is the only place the account's real email is available — used on the
+  // Business Card design, which is a self-view only, never rendered from
+  // the public /passport/[ndyId] page.
+  useEffect(() => {
+    if (auth.status !== "authenticated") return;
+    getMe()
+      .then((me) => setEmail(me.email))
+      .catch(() => {
+        /* email is a nice-to-have on the Business Card design — not worth
+         * surfacing an error banner over */
+      });
+  }, [auth.status]);
 
   // Encodes the real, rendered public passport page (apps/web's own
   // /passport/[ndyId] route) — this used to point at the raw JSON API
@@ -67,8 +110,26 @@ export default function PassportPage() {
   const cryndyLabel = `${(cryndy?.availableBalance ?? 0).toLocaleString()} CRYNDY`;
   const ndybitsLabel = `${(ndybits?.balance ?? 0).toLocaleString()} NDYBITS`;
   const connectedPlatformsLabel = `${mockConnectedPlatformsCount} Platforms`;
+  const publicPassportUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/passport/${auth.ndyId}`;
 
   const canDownload = Boolean(passport && qrDataUrl);
+
+  const cardData: PassportCardData = {
+    ndyId: auth.ndyId,
+    displayName,
+    profilePhotoUrl: passport?.profilePhotoUrl,
+    verified,
+    bio: passport?.bio,
+    country: passport?.country,
+    website: passport?.website,
+    linkedinUrl: passport?.socials?.linkedin,
+    instagramUrl: passport?.socials?.instagram,
+    xUrl: passport?.socials?.x,
+    businessName: passport?.business?.name,
+    businessRole: passport?.business?.role,
+    email,
+    qrDataUrl,
+  };
 
   async function handleDownload() {
     if (!passport || !qrDataUrl || auth.status !== "authenticated") return;
@@ -100,18 +161,27 @@ export default function PassportPage() {
         <div>
           <h1 className="text-2xl font-semibold">NDY Passport</h1>
           <p className="mt-1 text-sm text-foreground-muted">
-            Your identity, membership, and ownership record across the NDJOYIT
+            Your digital identity and digital business card across the NDJOYIT
             ecosystem.
           </p>
         </div>
-        <button
-          onClick={handleDownload}
-          disabled={!canDownload || downloading}
-          className="flex shrink-0 items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Download size={16} strokeWidth={2} />
-          {downloading ? "Preparing…" : "Download PDF"}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/passport/complete"
+            className="flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2"
+          >
+            <Pencil size={16} strokeWidth={2} />
+            Edit Passport
+          </Link>
+          <button
+            onClick={handleDownload}
+            disabled={!canDownload || downloading}
+            className="flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download size={16} strokeWidth={2} />
+            {downloading ? "Preparing…" : "Download PDF"}
+          </button>
+        </div>
       </div>
 
       {downloadError && (
@@ -120,53 +190,29 @@ export default function PassportPage() {
         </p>
       )}
 
-      <div className="mt-6 grid gap-6 md:grid-cols-[320px_1fr]">
-        <div className="overflow-hidden rounded-xl border border-border bg-surface p-6 text-center">
-          <div className="text-xs font-semibold uppercase tracking-widest text-foreground-muted">
-            NDY Passport
-          </div>
+      {/* Design picker — matches the mockup's promise of multiple
+          selectable card styles. Purely a display choice; every design
+          renders the same underlying data. */}
+      <div className="mt-6 flex flex-wrap gap-2">
+        {PASSPORT_CARD_DESIGNS.map((d) => (
+          <button
+            key={d.id}
+            onClick={() => selectDesign(d.id)}
+            title={d.description}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+              design === d.id
+                ? "bg-accent text-white"
+                : "border border-border text-foreground-muted hover:text-foreground"
+            }`}
+          >
+            {d.label}
+          </button>
+        ))}
+      </div>
 
-          <div className="mx-auto mt-6">
-            <Avatar
-              photoUrl={passport?.profilePhotoUrl}
-              name={displayName}
-              size={128}
-              className="mx-auto text-4xl ring-4 ring-surface-2 shadow-lg"
-            />
-          </div>
-
-          <div className="mt-4 text-lg font-semibold">{displayName}</div>
-
-          <div className="mt-3 text-[10px] uppercase tracking-widest text-foreground-muted">
-            NDY ID
-          </div>
-          <div className="font-mono text-sm">{auth.ndyId}</div>
-
-          <div className="mx-auto mt-4 flex h-[180px] w-[180px] items-center justify-center rounded-lg bg-white p-2">
-            {qrDataUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={qrDataUrl}
-                alt="NDY Passport verification QR code"
-                width={164}
-                height={164}
-              />
-            ) : (
-              <span className="text-xs text-black/40">Generating…</span>
-            )}
-          </div>
-
-          <div className="mt-4">
-            <span
-              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
-                verified
-                  ? "bg-good/15 text-good"
-                  : "bg-critical/15 text-critical"
-              }`}
-            >
-              {verified ? "Verified" : "Not Verified"}
-            </span>
-          </div>
+      <div className="mt-4 grid gap-6 md:grid-cols-[1fr_1fr]" ref={qrSectionRef}>
+        <div className={design === "passport" ? "md:row-span-2" : ""}>
+          <PassportCard design={design} data={cardData} />
         </div>
 
         <div className="overflow-hidden rounded-xl border border-border bg-surface">
@@ -189,12 +235,19 @@ export default function PassportPage() {
             />
           </dl>
         </div>
+
+        <SharePanel
+          publicUrl={publicPassportUrl}
+          onScrollToQr={() => qrSectionRef.current?.scrollIntoView({ behavior: "smooth" })}
+        />
+
+        <NfcPanel ndyId={auth.ndyId} displayName={displayName} />
       </div>
 
       <p className="mt-4 text-xs text-foreground-muted">
-        Full Passport editing and privacy controls over what connected platforms
-        can see land in a later milestone. Connected Platforms above is still
-        mock data — no platforms backend exists yet.
+        Connected Platforms above is still mock data — no platforms backend
+        exists yet. NFC cards and Apple/Google Wallet passes are on the
+        roadmap.
       </p>
     </div>
   );

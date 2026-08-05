@@ -188,14 +188,21 @@ export function loginWithPassword(
   });
 }
 
+// Same passport fields as UpdateProfileInput (see below) — registration
+// collects them up front now instead of deferring to a later step, so the
+// two shapes need to stay in sync. profilePhotoUrl is excluded: there's no
+// file to upload yet at the point the registration form submits.
+export type RegisterPassportFields = Omit<UpdateProfileInput, "fullName" | "profilePhotoUrl">;
+
 export function registerWithPassword(
   email: string,
   password: string,
   fullName: string,
+  passportFields?: RegisterPassportFields,
 ): Promise<IssuedSession> {
   return apiFetch<IssuedSession>("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ email, password, fullName }),
+    body: JSON.stringify({ email, password, fullName, ...passportFields }),
   });
 }
 

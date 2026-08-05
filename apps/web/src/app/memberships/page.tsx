@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -15,6 +16,7 @@ import {
   type MembershipSummary,
 } from "@/lib/api";
 import { HomepageFooter } from "@/components/homepage-widgets";
+import { TierGrid, TierCompareTable } from "@/components/tier-grid";
 import "@/styles/homepage.css";
 import "@/styles/membership.css";
 
@@ -25,86 +27,9 @@ import "@/styles/membership.css";
  * the same visuals with real plan/subscribe state layered in; the
  * account-management surface (cancel, billing history) lives at the
  * separate /memberships/manage URL rather than here, so this page never
- * needs to branch its whole layout on auth status. */
-
-const TIER_ORDER: MembershipTier[] = [
-  "RISE",
-  "FLOW",
-  "PULSE",
-  "VAULT",
-  "MODE",
-  "LEGACY",
-];
-
-// One accent color + icon per tier so each reads as a distinct rung on the
-// ladder rather than a repeated card shape with different numbers. Colors
-// reuse the same palette already established in homepage.css (--hp-*) so
-// this page's tiers still feel like part of the same system.
-const TIER_STYLE: Record<
-  MembershipTier,
-  { color: string; tagline: string; icon: React.ReactNode }
-> = {
-  RISE: {
-    color: "#4f7cff",
-    tagline: "Your first step into the ecosystem.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-        <path d="M4 17 10 11 14 15 20 7" />
-        <path d="M14 7h6v6" />
-      </svg>
-    ),
-  },
-  FLOW: {
-    color: "#22d3ee",
-    tagline: "Move faster with priority access.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-        <path d="M3 12c3 0 3-5 6-5s3 5 6 5 3-5 6-5" />
-        <path d="M3 17c3 0 3-5 6-5s3 5 6 5 3-5 6-5" />
-      </svg>
-    ),
-  },
-  PULSE: {
-    color: "#8b5cf6",
-    tagline: "Built for people who trade and transact often.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-        <path d="M3 12h4l2.5-7L13 19l2.5-7H21" />
-      </svg>
-    ),
-  },
-  VAULT: {
-    color: "#e0a83c",
-    tagline: "Higher limits, dedicated attention.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-        <rect x="4" y="10.5" width="16" height="9.5" rx="2" />
-        <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
-        <circle cx="12" cy="15" r="1.6" />
-      </svg>
-    ),
-  },
-  MODE: {
-    color: "#ec4899",
-    tagline: "Business-tier verification and API access.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-        <rect x="3.5" y="5" width="17" height="11.5" rx="1.6" />
-        <path d="M2 20h20M9.5 10.2l-1.7 1.7 1.7 1.7M14.5 10.2l1.7 1.7-1.7 1.7" />
-      </svg>
-    ),
-  },
-  LEGACY: {
-    color: "#d4af5a",
-    tagline: "The full NDY identity, white-glove from day one.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-        <path d="M12 2.5 19 5.5v5.5c0 5-3 8.2-7 9.5-4-1.3-7-4.5-7-9.5V5.5Z" />
-        <path d="m9 11.5 2 2 4-4.2" />
-      </svg>
-    ),
-  },
-};
+ * needs to branch its whole layout on auth status. Tier cards themselves
+ * live in components/tier-grid.tsx, shared with /memberships/manage so an
+ * existing member can browse/upgrade without leaving the dashboard shell. */
 
 const WHY_TILES: {
   color: string;
@@ -215,21 +140,12 @@ const TRUST_CHIPS: { title: string; sub: string; icon: React.ReactNode }[] = [
   },
 ];
 
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-      <path d="m5 12 5 5L20 7" />
-    </svg>
-  );
-}
-
 export default function MembershipsMarketingPage() {
   const { auth, logout } = useAuth();
   const [tiers, setTiers] = useState<Record<MembershipTier, TierInfo> | null>(
     null,
   );
   const [summary, setSummary] = useState<MembershipSummary | null>(null);
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("MONTHLY");
   const [busyTier, setBusyTier] = useState<MembershipTier | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -255,7 +171,7 @@ export default function MembershipsMarketingPage() {
     refreshSummary();
   }, [refreshSummary]);
 
-  async function handleSubscribe(tier: MembershipTier) {
+  async function handleSubscribe(tier: MembershipTier, billingCycle: BillingCycle) {
     if (auth.status !== "authenticated") {
       window.location.assign(`/login?next=/memberships`);
       return;
@@ -281,6 +197,21 @@ export default function MembershipsMarketingPage() {
   return (
     <div className="ndy-homepage" id="top">
       <div className="hp-page">
+        {/* This is the public marketing page — outside the (dashboard)
+            shell, so there's no sidebar here, which reads as "the app
+            broke" to an authenticated user who clicked in from
+            /memberships/manage's "Browse all tiers" link. This bar makes
+            the way back unmissable instead of relying on the smaller
+            "Dashboard" link buried in the header below. */}
+        {auth.status === "authenticated" && (
+          <div className="mem-back-bar">
+            <Link href="/dashboard" className="mem-back-bar-link">
+              <ArrowLeft size={14} strokeWidth={2} />
+              Back to Dashboard
+            </Link>
+          </div>
+        )}
+
         <header className="hp-topbar">
           <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
             <Logo />
@@ -389,109 +320,16 @@ export default function MembershipsMarketingPage() {
           </p>
         </div>
 
-        <div className="mem-toggle">
-          <div className="mem-toggle-track">
-            <button
-              onClick={() => setBillingCycle("MONTHLY")}
-              className={`mem-toggle-btn ${billingCycle === "MONTHLY" ? "mem-toggle-active" : ""}`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingCycle("ANNUAL")}
-              className={`mem-toggle-btn ${billingCycle === "ANNUAL" ? "mem-toggle-active" : ""}`}
-            >
-              Annual <span className="mem-toggle-save">Save ~17%</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="mem-tiers">
-          {tiers &&
-            TIER_ORDER.map((tier, i) => {
-              const info = tiers[tier];
-              const style = TIER_STYLE[tier];
-              const priceCents =
-                billingCycle === "ANNUAL"
-                  ? info.annualPriceCents
-                  : info.monthlyPriceCents;
-              const isCurrent = currentTier === tier;
-              return (
-                <motion.div
-                  key={tier}
-                  className={`mem-tier-card ${isCurrent ? "mem-tier-current" : ""}`}
-                  style={{ "--tier-c": style.color } as CSSProperties}
-                  initial={{ opacity: 0, y: 24 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.45, delay: i * 0.06 }}
-                  whileHover={{ y: -8, scale: 1.015 }}
-                >
-                  {isCurrent && <span className="mem-tier-badge">Current plan</span>}
-                  <div className="mem-tier-icon">{style.icon}</div>
-                  <h3>{info.label}</h3>
-                  <p className="mem-tier-tagline">{style.tagline}</p>
-                  <div className="mem-tier-price">
-                    <span className="mem-price-amount">
-                      ${(priceCents / 100).toFixed(0)}
-                    </span>
-                    <span className="mem-price-period">
-                      /{billingCycle === "ANNUAL" ? "yr" : "mo"}
-                    </span>
-                  </div>
-                  <div className="mem-tier-annual-note">
-                    {billingCycle === "ANNUAL" ? "Billed annually" : " "}
-                  </div>
-                  <ul className="mem-tier-benefits">
-                    {info.benefits.map((b) => (
-                      <li key={b}>
-                        <span className="mem-tier-check">
-                          <CheckIcon />
-                        </span>
-                        {b}
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    onClick={() => handleSubscribe(tier)}
-                    disabled={isCurrent || busyTier === tier}
-                    className={`mem-tier-cta ${tier === "LEGACY" || tier === "MODE" ? "mem-tier-cta-solid" : ""}`}
-                  >
-                    {isCurrent
-                      ? "Current plan"
-                      : busyTier === tier
-                        ? "…"
-                        : auth.status === "authenticated"
-                          ? "Subscribe"
-                          : "Sign up to join"}
-                  </button>
-                </motion.div>
-              );
-            })}
-        </div>
+        <TierGrid
+          tiers={tiers}
+          currentTier={currentTier}
+          isAuthenticated={auth.status === "authenticated"}
+          busyTier={busyTier}
+          onSubscribe={handleSubscribe}
+        />
 
         {/* ---------- everything included, side by side ---------- */}
-        {tiers && (
-          <div className="mem-compare">
-            {TIER_ORDER.map((tier) => {
-              const info = tiers[tier];
-              const style = TIER_STYLE[tier];
-              return (
-                <div
-                  key={tier}
-                  className="mem-compare-col"
-                  style={{ "--tier-c": style.color } as CSSProperties}
-                >
-                  <h4>{info.label}</h4>
-                  <ul>
-                    {info.benefits.map((b) => (
-                      <li key={b}>{b}</li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <TierCompareTable tiers={tiers} />
 
         {/* ---------- trust & security ---------- */}
         <div className="mem-section-title">

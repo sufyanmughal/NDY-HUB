@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { loginWithPasskey, browserSupportsWebAuthn } from "@/lib/passkey";
 import { useAuth } from "@/lib/auth-context";
+import { COUNTRIES } from "@/lib/countries";
 import { TwoFactorChallengeForm } from "./two-factor-challenge-form";
 
 /**
@@ -23,6 +24,17 @@ export function PasswordAuthForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  // Passport Card fields — collected here, at account creation, instead of
+  // a separate step afterwards. All optional except full name.
+  const [showPassportFields, setShowPassportFields] = useState(false);
+  const [bio, setBio] = useState("");
+  const [country, setCountry] = useState("");
+  const [website, setWebsite] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [xUrl, setXUrl] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [businessRole, setBusinessRole] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
@@ -67,7 +79,16 @@ export function PasswordAuthForm() {
       const result =
         mode === "signin"
           ? await loginWithPassword(email, password)
-          : await registerWithPassword(email, password, fullName);
+          : await registerWithPassword(email, password, fullName, {
+              bio: bio.trim() || undefined,
+              country: country || undefined,
+              website: website.trim() || undefined,
+              linkedinUrl: linkedinUrl.trim() || undefined,
+              instagramUrl: instagramUrl.trim() || undefined,
+              xUrl: xUrl.trim() || undefined,
+              businessName: businessName.trim() || undefined,
+              businessRole: businessRole.trim() || undefined,
+            });
       if ("requires2fa" in result) {
         setChallengeToken(result.challengeToken);
         setBusy(false);
@@ -165,6 +186,131 @@ export function PasswordAuthForm() {
             >
               Forgot password?
             </Link>
+          </div>
+        )}
+
+        {mode === "register" && (
+          <div className="rounded-md border border-border">
+            <button
+              type="button"
+              onClick={() => setShowPassportFields((v) => !v)}
+              className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-foreground-muted hover:text-foreground"
+            >
+              <span>
+                Add your NDY Passport details{" "}
+                <span className="font-normal text-foreground-muted/70">
+                  (optional — can add later)
+                </span>
+              </span>
+              <span>{showPassportFields ? "−" : "+"}</span>
+            </button>
+
+            {showPassportFields && (
+              <div className="space-y-3 border-t border-border p-3">
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                    Bio
+                  </label>
+                  <textarea
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    maxLength={280}
+                    rows={2}
+                    placeholder="A short line about who you are."
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                    Country
+                  </label>
+                  <select
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Prefer not to say</option>
+                    {COUNTRIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                    Website
+                  </label>
+                  <input
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="https://"
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                      LinkedIn
+                    </label>
+                    <input
+                      value={linkedinUrl}
+                      onChange={(e) => setLinkedinUrl(e.target.value)}
+                      placeholder="https://linkedin.com/in/…"
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                      Instagram
+                    </label>
+                    <input
+                      value={instagramUrl}
+                      onChange={(e) => setInstagramUrl(e.target.value)}
+                      placeholder="https://instagram.com/…"
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                      X / Twitter
+                    </label>
+                    <input
+                      value={xUrl}
+                      onChange={(e) => setXUrl(e.target.value)}
+                      placeholder="https://x.com/…"
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                      Business name
+                    </label>
+                    <input
+                      value={businessName}
+                      onChange={(e) => setBusinessName(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                      Role / Title
+                    </label>
+                    <input
+                      value={businessRole}
+                      onChange={(e) => setBusinessRole(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
