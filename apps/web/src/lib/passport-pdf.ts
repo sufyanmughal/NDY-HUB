@@ -168,7 +168,17 @@ function measurePassportCardHeight(data: PassportPdfData): number {
 }
 
 function buildPassportCardPdf(data: PassportPdfData): jsPDF {
-  const pageHeight = measurePassportCardHeight(data);
+  // jsPDF's actual (undocumented-by-type) behavior: format: [w, h] with
+  // orientation "portrait" (the default) swaps w/h whenever w > h, no
+  // matter what — confirmed by reading jsPDF's own getPageSize source,
+  // after a sparsely-filled test account's measured height landed near
+  // PAGE_WIDTH and the QR/NFC glyph came out clipped off the right edge
+  // of a downloaded PDF. The Math.max floor is the actual fix — it
+  // guarantees pageHeight > PAGE_WIDTH always, so the swap condition
+  // never triggers, regardless of how little a given account has filled
+  // in (this design is meant to always read taller than wide, like a
+  // phone-shaped card, never landscape).
+  const pageHeight = Math.max(measurePassportCardHeight(data), PAGE_WIDTH + 40);
   const doc = new jsPDF({ unit: "pt", format: [PAGE_WIDTH, pageHeight] });
 
   doc.setFillColor(PASSPORT_COLORS.cardBg);
