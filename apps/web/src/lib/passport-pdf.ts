@@ -16,20 +16,20 @@ const COLORS = {
   critical: "#f0605a",
 };
 
-// The Passport design's own palette — matches the user's reference
-// component (C:\Users\n8n\projects\ndy-passport-card) exactly, which uses
-// indigo/violet rather than this app's blue/purple COLORS.accent/accent2.
-// Kept separate rather than repointing COLORS since the Business Card and
-// Minimal designs below still use the app-wide palette.
+// The Passport design's own palette — matches
+// components/passport-cards/vertical-card.tsx exactly (the NDJOYIT brand
+// gradient: magenta/violet/cyan against a near-black card), not this
+// app's blue/purple COLORS.accent/accent2. Kept separate since the
+// Business Card and Minimal designs below still use the app-wide palette.
 const PASSPORT_COLORS = {
-  bgTop: "#171335",
-  bgBottom: "#050509",
-  indigo: "#818cf8",
-  violet: "#a78bfa",
+  cardBg: "#010a19",
+  magenta: "#e600f0",
+  violet: "#a855f7",
   sky: "#38bdf8",
+  indigo: "#818cf8", // footer badge gradient's second stop, matches the on-screen card
   slateMuted: "#94a3b8",
   slateBody: "#f1f5f9",
-  slateBio: "#94a3b8",
+  bio: "#f0abfc",
 };
 
 /** Which on-screen card design (components/passport-cards/) the PDF
@@ -75,6 +75,15 @@ export interface PassportPdfData {
   email?: string | null;
   /** Same self-view-only treatment as email. */
   phone?: string | null;
+  /** Data: URL versions of public/logo-mark.png and public/verified-badge.png
+   * — the actual brand assets, not hand-drawn approximations. Populated by
+   * downloadPassportPdf below (fetched once, same static files the
+   * on-screen card's <Image> tags point at) rather than required from
+   * every caller; buildPassportPdf/buildPassportCardPdf degrade to a text
+   * wordmark / no badge if either fetch failed, same "don't fail the
+   * whole download over a missing extra" precedent as photoDataUrl. */
+  logoDataUrl?: string | null;
+  verifiedBadgeDataUrl?: string | null;
 }
 
 /**
@@ -96,69 +105,95 @@ export function buildPassportPdf(
 }
 
 // ============================================================
-// "Passport" design — ported from the user's own reference component
-// (C:\Users\n8n\projects\ndy-passport-card, app/components/PassportCard.tsx):
-// "NDY PASSPORT / Digital Business Card" header with an NFC glyph,
-// photo+name+title+bio in a left column, icon-led contact rows (NDY ID/
-// Location/Email/Website/Phone) beside it, and a footer row pairing a
-// "Verified Member / <tier>" badge with a QR (NDY badge overlaid at its
-// center, matching the reference). Matches
-// components/passport-cards/vertical-card.tsx exactly in structure/order;
-// PASSPORT_COLORS mirrors that component's indigo/violet palette.
+// "Passport" design — matches components/passport-cards/vertical-card.tsx
+// exactly (which itself matches the user's passportcard.jpeg reference):
+// full "ND / NDJOYIT / HUB" logo lockup + "PASSPORT / DIGITAL BUSINESS
+// CARD" heading + NFC glyph in the header; photo (with the real
+// verified-badge.png overlay, not a hand-drawn checkmark) + name/title/
+// bio in a left column, a vertical divider, then icon-led contact rows
+// (NDY ID/Location/Email/Website/Phone) in a right column; a footer row
+// pairing a "Verified Member / <tier>" badge with a QR + "Scan to
+// connect" caption. PASSPORT_COLORS mirrors that component's NDJOYIT
+// magenta/violet/cyan palette.
 // ============================================================
 
 const PAGE_WIDTH = 460;
-const PAGE_HEIGHT = 640;
-const MARGIN = 30;
+const PAGE_HEIGHT = 660;
+const MARGIN = 28;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
 function buildPassportCardPdf(data: PassportPdfData): jsPDF {
   const doc = new jsPDF({ unit: "pt", format: [PAGE_WIDTH, PAGE_HEIGHT] });
 
-  doc.setFillColor(PASSPORT_COLORS.bgBottom);
-  doc.roundedRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 22, 22, "F");
-  // radial-gradient stand-in: jsPDF has no true radial fill, so a soft
-  // top-right wash approximates the reference's 120%/140% radial glow.
-  doc.setGState(new GState({ opacity: 0.5 }));
-  doc.setFillColor(PASSPORT_COLORS.bgTop);
-  doc.roundedRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT * 0.55, 22, 22, "F");
-  doc.setGState(new GState({ opacity: 1 }));
+  doc.setFillColor(PASSPORT_COLORS.cardBg);
+  doc.roundedRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 20, 20, "F");
 
-  // Header: "NDY PASSPORT" left, NFC glyph right
-  let y = MARGIN + 22;
+  // Header: logo lockup (left) + "PASSPORT / DIGITAL BUSINESS CARD" (center) + NFC glyph (right)
+  const headerTop = MARGIN;
+  const logoHeight = 54;
+  if (data.logoDataUrl) {
+    // public/logo-mark.png is 547x457 — preserve that aspect ratio.
+    const logoWidth = logoHeight * (547 / 457);
+    doc.addImage(data.logoDataUrl, "PNG", MARGIN, headerTop, logoWidth, logoHeight);
+  } else {
+    // Falls back to a plain text wordmark if the asset fetch failed —
+    // matches the on-screen card's own graceful-degradation precedent
+    // for a missing photo, just for the logo instead.
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.setTextColor("#ffffff");
+    doc.text("NDJOYIT HUB", MARGIN, headerTop + logoHeight / 2);
+  }
+
+  const headingX = MARGIN + 130;
+  let y = headerTop + 16;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(19);
-  doc.setTextColor(PASSPORT_COLORS.indigo);
-  doc.text("NDY ", MARGIN, y);
-  const ndyWidth = doc.getTextWidth("NDY ");
+  doc.setFontSize(15);
   doc.setTextColor("#ffffff");
-  doc.text("PASSPORT", MARGIN + ndyWidth, y);
-
-  y += 15;
-  doc.setFont("helvetica", "normal");
+  doc.text("PASSPORT", headingX, y);
+  y += 12;
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
-  doc.setTextColor(PASSPORT_COLORS.slateMuted);
-  doc.text("DIGITAL BUSINESS CARD", MARGIN, y);
+  doc.setTextColor(PASSPORT_COLORS.violet);
+  doc.text("DIGITAL BUSINESS", headingX, y);
+  const dbWidth = doc.getTextWidth("DIGITAL BUSINESS ");
+  doc.setTextColor(PASSPORT_COLORS.sky);
+  doc.text("CARD", headingX + dbWidth, y);
 
-  drawNfcGlyph(doc, PAGE_WIDTH - MARGIN - 10, MARGIN + 8);
+  drawNfcGlyph(doc, PAGE_WIDTH - MARGIN - 10, headerTop + 10);
 
-  // Body: photo/name/bio column (left) + icon rows column (right)
-  const bodyTop = y + 34;
-  const avatarR = 30;
+  // Body: photo/name/bio column (left) | vertical divider | icon rows column (right)
+  const bodyTop = headerTop + logoHeight + 30;
+  const avatarR = 28;
   const avatarCx = MARGIN + avatarR;
   const avatarCy = bodyTop + avatarR;
   drawAvatar(doc, data, avatarCx, avatarCy, avatarR, 20);
   if (data.verified) {
-    doc.setFillColor(PASSPORT_COLORS.indigo);
-    doc.circle(avatarCx + avatarR - 3, avatarCy + avatarR - 3, 8, "F");
-    doc.setTextColor("#ffffff");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    centerText(doc, "\u2713", avatarCx + avatarR - 3, avatarCy + avatarR);
+    const badgeR = 10;
+    const badgeCx = avatarCx + avatarR - 2;
+    const badgeCy = avatarCy + avatarR - 2;
+    if (data.verifiedBadgeDataUrl) {
+      doc.addImage(
+        data.verifiedBadgeDataUrl,
+        "PNG",
+        badgeCx - badgeR,
+        badgeCy - badgeR,
+        badgeR * 2,
+        badgeR * 2,
+      );
+    } else {
+      doc.setFillColor("#2b8fff");
+      doc.circle(badgeCx, badgeCy, badgeR, "F");
+      doc.setTextColor("#ffffff");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      centerText(doc, "✓", badgeCx, badgeCy + 3);
+    }
   }
 
-  const leftColWidth = CONTENT_WIDTH * 0.44;
-  let leftY = avatarCy + avatarR + 22;
+  const dividerX = MARGIN + CONTENT_WIDTH * 0.46;
+  const leftColWidth = dividerX - MARGIN - 14;
+  let leftY = avatarCy + avatarR + 20;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
   doc.setTextColor("#ffffff");
@@ -169,22 +204,22 @@ function buildPassportCardPdf(data: PassportPdfData): jsPDF {
     leftY += 15;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9.5);
-    doc.setTextColor(PASSPORT_COLORS.violet);
+    doc.setTextColor(PASSPORT_COLORS.slateMuted);
     doc.text(truncateToWidth(doc, titleLine, leftColWidth), MARGIN, leftY);
   }
   if (data.bio) {
     leftY += 16;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
-    doc.setTextColor(PASSPORT_COLORS.slateBio);
+    doc.setTextColor(PASSPORT_COLORS.bio);
     const bioLines = doc.splitTextToSize(data.bio, leftColWidth) as string[];
     doc.text(bioLines.slice(0, 3), MARGIN, leftY);
     leftY += bioLines.slice(0, 3).length * 11;
   }
 
   // Right column: icon-led label/value rows
-  const rightColX = MARGIN + leftColWidth + 20;
-  const rightColWidth = CONTENT_WIDTH - leftColWidth - 20;
+  const rightColX = dividerX + 14;
+  const rightColWidth = PAGE_WIDTH - MARGIN - rightColX;
   const infoRows: ["id" | "location" | "email" | "website" | "phone", string, string][] = [
     ["id", "NDY ID", data.ndyId],
     ...(data.country ? [["location", "Location", data.country] as ["location", string, string]] : []),
@@ -196,7 +231,7 @@ function buildPassportCardPdf(data: PassportPdfData): jsPDF {
   ];
   let rowY = bodyTop + 4;
   for (const [kind, label, value] of infoRows) {
-    drawInfoIcon(doc, kind, rightColX + 8, rowY + 6, PASSPORT_COLORS.indigo);
+    drawInfoIcon(doc, kind, rightColX + 8, rowY + 6, PASSPORT_COLORS.violet);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7);
@@ -211,20 +246,26 @@ function buildPassportCardPdf(data: PassportPdfData): jsPDF {
     rowY += 30;
   }
 
-  const bodyBottom = Math.max(leftY, rowY) + 18;
+  // Vertical divider between the two body columns
+  const dividerBottom = Math.max(leftY, rowY - 12);
+  doc.setDrawColor("#ffffff");
+  doc.setGState(new GState({ opacity: 0.1 }));
+  doc.setLineWidth(1);
+  doc.line(dividerX, bodyTop, dividerX, dividerBottom);
+  doc.setGState(new GState({ opacity: 1 }));
 
-  // Footer: badge (left) + QR with center NDY badge (right)
+  const bodyBottom = dividerBottom + 18;
+
+  // Footer: badge (left) + QR with center ND badge (right)
   const qrSize = 78;
   const qrX = PAGE_WIDTH - MARGIN - qrSize;
   const footerTop = bodyBottom;
   const badgeWidth = qrX - MARGIN - 16;
 
-  doc.setDrawColor("#ffffff");
-  doc.setGState(new GState({ opacity: 0.1 }));
+  doc.setDrawColor(PASSPORT_COLORS.violet);
+  doc.setGState(new GState({ opacity: 0.35 }));
+  doc.setLineWidth(1);
   doc.roundedRect(MARGIN, footerTop, badgeWidth, qrSize, 14, 14, "D");
-  doc.setFillColor("#ffffff");
-  doc.setGState(new GState({ opacity: 0.03 }));
-  doc.roundedRect(MARGIN, footerTop, badgeWidth, qrSize, 14, 14, "F");
   doc.setGState(new GState({ opacity: 1 }));
 
   const badgeLabel = data.verified ? "VERIFIED MEMBER" : "NOT VERIFIED";
@@ -235,23 +276,25 @@ function buildPassportCardPdf(data: PassportPdfData): jsPDF {
   doc.text(badgeLabel, MARGIN + 14, footerTop + 24);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
-  doc.setTextColor(PASSPORT_COLORS.violet);
+  doc.setTextColor(PASSPORT_COLORS.indigo);
   doc.text(truncateToWidth(doc, badgeValue, badgeWidth - 28), MARGIN + 14, footerTop + 44);
 
   doc.setFillColor("#ffffff");
   doc.roundedRect(qrX - 6, footerTop, qrSize + 12, qrSize + 12, 10, 10, "F");
   doc.addImage(data.qrDataUrl, "PNG", qrX, footerTop + 6, qrSize, qrSize);
-  // center "NDY" badge overlay, matching the reference
-  const badgeR = 12;
-  doc.setFillColor("#ffffff");
-  doc.roundedRect(qrX + qrSize / 2 - badgeR, footerTop + 6 + qrSize / 2 - badgeR, badgeR * 2, badgeR * 2, 4, 4, "F");
-  doc.setDrawColor(PASSPORT_COLORS.indigo);
+  // center "ND" badge overlay, matching the on-screen card
+  const centerBadgeR = 13;
+  const centerBadgeCx = qrX + qrSize / 2;
+  const centerBadgeCy = footerTop + 6 + qrSize / 2;
+  doc.setFillColor("#0b1220");
+  doc.circle(centerBadgeCx, centerBadgeCy, centerBadgeR, "F");
+  doc.setDrawColor("#ffffff");
   doc.setLineWidth(1.5);
-  doc.roundedRect(qrX + qrSize / 2 - badgeR, footerTop + 6 + qrSize / 2 - badgeR, badgeR * 2, badgeR * 2, 4, 4, "D");
-  doc.setFont("helvetica", "black");
-  doc.setFontSize(7.5);
-  doc.setTextColor(PASSPORT_COLORS.indigo);
-  centerText(doc, "NDY", qrX + qrSize / 2, footerTop + 6 + qrSize / 2 + 2.5);
+  doc.circle(centerBadgeCx, centerBadgeCy, centerBadgeR, "D");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(PASSPORT_COLORS.violet);
+  centerText(doc, "ND", centerBadgeCx, centerBadgeCy + 2.8);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
@@ -575,17 +618,24 @@ function drawFooter(doc: jsPDF, x: number, y: number): void {
  * the PDF, and triggers a file download. A failed photo fetch — network
  * error, no photo set, CORS misconfigured in some future environment —
  * degrades to the initials avatar rather than failing the whole download;
- * the PDF is still worth having without a photo.
+ * the PDF is still worth having without a photo. Also fetches the two
+ * static brand assets (logo-mark.png, verified-badge.png) as data URLs —
+ * only actually used by the "passport" design, but cheap/harmless to fetch
+ * regardless of which design was requested, and each degrades to a plain
+ * fallback (text wordmark / hand-drawn checkmark) on its own if it fails,
+ * same as the photo.
  */
 export async function downloadPassportPdf(
   data: Omit<PassportPdfData, "photoDataUrl"> & { photoUrl?: string | null },
   design: PassportPdfDesign = "passport",
 ): Promise<void> {
   const { photoUrl, ...rest } = data;
-  const photoDataUrl = photoUrl
-    ? await loadSquarePhotoDataUrl(photoUrl, 256).catch(() => null)
-    : null;
-  const doc = buildPassportPdf({ ...rest, photoDataUrl }, design);
+  const [photoDataUrl, logoDataUrl, verifiedBadgeDataUrl] = await Promise.all([
+    photoUrl ? loadSquarePhotoDataUrl(photoUrl, 256).catch(() => null) : Promise.resolve(null),
+    loadImageDataUrl("/logo-mark.png").catch(() => null),
+    loadImageDataUrl("/verified-badge.png").catch(() => null),
+  ]);
+  const doc = buildPassportPdf({ ...rest, photoDataUrl, logoDataUrl, verifiedBadgeDataUrl }, design);
   doc.save(`ndy-passport-${design}-${data.ndyId}.pdf`);
 }
 
@@ -623,6 +673,22 @@ async function loadSquarePhotoDataUrl(
     drawHeight,
   );
   return canvas.toDataURL("image/png");
+}
+
+/** Fetches a same-origin static asset (public/…) and returns it as a
+ * data: URL — jsPDF's addImage happily takes a data: URL but not a plain
+ * path, and unlike the user's photo this never needs cropping/resizing,
+ * just the raw bytes re-encoded. */
+async function loadImageDataUrl(path: string): Promise<string> {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`Failed to fetch ${path}: ${res.status}`);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }
 
 function centerText(
