@@ -118,15 +118,61 @@ export function buildPassportPdf(
 // ============================================================
 
 const PAGE_WIDTH = 460;
-const PAGE_HEIGHT = 660;
 const MARGIN = 28;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
+/**
+ * The on-screen card (`max-w-[420px]`) hugs its content — no matter how
+ * much or little a given account has filled in, there's never leftover
+ * whitespace at the bottom. A fixed PAGE_HEIGHT can't do that (a bare
+ * NDY-ID-only row and a full bio+5-contact-rows account need very
+ * different heights), so this replays the exact same top-to-bottom
+ * layout arithmetic buildPassportCardPdf uses — column count, row count,
+ * bio line-wrap count via a throwaway jsPDF instance (measuring text
+ * doesn't require knowing the final page size) — to size the real page
+ * before any drawing happens, rather than guessing a height that's
+ * either too tall (empty space) or too short (clipped content).
+ */
+function measurePassportCardHeight(data: PassportPdfData): number {
+  const probe = new jsPDF({ unit: "pt", format: [PAGE_WIDTH, 1000] });
+  const headerTop = MARGIN;
+  const logoHeight = 54;
+  const bodyTop = headerTop + logoHeight + 30;
+  const avatarR = 28;
+  const dividerX = MARGIN + CONTENT_WIDTH * 0.46;
+  const leftColWidth = dividerX - MARGIN - 14;
+
+  let leftY = bodyTop + avatarR * 2 + 20;
+  const titleLine = [data.businessRole, data.businessName].filter(Boolean).join(" | ");
+  if (titleLine) leftY += 15;
+  if (data.bio) {
+    probe.setFont("helvetica", "normal");
+    probe.setFontSize(8.5);
+    const bioLines = probe.splitTextToSize(data.bio, leftColWidth) as string[];
+    leftY += 16 + bioLines.slice(0, 3).length * 11;
+  }
+
+  const rowCount =
+    1 + // NDY ID always present
+    (data.country ? 1 : 0) +
+    (data.email ? 1 : 0) +
+    (data.website ? 1 : 0) +
+    (data.phone ? 1 : 0);
+  const rowY = bodyTop + 4 + rowCount * 30;
+
+  const dividerBottom = Math.max(leftY, rowY - 12);
+  const bodyBottom = dividerBottom + 18;
+  const qrSize = 78;
+  const footerBottom = bodyBottom + qrSize + 12 + 26; // footer block + "Scan to connect" caption
+  return footerBottom + 34; // breathing room + the "Generated …" footer line
+}
+
 function buildPassportCardPdf(data: PassportPdfData): jsPDF {
-  const doc = new jsPDF({ unit: "pt", format: [PAGE_WIDTH, PAGE_HEIGHT] });
+  const pageHeight = measurePassportCardHeight(data);
+  const doc = new jsPDF({ unit: "pt", format: [PAGE_WIDTH, pageHeight] });
 
   doc.setFillColor(PASSPORT_COLORS.cardBg);
-  doc.roundedRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 20, 20, "F");
+  doc.roundedRect(0, 0, PAGE_WIDTH, pageHeight, 20, 20, "F");
 
   // Header: logo lockup (left) + "PASSPORT / DIGITAL BUSINESS CARD" (center) + NFC glyph (right)
   const headerTop = MARGIN;
@@ -301,7 +347,7 @@ function buildPassportCardPdf(data: PassportPdfData): jsPDF {
   doc.setTextColor(PASSPORT_COLORS.slateMuted);
   centerText(doc, "Scan to connect", qrX + qrSize / 2, footerTop + qrSize + 26);
 
-  drawFooter(doc, MARGIN, PAGE_HEIGHT - 20);
+  drawFooter(doc, MARGIN, pageHeight - 20);
 
   return doc;
 }
@@ -592,13 +638,34 @@ function drawInfoIcon(
  * reference component's `<Wifi className="rotate-90" />` in the top-right
  * corner of the header. cx/cy is the glyph's own anchor point (top-right
  * of its bounding box, same as where the reference visually sits). */
+/** Three concentric quarter-arcs opening toward the top-right, matching
+ * the on-screen card's rotated Lucide `Wifi` icon — full concentric
+ * circles (the first attempt at this) read as a bullseye/target icon
+ * instead, since a signal-wave glyph is specifically a partial arc, not
+ * a ring. jsPDF (this installed version) has no arc/beginPath primitive
+ * despite what its .d.ts advertises — approximated with a short polyline
+ * via moveTo+lines, which at this size is visually indistinguishable
+ * from a true curve. cx/cy is the glyph's pivot point (bottom-left). */
 function drawNfcGlyph(doc: jsPDF, cx: number, cy: number): void {
   doc.setDrawColor("#ffffff");
-  doc.setGState(new GState({ opacity: 0.9 }));
-  doc.setLineWidth(1.1);
-  doc.circle(cx, cy, 3, "D");
-  doc.circle(cx, cy, 6.5, "D");
-  doc.circle(cx, cy, 10, "D");
+  doc.setGState(new GState({ opacity: 0.85 }));
+  doc.setLineWidth(1.3);
+  const STEPS = 8;
+  for (const r of [4, 7.5, 11]) {
+    const points: [number, number][] = [];
+    for (let i = 0; i <= STEPS; i++) {
+      // sweep from -135° to -45° (the upper-right quarter), matching a
+      // Wifi glyph's fan opening toward the top-right.
+      const angle = ((-135 + (i / STEPS) * 90) * Math.PI) / 180;
+      points.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
+    }
+    const segments = points
+      .slice(1)
+      .map((p, i) => [p[0] - points[i][0], p[1] - points[i][1]] as [number, number]);
+    doc.lines(segments, points[0][0], points[0][1], [1, 1], "S", false);
+  }
+  doc.setFillColor("#ffffff");
+  doc.circle(cx - 7.8, cy + 7.8, 1.2, "F");
   doc.setGState(new GState({ opacity: 1 }));
 }
 
