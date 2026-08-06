@@ -26,6 +26,14 @@ COPY --from=builder /repo/apps/api/dist ./dist
 COPY --from=builder /repo/apps/api/prisma ./prisma
 COPY --from=builder /repo/apps/api/package.json ./package.json
 COPY --from=builder /repo/node_modules ./node_modules
+# npm workspaces nests a dependency under apps/api/node_modules instead of
+# hoisting it to root whenever a conflicting version exists elsewhere in
+# the tree (e.g. apps/web wants a different nanoid range) — root
+# node_modules alone isn't guaranteed to have everything apps/api needs,
+# so merge the nested one on top (COPY can't merge directories itself,
+# hence landing it at a temp path first).
+COPY --from=builder /repo/apps/api/node_modules /tmp/api_node_modules
+RUN cp -rn /tmp/api_node_modules/. ./node_modules/ && rm -rf /tmp/api_node_modules
 
 RUN mkdir -p /app/uploads
 EXPOSE 3000
