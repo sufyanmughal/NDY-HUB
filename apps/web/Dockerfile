@@ -6,6 +6,11 @@ WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
+# npm workspaces runs every workspace's postinstall on a root `npm ci`,
+# including apps/api's `prisma generate` — needs its schema present even
+# though this image only builds apps/web. See apps/api/Dockerfile's own
+# copy of this comment for the matching fix there.
+COPY apps/api/prisma apps/api/prisma
 RUN npm ci
 
 COPY apps/web apps/web
