@@ -1,0 +1,6 @@
+# Shell scripts must stay LF — they run on Linux (droplet/CI), and this
+# repo is developed on Windows where core.autocrlf=true otherwise
+# checks them out as CRLF, which breaks `#!/usr/bin/env bash` and
+# `set -o pipefail` at runtime (invalid option name).
+*.sh text eol=lf
+Dockerfile text eol=lf
