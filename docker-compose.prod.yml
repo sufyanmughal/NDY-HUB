@@ -35,6 +35,10 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://ndyhub:${POSTGRES_PASSWORD}@postgres:5432/ndyhub
+      # schema.prisma's datasource requires directUrl (a Neon-era split
+      # between pooled/direct connections) — a self-hosted single Postgres
+      # container has no such split, so both point at the same instance.
+      DIRECT_URL: postgresql://ndyhub:${POSTGRES_PASSWORD}@postgres:5432/ndyhub
       PORT: 3000
       WEB_APP_URL: ${WEB_APP_URL}
       API_URL: ${API_URL}
