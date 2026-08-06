@@ -7,6 +7,11 @@ WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
+# apps/api's postinstall runs `prisma generate`, which needs the schema
+# file present — copied ahead of `npm ci` (not just apps/api's full
+# source) so this layer still only invalidates on schema/package changes,
+# not on every source edit.
+COPY apps/api/prisma apps/api/prisma
 RUN npm ci
 
 COPY apps/api apps/api

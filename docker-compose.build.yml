@@ -1,0 +1,24 @@
+# Build-on-the-box variant of docker-compose.prod.yml — used when there's
+# no CI pipeline pushing images to ghcr.io yet (no .github/workflows/deploy.yml
+# exists in this repo currently). Same services/env, just `build:` instead
+# of `image: ${IMAGE_*}` so the droplet compiles the Dockerfiles itself.
+#
+# Usage on the server (repo root):
+#   docker compose -f docker-compose.prod.yml -f docker-compose.build.yml --env-file .env.prod build
+#   docker compose -f docker-compose.prod.yml -f docker-compose.build.yml --env-file .env.prod up -d
+#   docker compose -f docker-compose.prod.yml -f docker-compose.build.yml --env-file .env.prod exec -T api npx prisma migrate deploy
+
+services:
+  api:
+    image: !reset null
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+
+  web:
+    image: !reset null
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${API_URL}
