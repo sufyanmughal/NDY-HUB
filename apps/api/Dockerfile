@@ -31,9 +31,18 @@ COPY --from=builder /repo/node_modules ./node_modules
 # the tree (e.g. apps/web wants a different nanoid range) — root
 # node_modules alone isn't guaranteed to have everything apps/api needs,
 # so merge the nested one on top (COPY can't merge directories itself,
-# hence landing it at a temp path first).
+# hence landing it at a temp path first). Alpine's `cp` is busybox, not
+# GNU coreutils: `cp -rn src/. dest/` silently skips the ENTIRE copy the
+# moment any single top-level entry already exists at the destination —
+# it doesn't merge per-file like GNU cp does — so this loops one
+# top-level entry at a time instead, letting -n's no-clobber behavior
+# apply per-package (new packages get added, already-hoisted ones are
+# correctly left alone).
 COPY --from=builder /repo/apps/api/node_modules /tmp/api_node_modules
-RUN cp -rn /tmp/api_node_modules/. ./node_modules/ && rm -rf /tmp/api_node_modules
+RUN for item in /tmp/api_node_modules/*/ /tmp/api_node_modules/.[!.]*/; do \
+      [ -e "$item" ] && cp -rn "$item" ./node_modules/ 2>/dev/null; \
+    done; \
+    rm -rf /tmp/api_node_modules
 
 RUN mkdir -p /app/uploads
 EXPOSE 3000
