@@ -151,6 +151,11 @@ export interface PublicPassport {
   fullName: string | null;
   profilePhotoUrl: string | null;
   verificationLevel: string;
+  // Founder/Super Admin accounts read as verified regardless of their own
+  // (self-serve) verificationLevel — computed server-side by
+  // isPassportVerified so this never has to duplicate that role logic
+  // (or the role itself, which isn't exposed publicly) here.
+  isVerified: boolean;
   ndyappsConnected: boolean;
   memberSince: string;
   // Each null either because the owner never set it, or chose to keep it
@@ -427,6 +432,9 @@ export interface MeProfile {
   // Only fullName gates the dashboard — see DashboardGate. Every other
   // Passport Card field is optional and editable any time from Settings.
   passportComplete: boolean;
+  // Founder/Super Admin accounts read as verified regardless of their own
+  // verificationLevel — see PublicPassport.isVerified's doc comment.
+  isVerified: boolean;
 }
 
 export function getMe(): Promise<MeProfile> {

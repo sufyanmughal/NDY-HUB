@@ -84,7 +84,9 @@ export default function PublicPassportPage({
     setTimeout(() => setShareCopied(false), 2000);
   }
 
-  const verified = passport ? passport.verificationLevel !== "LEVEL_0" : false;
+  // Server-computed (see api.ts's PublicPassport.isVerified doc comment)
+  // — Founder/Super Admin accounts always read as verified here too.
+  const verified = passport?.isVerified ?? false;
 
   const cardData: PassportCardData | null = passport
     ? {

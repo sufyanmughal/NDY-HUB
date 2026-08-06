@@ -8,7 +8,7 @@ import type { PassportCardData } from "./types";
  * left, contact details below, QR on the right. */
 export function BusinessPassportCard({ data }: { data: PassportCardData }) {
   const hasContactRow =
-    data.country || data.website || data.email;
+    data.country || data.website || data.email || data.phone;
   const hasSocials = data.linkedinUrl || data.instagramUrl || data.xUrl;
 
   return (
@@ -72,6 +72,7 @@ export function BusinessPassportCard({ data }: { data: PassportCardData }) {
               </a>
             )}
             {data.email && <div>{data.email}</div>}
+            {data.phone && <div>{data.phone}</div>}
           </div>
 
           {hasSocials && (

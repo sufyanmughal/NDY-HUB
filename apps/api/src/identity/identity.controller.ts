@@ -1,5 +1,6 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { IdentityService } from './identity.service';
+import { isPassportVerified } from '../common/passport-verification.util';
 
 // Public-safe view of a Passport — never leaks email, password hash, or
 // anything the owner hasn't chosen to expose. Full self-view lives behind
@@ -21,6 +22,12 @@ export class IdentityController {
       fullName: user.fullName,
       profilePhotoUrl: user.profilePhotoUrl,
       verificationLevel: user.verificationLevel,
+      // Founder/Super Admin accounts read as verified regardless of their
+      // (self-serve) verificationLevel — see isPassportVerified's doc
+      // comment. role itself is never exposed here; deliberately not
+      // publishing NDY HUB's internal admin roles on a public profile
+      // page, only the derived yes/no this card actually needs.
+      isVerified: isPassportVerified(user),
       ndyappsConnected: user.ndyappsConnected,
       memberSince: user.createdAt,
       bio: user.bioIsPublic ? user.bio : null,

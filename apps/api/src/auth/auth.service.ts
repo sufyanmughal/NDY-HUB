@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { GeoIpService } from '../common/geo-ip.service';
 import { PhotoStorageService } from '../common/photo-storage.service';
+import { isPassportVerified } from '../common/passport-verification.util';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
 import { TotpService } from './totp.service';
 import { LoginRequestGateway } from './login-request.gateway';
@@ -153,6 +154,7 @@ export class AuthService {
       // and skippable. Widened from fullName-only per the user's explicit
       // "these details must be required" direction.
       passportComplete: isPassportComplete(user),
+      isVerified: isPassportVerified(user),
     };
   }
 
@@ -179,6 +181,7 @@ export class AuthService {
       businessIsPublic: user.businessIsPublic,
       phoneIsPublic: user.phoneIsPublic,
       passportComplete: isPassportComplete(user),
+      isVerified: isPassportVerified(user),
     };
   }
 

@@ -85,10 +85,11 @@ export default function PassportPage() {
   if (auth.status !== "authenticated") return null;
 
   const displayName = passport?.fullName ?? "Name not set yet";
-  // A passport at LEVEL_0 has nothing confirmed yet — showing it as
-  // "Verified" regardless of level (the old behavior here) overstated
-  // every brand-new account's status.
-  const verified = passport ? passport.verificationLevel !== "LEVEL_0" : false;
+  // Server-computed: normal accounts need verificationLevel past LEVEL_0,
+  // but Founder/Super Admin accounts always read as verified regardless
+  // (see the API's isPassportVerified for why) — this app never
+  // re-derives that role logic client-side.
+  const verified = passport?.isVerified ?? false;
   const verificationLevelLabel = passport
     ? `Level ${passport.verificationLevel.replace("LEVEL_", "")}`
     : "…";

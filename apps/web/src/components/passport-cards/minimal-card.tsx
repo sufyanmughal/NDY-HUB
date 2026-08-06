@@ -1,9 +1,14 @@
 import { Avatar } from "@/components/avatar";
 import type { PassportCardData } from "./types";
 
-/** "Minimal Dark" design — stripped-back, high-contrast, no detail rows.
- * Just identity + QR, for a cleaner share-first look. */
+/** "Minimal Dark" design — stripped-back, high-contrast, mostly identity +
+ * QR for a cleaner share-first look. Email/phone are the one exception:
+ * shown as a compact single line (not full icon rows like the other two
+ * designs) since a business card with literally no way to contact the
+ * person isn't useful even in a minimal layout. */
 export function MinimalPassportCard({ data }: { data: PassportCardData }) {
+  const contactLine = [data.email, data.phone].filter(Boolean).join(" · ");
+
   return (
     <div className="overflow-hidden rounded-xl border border-border/60 bg-background p-6">
       <div className="flex items-center justify-between">
@@ -26,6 +31,9 @@ export function MinimalPassportCard({ data }: { data: PassportCardData }) {
         <div>
           <div className="text-lg font-semibold leading-tight">{data.displayName}</div>
           <div className="font-mono text-xs text-foreground-muted">{data.ndyId}</div>
+          {contactLine && (
+            <div className="mt-0.5 text-xs text-foreground-muted">{contactLine}</div>
+          )}
         </div>
       </div>
 
