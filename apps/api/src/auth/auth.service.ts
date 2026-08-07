@@ -400,7 +400,7 @@ export class AuthService {
     const { subject, html } = passwordResetEmail({
       fullName,
       code,
-      logoUrl: `${webAppUrl}/logo-mark.png`,
+      logoUrl: `${webAppUrl}/email-logo.jpeg`,
     });
     // Fire-and-forget: a slow/failed email provider shouldn't hold up the
     // response to a request that already succeeded server-side (the code
@@ -532,7 +532,7 @@ export class AuthService {
     const { subject, html } = verificationEmail({
       fullName,
       verifyUrl: link,
-      logoUrl: `${webAppUrl}/logo-mark.png`,
+      logoUrl: `${webAppUrl}/email-logo.jpeg`,
     });
     // Fire-and-forget — see sendPasswordResetEmail's comment for why.
     void this.mail.send({ to: email, subject, html });
