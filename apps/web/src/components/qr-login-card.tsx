@@ -109,6 +109,16 @@ function PendingView({
           "The dev shortcut account has 2FA enabled — disable it in Settings to use this shortcut.",
         );
       }
+      // The dev-shortcut email is exempt from email verification
+      // server-side (see AuthService.register's DEV_SHORTCUT_EMAIL check),
+      // so this account always gets a real session directly — the
+      // requiresEmailVerification branch can't actually happen for it,
+      // this narrows the type rather than handling a real runtime case.
+      if ("requiresEmailVerification" in result) {
+        throw new Error(
+          "Unexpected: the dev shortcut account should never require email verification.",
+        );
+      }
       await approveLoginRequestAs(token, result.accessToken);
       // No further action needed here — the WebSocket subscription already
       // listening on this token (in useLoginRequest) picks up APPROVED and

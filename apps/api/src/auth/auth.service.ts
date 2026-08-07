@@ -37,6 +37,13 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const SALT_ROUNDS = 12;
+// The QR-login card's dev-only shortcut (apps/web/.../qr-login-card.tsx)
+// needs a real session back immediately on a fresh database, with no
+// browser/inbox available to click a verification link from — this one
+// hardcoded account is exempted from the email-verification gate so that
+// local testing without a phone still works. Never matches a real user's
+// address.
+const DEV_SHORTCUT_EMAIL = 'dev-test@ndyhub.local';
 const LOGIN_REQUEST_TTL_MS = 90_000; // 90 seconds, per the desktop-QR / deep-link spec
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour — tighter than email verification on purpose
@@ -61,8 +68,23 @@ export class AuthService {
     private readonly mail: MailService,
   ) {}
 
-  async register(dto: RegisterDto, meta: SessionMeta): Promise<IssuedSession> {
+  /**
+   * No session is issued here anymore — an account only becomes usable
+   * once its email is confirmed (see confirmEmailVerification, which is
+   * where the first real session now gets minted). Returning
+   * requiresEmailVerification instead of throwing keeps this the same
+   * "successful request, different next step" shape login() already uses
+   * for requires2fa, rather than treating a brand-new, expected state as
+   * an error.
+   */
+  async register(
+    dto: RegisterDto,
+    meta: SessionMeta,
+  ): Promise<
+    IssuedSession | { requiresEmailVerification: true; email: string }
+  > {
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
+    const isDevShortcut = dto.email === DEV_SHORTCUT_EMAIL;
     const user = await this.identity.createUser({
       email: dto.email,
       passwordHash,
@@ -83,12 +105,21 @@ export class AuthService {
       businessIsPublic: dto.businessIsPublic,
       phoneIsPublic: dto.phoneIsPublic,
     });
+
+    if (isDevShortcut) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerifiedAt: new Date() },
+      });
+      return this.sessions.issueSession(user.id, user.ndyId, meta);
+    }
+
     await this.issueAndSendVerificationEmail(
       user.id,
       user.email,
       user.fullName,
     );
-    return this.sessions.issueSession(user.id, user.ndyId, meta);
+    return { requiresEmailVerification: true, email: user.email };
   }
 
   /**
@@ -96,12 +127,20 @@ export class AuthService {
    * from before. For a 2FA-enabled account, password success alone isn't
    * enough: this returns a short-lived challenge token instead, and the
    * caller has to complete TotpService.verifyChallenge with a TOTP or
-   * backup code before a session actually gets issued.
+   * backup code before a session actually gets issued. Same reasoning now
+   * applies to an unverified email: login() reports it instead of issuing
+   * a session, same "successful login, extra step required" shape as
+   * requires2fa rather than a thrown error — a correct password on an
+   * unverified account isn't really "incorrect email or password."
    */
   async login(
     dto: LoginDto,
     meta: SessionMeta,
-  ): Promise<IssuedSession | { requires2fa: true; challengeToken: string }> {
+  ): Promise<
+    | IssuedSession
+    | { requires2fa: true; challengeToken: string }
+    | { requiresEmailVerification: true; email: string }
+  > {
     const user = await this.identity.findByEmail(dto.email);
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Incorrect email or password.');
@@ -112,6 +151,9 @@ export class AuthService {
     }
     if (user.suspended) {
       throw new UnauthorizedException('This account has been suspended.');
+    }
+    if (!user.emailVerifiedAt) {
+      return { requiresEmailVerification: true, email: user.email };
     }
     if (user.totpEnabledAt) {
       const challengeToken = await this.totp.issueChallenge(user.id);
@@ -326,12 +368,33 @@ export class AuthService {
     void this.mail.send({ to: email, subject, html });
   }
 
-  /** Resend, called from Settings — register() already sends the first one. */
+  /** Resend, called from Settings by an already-signed-in user whose email
+   * somehow still isn't verified (edge case, not the main path anymore —
+   * see requestEmailVerificationByEmail for the pre-login case, which is
+   * the one an unverified account actually hits after register()). */
   async requestEmailVerification(userId: string): Promise<void> {
     const user = await this.identity.findById(userId);
     if (user.emailVerifiedAt) {
       throw new BadRequestException('This email address is already verified.');
     }
+    await this.issueAndSendVerificationEmail(
+      user.id,
+      user.email,
+      user.fullName,
+    );
+  }
+
+  /**
+   * Resend for the pre-login case: a freshly registered account has no
+   * session yet (register() no longer issues one), so it can't hit the
+   * JwtAuthGuard-protected /verify-email/resend above. Same
+   * account-enumeration-safe shape as forgotPassword — resolves the same
+   * way whether or not the email exists/is already verified, so a caller
+   * can't use this to probe which emails are registered.
+   */
+  async requestEmailVerificationByEmail(email: string): Promise<void> {
+    const user = await this.identity.findByEmail(email);
+    if (!user || user.emailVerifiedAt || user.deletedAt) return;
     await this.issueAndSendVerificationEmail(
       user.id,
       user.email,
@@ -346,10 +409,15 @@ export class AuthService {
    * atomic way as every other one-time token in this schema: the update's
    * WHERE clause only matches while the hash is still present, so a
    * double-click or a replayed request updates zero rows the second time.
+   * Now also the moment a brand-new account gets its first real session —
+   * register() no longer issues one, so this is where that finally
+   * happens, the same way TotpService.verifyChallenge is where a 2FA
+   * login's session finally gets issued.
    */
   async confirmEmailVerification(
     dto: ConfirmEmailDto,
-  ): Promise<{ verificationLevel: VerificationLevel }> {
+    meta: SessionMeta,
+  ): Promise<IssuedSession> {
     const tokenHash = hashToken(dto.token);
     const user = await this.prisma.user.findUnique({
       where: { emailVerificationTokenHash: tokenHash },
@@ -383,12 +451,7 @@ export class AuthService {
       throw new ConflictException('This verification link was already used.');
     }
 
-    return {
-      verificationLevel:
-        user.verificationLevel === VerificationLevel.LEVEL_0
-          ? VerificationLevel.LEVEL_1
-          : user.verificationLevel,
-    };
+    return this.sessions.issueSession(user.id, user.ndyId, meta);
   }
 
   private async issueAndSendVerificationEmail(

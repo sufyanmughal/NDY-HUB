@@ -2,9 +2,10 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Check, X } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 import { confirmEmailVerification } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 type ConfirmPhase =
   | { phase: "loading" }
@@ -13,6 +14,8 @@ type ConfirmPhase =
 
 function VerifyEmailPageInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { login } = useAuth();
   const token = searchParams.get("token");
   const [state, setState] = useState<ConfirmPhase>({ phase: "loading" });
 
@@ -20,7 +23,14 @@ function VerifyEmailPageInner() {
     if (!token) return;
     let cancelled = false;
     confirmEmailVerification(token)
-      .then(() => {
+      .then(async () => {
+        if (cancelled) return;
+        // confirmEmailVerification now issues the account's first real
+        // session (register() no longer does) — the cookie is already set
+        // server-side by the time this resolves, so this just syncs
+        // AuthProvider's own state from it, same as every other
+        // freshly-issued-session flow (password login, 2FA, passkey, …).
+        await login();
         if (!cancelled) setState({ phase: "success" });
       })
       .catch((err: Error) => {
@@ -29,7 +39,13 @@ function VerifyEmailPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, login]);
+
+  useEffect(() => {
+    if (state.phase !== "success") return;
+    const timer = setTimeout(() => router.replace("/dashboard"), 1200);
+    return () => clearTimeout(timer);
+  }, [state.phase, router]);
 
   const effective: ConfirmPhase = token
     ? state
@@ -58,6 +74,9 @@ function VerifyEmailPageInner() {
               <Check size={20} strokeWidth={2.5} />
             </div>
             <p className="mt-3 text-sm font-medium">Your email is verified.</p>
+            <p className="mt-1 text-xs text-foreground-muted">
+              Taking you to your dashboard…
+            </p>
             <Link
               href="/dashboard"
               className="mt-4 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"

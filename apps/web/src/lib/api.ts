@@ -182,7 +182,9 @@ export function getPublicPassport(ndyId: string): Promise<PublicPassport> {
 // NDYAPPS would, without a phone in the loop, for local testing.
 
 export type LoginResult =
-  IssuedSession | { requires2fa: true; challengeToken: string };
+  | IssuedSession
+  | { requires2fa: true; challengeToken: string }
+  | { requiresEmailVerification: true; email: string };
 
 export function loginWithPassword(
   email: string,
@@ -200,13 +202,18 @@ export function loginWithPassword(
 // file to upload yet at the point the registration form submits.
 export type RegisterPassportFields = Omit<UpdateProfileInput, "fullName" | "profilePhotoUrl">;
 
+// No session is issued at registration anymore — the account only
+// becomes usable once its email is confirmed, so this always resolves to
+// the "go check your inbox" shape rather than real tokens.
+export type RegisterResult = { requiresEmailVerification: true; email: string };
+
 export function registerWithPassword(
   email: string,
   password: string,
   fullName: string,
   passportFields?: RegisterPassportFields,
-): Promise<IssuedSession> {
-  return apiFetch<IssuedSession>("/auth/register", {
+): Promise<RegisterResult> {
+  return apiFetch<RegisterResult>("/auth/register", {
     method: "POST",
     body: JSON.stringify({ email, password, fullName, ...passportFields }),
   });
@@ -671,10 +678,13 @@ export async function beginConnectOAuthProvider(
 
 // --- Email verification ---
 
+// Confirming now issues the account's first real session (register() no
+// longer does), so this returns real tokens — the cookie gets set as a
+// side effect server-side, same as login/register.
 export function confirmEmailVerification(
   token: string,
-): Promise<{ verificationLevel: string }> {
-  return apiFetch<{ verificationLevel: string }>("/auth/verify-email/confirm", {
+): Promise<IssuedSession> {
+  return apiFetch<IssuedSession>("/auth/verify-email/confirm", {
     method: "POST",
     body: JSON.stringify({ token }),
   });
@@ -682,6 +692,15 @@ export function confirmEmailVerification(
 
 export function resendEmailVerification(): Promise<void> {
   return authedFetch<void>("/auth/verify-email/resend", { method: "POST" });
+}
+
+// Pre-login counterpart: a freshly registered or not-yet-verified account
+// has no session to authenticate resendEmailVerification's request with.
+export function resendEmailVerificationByEmail(email: string): Promise<void> {
+  return apiFetch<void>("/auth/verify-email/resend-by-email", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
 }
 
 // --- GDPR: data export + account deletion ---

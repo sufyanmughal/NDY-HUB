@@ -37,6 +37,7 @@ import { RefreshDto } from './dto/refresh.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ConfirmEmailDto } from './dto/confirm-email.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ConfirmTotpDto } from './dto/confirm-totp.dto';
@@ -212,16 +213,28 @@ export class AuthController {
 
   // Public: the token itself is the credential, same as a password-reset
   // link — there's no session to require yet if this is opened in a fresh
-  // browser tab from the verification email.
+  // browser tab from the verification email. Now also where a brand-new
+  // account's first real session gets issued (register() no longer issues
+  // one directly), so this needs sessionMeta(req) same as login/register.
   @Post('verify-email/confirm')
-  confirmEmailVerification(@Body() dto: ConfirmEmailDto) {
-    return this.auth.confirmEmailVerification(dto);
+  confirmEmailVerification(@Body() dto: ConfirmEmailDto, @Req() req: Request) {
+    return this.auth.confirmEmailVerification(dto, sessionMeta(req));
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('verify-email/resend')
   resendEmailVerification(@CurrentUser() user: AuthenticatedRequestUser) {
     return this.auth.requestEmailVerification(user.sub);
+  }
+
+  // Public counterpart for the case that actually matters now: a freshly
+  // registered account has no session yet (nothing to attach a
+  // JwtAuthGuard-protected request to), so this is what a "Resend email"
+  // button on the post-register/login screens actually calls.
+  @Throttle(BRUTE_FORCE_GUARD)
+  @Post('verify-email/resend-by-email')
+  resendEmailVerificationByEmail(@Body() dto: ResendVerificationDto) {
+    return this.auth.requestEmailVerificationByEmail(dto.email);
   }
 
   // Same brute-force tier as login/register — this is public and takes an

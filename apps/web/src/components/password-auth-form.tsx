@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   loginWithPassword,
   registerWithPassword,
+  resendEmailVerificationByEmail,
   getOAuthProviders,
   buildOAuthStartUrl,
 } from "@/lib/api";
@@ -44,6 +45,14 @@ export function PasswordAuthForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  // Set once register() or login() reports requiresEmailVerification —
+  // swaps the form out for a "check your inbox" screen, same pattern as
+  // challengeToken swapping in TwoFactorChallengeForm below.
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<
+    string | null
+  >(null);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [oauthProviders, setOauthProviders] = useState<{
     google: boolean;
@@ -105,10 +114,29 @@ export function PasswordAuthForm() {
         setBusy(false);
         return;
       }
+      if ("requiresEmailVerification" in result) {
+        setPendingVerificationEmail(result.email);
+        setBusy(false);
+        return;
+      }
       await login();
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
+    }
+  }
+
+  async function handleResendVerification() {
+    if (!pendingVerificationEmail) return;
+    setResendBusy(true);
+    setResendMessage(null);
+    try {
+      await resendEmailVerificationByEmail(pendingVerificationEmail);
+      setResendMessage("Verification email sent — check your inbox.");
+    } catch (err) {
+      setResendMessage((err as Error).message);
+    } finally {
+      setResendBusy(false);
     }
   }
 
@@ -118,6 +146,42 @@ export function PasswordAuthForm() {
         challengeToken={challengeToken}
         onCancel={() => setChallengeToken(null)}
       />
+    );
+  }
+
+  if (pendingVerificationEmail) {
+    return (
+      <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 text-center">
+        <h2 className="text-lg font-semibold">Check your email</h2>
+        <p className="mt-2 text-sm text-foreground-muted">
+          We sent a verification link to{" "}
+          <span className="font-medium text-foreground">
+            {pendingVerificationEmail}
+          </span>
+          . Click it to activate your account, then sign in.
+        </p>
+        {resendMessage && (
+          <p className="mt-3 text-sm text-accent">{resendMessage}</p>
+        )}
+        <button
+          type="button"
+          onClick={handleResendVerification}
+          disabled={resendBusy}
+          className="mt-4 w-full rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {resendBusy ? "Sending…" : "Resend verification email"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setPendingVerificationEmail(null);
+            setMode("signin");
+          }}
+          className="mt-2 w-full rounded-md px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground"
+        >
+          Back to sign in
+        </button>
+      </div>
     );
   }
 
