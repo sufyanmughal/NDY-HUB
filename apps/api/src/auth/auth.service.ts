@@ -25,6 +25,7 @@ import {
 } from '../common/mail-templates';
 import { isPassportVerified } from '../common/passport-verification.util';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
+import { SecurityEventService } from './security-event.service';
 import { TotpService } from './totp.service';
 import { LoginRequestGateway } from './login-request.gateway';
 import { RegisterDto } from './dto/register.dto';
@@ -74,6 +75,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly identity: IdentityService,
     private readonly sessions: SessionService,
+    private readonly securityEvents: SecurityEventService,
     private readonly totp: TotpService,
     private readonly gateway: LoginRequestGateway,
     private readonly config: ConfigService,
@@ -130,7 +132,13 @@ export class AuthService {
         where: { id: user.id },
         data: { emailVerifiedAt: new Date() },
       });
-      return this.sessions.issueSession(user.id, user.ndyId, meta);
+      const session = await this.sessions.issueSession(
+        user.id,
+        user.ndyId,
+        meta,
+      );
+      void this.securityEvents.recordLogin(user.id, meta, false);
+      return session;
     }
 
     await this.issueAndSendVerificationEmail(
@@ -182,7 +190,10 @@ export class AuthService {
       const challengeToken = await this.totp.issueChallenge(user.id);
       return { requires2fa: true, challengeToken };
     }
-    return this.sessions.issueSession(user.id, user.ndyId, meta);
+    const isNewDevice = await this.securityEvents.isNewDevice(user.id, meta);
+    const session = await this.sessions.issueSession(user.id, user.ndyId, meta);
+    void this.securityEvents.recordLogin(user.id, meta, isNewDevice);
+    return session;
   }
 
   async refresh(
@@ -301,6 +312,7 @@ export class AuthService {
       where: { id: userId },
       data: { passwordHash: newHash },
     });
+    void this.securityEvents.record(userId, 'PASSWORD_CHANGED');
   }
 
   /**
@@ -381,6 +393,7 @@ export class AuthService {
       where: { userId: user.id, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    void this.securityEvents.record(user.id, 'PASSWORD_CHANGED');
   }
 
   private async issueAndSendPasswordResetCode(
@@ -501,7 +514,9 @@ export class AuthService {
       throw new ConflictException('This verification link was already used.');
     }
 
-    return this.sessions.issueSession(user.id, user.ndyId, meta);
+    const session = await this.sessions.issueSession(user.id, user.ndyId, meta);
+    void this.securityEvents.recordLogin(user.id, meta, false);
+    return session;
   }
 
   private async issueAndSendVerificationEmail(

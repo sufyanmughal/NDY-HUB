@@ -8,14 +8,32 @@ import {
   revokeAllSessions,
   getConnectedSites,
   revokeConnectedSite,
+  getMySecurityEvents,
   type SecuritySession,
   type ConnectedSite,
+  type SecurityEvent,
+  type SecurityEventType,
 } from "@/lib/api";
+
+const SECURITY_EVENT_LABELS: Record<SecurityEventType, string> = {
+  LOGIN_SUCCESS: "Signed in",
+  NEW_DEVICE: "New device signed in",
+  PASSWORD_CHANGED: "Password changed",
+  PASSKEY_ADDED: "Passkey added",
+  PASSKEY_REMOVED: "Passkey removed",
+  TOTP_ENABLED: "Two-factor authentication enabled",
+  TOTP_DISABLED: "Two-factor authentication disabled",
+  RECOVERY_CODE_USED: "Recovery code used to sign in",
+  EMAIL_CHANGED: "Email address changed",
+  OAUTH_APP_CONNECTED: "Connected a new app",
+  OAUTH_APP_REVOKED: "Revoked access to an app",
+};
 
 export default function SecurityPage() {
   const { auth, logout } = useAuth();
   const [sessions, setSessions] = useState<SecuritySession[] | null>(null);
   const [sites, setSites] = useState<ConnectedSite[] | null>(null);
+  const [events, setEvents] = useState<SecurityEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [siteBusyId, setSiteBusyId] = useState<string | null>(null);
@@ -34,10 +52,18 @@ export default function SecurityPage() {
       .catch((err) => setError((err as Error).message));
   }, [auth]);
 
+  const refreshEvents = useCallback(() => {
+    if (auth.status !== "authenticated") return;
+    getMySecurityEvents()
+      .then(setEvents)
+      .catch((err) => setError((err as Error).message));
+  }, [auth]);
+
   useEffect(() => {
     refresh();
     refreshSites();
-  }, [refresh, refreshSites]);
+    refreshEvents();
+  }, [refresh, refreshSites, refreshEvents]);
 
   if (auth.status !== "authenticated") return null;
   async function handleRevoke(sessionId: string) {
@@ -182,13 +208,38 @@ export default function SecurityPage() {
         )}
       </div>
 
+      <div className="rounded-lg border border-border bg-surface p-5">
+        <h2 className="text-sm font-medium text-foreground-muted">
+          Security History
+        </h2>
+        {events && events.length === 0 ? (
+          <p className="mt-3 text-sm text-foreground-muted">
+            No security activity recorded yet.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-border">
+            {events?.map((event) => (
+              <li key={event.id} className="py-3 text-sm">
+                <div className="font-medium">
+                  {SECURITY_EVENT_LABELS[event.type] ?? event.type}
+                </div>
+                <div className="text-xs text-foreground-muted">
+                  {new Date(event.createdAt).toLocaleString()}
+                  {event.ip ? ` · ${event.ip}` : ""}
+                  {event.userAgent ? ` · ${event.userAgent}` : ""}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <p className="text-xs text-foreground-muted">
         Revoking a session stops it from staying signed in past its current
         15-minute access token — it can no longer refresh into a new one.
         Revoking a connected website also kills every refresh token it holds for
         your account, so it can&apos;t silently mint new access tokens after the
-        fact. NDYAPPS connection controls and login history land in a later
-        milestone.
+        fact. NDYAPPS connection controls land in a later milestone.
       </p>
     </div>
   );

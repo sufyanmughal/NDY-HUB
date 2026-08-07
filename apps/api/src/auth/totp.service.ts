@@ -22,6 +22,7 @@ import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
+import { SecurityEventService } from './security-event.service';
 import {
   encryptTotpSecret,
   decryptTotpSecret,
@@ -53,6 +54,7 @@ export class TotpService {
     private readonly prisma: PrismaService,
     private readonly identity: IdentityService,
     private readonly sessions: SessionService,
+    private readonly securityEvents: SecurityEventService,
     private readonly config: ConfigService,
   ) {}
 
@@ -137,6 +139,7 @@ export class TotpService {
         })),
       }),
     ]);
+    void this.securityEvents.record(userId, 'TOTP_ENABLED');
 
     return { backupCodes };
   }
@@ -160,12 +163,12 @@ export class TotpService {
       throw new UnauthorizedException('Current password is incorrect.');
     }
 
-    const valid = await this.verifyCodeOrBackupCode(
+    const matched = await this.verifyCodeOrBackupCode(
       userId,
       user.totpSecretEncrypted,
       dto.code,
     );
-    if (!valid) {
+    if (!matched) {
       throw new UnauthorizedException('Incorrect code.');
     }
 
@@ -176,6 +179,7 @@ export class TotpService {
       }),
       this.prisma.totpBackupCode.deleteMany({ where: { userId } }),
     ]);
+    void this.securityEvents.record(userId, 'TOTP_DISABLED');
   }
 
   /** Called from AuthService.login() once the password checks out. */
@@ -215,12 +219,12 @@ export class TotpService {
       );
     }
 
-    const valid = await this.verifyCodeOrBackupCode(
+    const matched = await this.verifyCodeOrBackupCode(
       user.id,
       user.totpSecretEncrypted,
       dto.code,
     );
-    if (!valid) {
+    if (matched === null) {
       throw new UnauthorizedException('Incorrect code.');
     }
 
@@ -235,7 +239,13 @@ export class TotpService {
       throw new ConflictException('This login attempt was already completed.');
     }
 
-    return this.sessions.issueSession(user.id, user.ndyId, meta);
+    if (matched === 'backup') {
+      void this.securityEvents.record(user.id, 'RECOVERY_CODE_USED', meta);
+    }
+    const isNewDevice = await this.securityEvents.isNewDevice(user.id, meta);
+    const session = await this.sessions.issueSession(user.id, user.ndyId, meta);
+    void this.securityEvents.recordLogin(user.id, meta, isNewDevice);
+    return session;
   }
 
   private async verifyTotpCode(
@@ -265,12 +275,15 @@ export class TotpService {
     }
   }
 
+  /** 'totp' | 'backup' | null (not a valid code either way) — the caller
+   * needs to know *which* matched to log RECOVERY_CODE_USED only when a
+   * backup code was actually the one spent, not on every 2FA login. */
   private async verifyCodeOrBackupCode(
     userId: string,
     encryptedSecret: string,
     code: string,
-  ): Promise<boolean> {
-    if (await this.verifyTotpCode(encryptedSecret, code)) return true;
+  ): Promise<'totp' | 'backup' | null> {
+    if (await this.verifyTotpCode(encryptedSecret, code)) return 'totp';
 
     // Falls back to a backup code — single-use, enforced the same
     // updateMany-then-check-count way as every other one-time credential
@@ -279,7 +292,7 @@ export class TotpService {
       where: { userId, codeHash: hashBackupCode(code), usedAt: null },
       data: { usedAt: new Date() },
     });
-    return result.count > 0;
+    return result.count > 0 ? 'backup' : null;
   }
 }
 

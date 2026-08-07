@@ -10,6 +10,7 @@ import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from 'jose';
 import { PrismaService } from '../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
+import { SecurityEventService } from './security-event.service';
 import { TotpService } from './totp.service';
 import type { AppleCallbackDto } from './dto/apple-callback.dto';
 
@@ -54,6 +55,7 @@ export class SocialAuthService {
     private readonly prisma: PrismaService,
     private readonly identity: IdentityService,
     private readonly sessions: SessionService,
+    private readonly securityEvents: SecurityEventService,
     private readonly totp: TotpService,
     private readonly config: ConfigService,
   ) {}
@@ -572,7 +574,10 @@ export class SocialAuthService {
     if (deleted.count === 0) throw expired;
 
     const user = await this.identity.findById(row.userId);
-    return this.sessions.issueSession(user.id, user.ndyId, meta);
+    const isNewDevice = await this.securityEvents.isNewDevice(user.id, meta);
+    const session = await this.sessions.issueSession(user.id, user.ndyId, meta);
+    void this.securityEvents.recordLogin(user.id, meta, isNewDevice);
+    return session;
   }
 
   private async consumeState(

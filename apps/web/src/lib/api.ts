@@ -426,6 +426,31 @@ export function revokeAllSessions(): Promise<{ revokedCount: number }> {
   );
 }
 
+export type SecurityEventType =
+  | "LOGIN_SUCCESS"
+  | "NEW_DEVICE"
+  | "PASSWORD_CHANGED"
+  | "PASSKEY_ADDED"
+  | "PASSKEY_REMOVED"
+  | "TOTP_ENABLED"
+  | "TOTP_DISABLED"
+  | "RECOVERY_CODE_USED"
+  | "EMAIL_CHANGED"
+  | "OAUTH_APP_CONNECTED"
+  | "OAUTH_APP_REVOKED";
+
+export interface SecurityEvent {
+  id: string;
+  type: SecurityEventType;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+export function getMySecurityEvents(): Promise<SecurityEvent[]> {
+  return authedFetch<SecurityEvent[]>("/security/events");
+}
+
 // --- Settings ---
 
 export interface MeProfile {

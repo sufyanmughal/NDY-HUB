@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SecurityEventService } from '../auth/security-event.service';
 import { normalizeScope, parseScope } from './scopes';
 
 @Injectable()
 export class GrantService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly securityEvents: SecurityEventService,
+  ) {}
 
   /** A returning user whose existing grant already covers everything the
    * client is asking for this time skips the consent screen — that's the
@@ -33,11 +37,18 @@ export class GrantService {
       ? normalizeScope([...parseScope(existing.scope), ...parseScope(scope)])
       : normalizeScope(parseScope(scope));
 
-    return this.prisma.oAuthGrant.upsert({
+    const grant = await this.prisma.oAuthGrant.upsert({
       where: { userId_clientId: { userId, clientId: clientDbId } },
       create: { userId, clientId: clientDbId, scope: mergedScope },
       update: { scope: mergedScope, revokedAt: null },
     });
+    // Only a brand-new grant counts as "connected" — re-consenting to a
+    // wider scope on an existing connection isn't a new event worth
+    // surfacing in the security timeline.
+    if (!existing) {
+      void this.securityEvents.record(userId, 'OAUTH_APP_CONNECTED');
+    }
+    return grant;
   }
 
   async listForUser(userId: string) {
@@ -68,5 +79,6 @@ export class GrantService {
         data: { revokedAt: new Date() },
       }),
     ]);
+    void this.securityEvents.record(userId, 'OAUTH_APP_REVOKED');
   }
 }

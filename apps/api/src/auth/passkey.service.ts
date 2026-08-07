@@ -18,6 +18,7 @@ import { isoUint8Array } from '@simplewebauthn/server/helpers';
 import { PrismaService } from '../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
+import { SecurityEventService } from './security-event.service';
 import { PasskeyRegisterVerifyDto } from './dto/passkey-register-verify.dto';
 import { PasskeyLoginVerifyDto } from './dto/passkey-login-verify.dto';
 
@@ -51,6 +52,7 @@ export class PasskeyService {
     private readonly prisma: PrismaService,
     private readonly identity: IdentityService,
     private readonly sessions: SessionService,
+    private readonly securityEvents: SecurityEventService,
     config: ConfigService,
   ) {
     const webAppUrl = config.getOrThrow<string>('WEB_APP_URL');
@@ -78,6 +80,7 @@ export class PasskeyService {
     if (result.count === 0) {
       throw new NotFoundException('Passkey not found.');
     }
+    void this.securityEvents.record(userId, 'PASSKEY_REMOVED');
   }
 
   async beginRegistration(userId: string): Promise<{
@@ -140,7 +143,7 @@ export class PasskeyService {
 
     const { credential } = result.registrationInfo;
     try {
-      return await this.prisma.passkey.create({
+      const passkey = await this.prisma.passkey.create({
         data: {
           userId,
           credentialId: credential.id,
@@ -156,6 +159,8 @@ export class PasskeyService {
           lastUsedAt: true,
         },
       });
+      void this.securityEvents.record(userId, 'PASSKEY_ADDED');
+      return passkey;
     } catch {
       // Unique constraint on credentialId — this exact authenticator/key
       // pair is already registered (to this account or another one).
@@ -234,7 +239,10 @@ export class PasskeyService {
       },
     });
 
-    return this.sessions.issueSession(user.id, user.ndyId, meta);
+    const isNewDevice = await this.securityEvents.isNewDevice(user.id, meta);
+    const session = await this.sessions.issueSession(user.id, user.ndyId, meta);
+    void this.securityEvents.recordLogin(user.id, meta, isNewDevice);
+    return session;
   }
 
   /** Single-use redemption: read the challenge value the verify call below

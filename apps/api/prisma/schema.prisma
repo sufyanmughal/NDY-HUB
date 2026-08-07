@@ -172,6 +172,7 @@ model User {
   oauthRefreshTokens      OAuthRefreshToken[]
   passkeys                Passkey[]
   webauthnChallenges      WebauthnChallenge[]
+  securityEvents          SecurityEvent[]
   authIdentities          AuthIdentity[]
   oauthLoginExchanges     OAuthLoginExchange[]
   externalAuthLinkStates  ExternalAuthState[]
@@ -654,6 +655,37 @@ model Session {
   revokedAt        DateTime?
 
   @@index([userId])
+}
+
+enum SecurityEventType {
+  LOGIN_SUCCESS
+  NEW_DEVICE
+  PASSWORD_CHANGED
+  PASSKEY_ADDED
+  PASSKEY_REMOVED
+  TOTP_ENABLED
+  TOTP_DISABLED
+  RECOVERY_CODE_USED
+  EMAIL_CHANGED
+  OAUTH_APP_CONNECTED
+  OAUTH_APP_REVOKED
+}
+
+// A user-facing "what happened on my account" timeline — distinct from
+// AuditLogEntry, which only records admin actions taken *on* a user
+// (suspend, role change) and requires an adminUserId. This is self-service:
+// every row is an event the account owner should be able to see about
+// their own account, per the client's explicit "security history" spec.
+model SecurityEvent {
+  id        String            @id @default(uuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      SecurityEventType
+  ip        String?
+  userAgent String?
+  createdAt DateTime          @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // A user's own request; a single admin reply resolves it. Deliberately not
