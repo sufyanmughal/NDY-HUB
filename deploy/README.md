@@ -72,6 +72,40 @@ under the repo's **Actions** tab.
 - Re-run migrations by hand:
   `docker compose -f docker-compose.prod.yml exec -T api npx prisma migrate deploy`
 
+## Domain & HTTPS
+
+Once a real domain's DNS (A records for the bare domain, `www`, and `api`
+subdomains) points at the Droplet's IP, `deploy/nginx.conf` terminates TLS
+for it instead of serving plain HTTP on the bare IP. Setup, done once:
+
+1. `apt-get install -y certbot`
+2. Stop nginx (it's squatting on port 80, which the ACME HTTP-01 challenge
+   needs free): `docker stop ndy-hub-nginx`
+3. `certbot certonly --standalone -d yourdomain.com -d www.yourdomain.com -d api.yourdomain.com --agree-tos -m you@example.com`
+   — issues to `/etc/letsencrypt/live/yourdomain.com/`, valid 90 days.
+4. `docker-compose.prod.yml`'s `nginx` service already mounts
+   `/etc/letsencrypt:/etc/letsencrypt:ro` and publishes `443:443` — `deploy/nginx.conf`
+   references the cert path directly, so no further compose changes
+   are needed for a different domain, just editing the `server_name`/cert
+   path in `nginx.conf` itself.
+5. Update `.env.prod`: `WEB_APP_URL=https://yourdomain.com`,
+   `API_URL=https://api.yourdomain.com` — then **rebuild the web image**
+   (`NEXT_PUBLIC_API_URL` is baked in at build time, an env-only change on
+   a running container has no effect) and `up -d` the whole stack.
+6. Once confirmed working, close port 3000 in `ufw` — nginx reaches the
+   `api` container over the Docker network directly, so the API doesn't
+   need its own port published to the internet anymore.
+
+**Renewal**: certbot's own `certbot.timer` (systemd) already runs twice
+daily and only actually renews within 30 days of expiry — but since certs
+here were issued via `--standalone`, renewal needs port 80 free the same
+way issuance did. Renewal hooks handle this automatically:
+`/etc/letsencrypt/renewal-hooks/pre/stop-nginx.sh` (`docker stop
+ndy-hub-nginx`) and `.../post/start-nginx.sh` (`docker start
+ndy-hub-nginx`) — both installed once, no cron/timer changes needed after
+that. Verify the whole chain without burning a real renewal:
+`certbot renew --dry-run`.
+
 ## Disaster recovery
 
 **Backups**: `deploy/backup.sh` runs automatically every night at 03:00 UTC
