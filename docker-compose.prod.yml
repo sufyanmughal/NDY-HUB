@@ -81,9 +81,10 @@ services:
       - web
     ports:
       - "80:80"
-      - "3000:3000"
+      - "443:443"
     volumes:
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
 
 volumes:
   ndy_hub_postgres_data:
