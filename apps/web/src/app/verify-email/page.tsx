@@ -93,9 +93,15 @@ function VerifyEmailPageInner() {
             </div>
             <p className="mt-3 text-sm">{effective.message}</p>
             <p className="mt-3 text-xs text-foreground-muted">
-              Verification links expire after 24 hours or after one use —
-              request a new one from Settings once you&apos;re signed in.
+              Verification links expire after 4 minutes and 59 seconds, or
+              after one use — go back and sign in to request a new one.
             </p>
+            <Link
+              href="/login"
+              className="mt-4 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+            >
+              Back to sign in
+            </Link>
           </div>
         )}
       </div>

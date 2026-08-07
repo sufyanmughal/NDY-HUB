@@ -21,10 +21,15 @@ interface EmailLayoutArgs {
   preheader: string;
   greeting: string;
   intro: string;
-  /** The link the button points at. */
-  actionUrl: string;
-  actionLabel: string;
-  /** e.g. "This link expires in 24 hours." */
+  /** Clickable-button mode (verification email). Mutually exclusive with
+   * `code` — exactly one of the two is provided by each caller. */
+  actionUrl?: string;
+  actionLabel?: string;
+  /** Typed-in-code mode (password reset). A large, letter-spaced digit
+   * block instead of a button — nothing to click, the user reads it and
+   * types it into the app. */
+  code?: string;
+  /** e.g. "This code expires in 4 minutes and 59 seconds." */
   expiryNote: string;
   logoUrl?: string;
 }
@@ -36,6 +41,7 @@ function emailLayout({
   intro,
   actionUrl,
   actionLabel,
+  code,
   expiryNote,
   logoUrl,
 }: EmailLayoutArgs): string {
@@ -73,13 +79,23 @@ function emailLayout({
               <p style="margin:0 0 16px; font-size:16px; line-height:1.5; color:${BRAND_INK};">${greeting}</p>
               <p style="margin:0 0 28px; font-size:15px; line-height:1.6; color:${BRAND_MUTED};">${intro}</p>
 
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+              ${
+                code
+                  ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                <tr>
+                  <td style="border-radius:10px; background-color:${BRAND_BG}; border:1px solid ${BRAND_BORDER}; padding:18px 32px;">
+                    <span style="display:block; font-size:32px; font-weight:700; letter-spacing:0.3em; color:${BRAND_INK}; font-family:'SF Mono',Consolas,Menlo,monospace;">${code}</span>
+                  </td>
+                </tr>
+              </table>`
+                  : `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
                 <tr>
                   <td style="border-radius:10px; background-color:${BRAND_INDIGO};">
                     <a href="${actionUrl}" target="_blank" style="display:inline-block; padding:14px 28px; font-size:15px; font-weight:600; color:#ffffff; text-decoration:none; border-radius:10px;">${actionLabel}</a>
                   </td>
                 </tr>
-              </table>
+              </table>`
+              }
 
               <p style="margin:0 0 8px; font-size:13px; line-height:1.5; color:${BRAND_MUTED};">${expiryNote}</p>
               <p style="margin:0; font-size:13px; line-height:1.5; color:${BRAND_MUTED};">If you didn't request this, you can safely ignore this email.</p>
@@ -119,7 +135,7 @@ export function verificationEmail(args: {
       intro: `Welcome to ${productName}. Confirm your email address below to activate your NDY Identity and finish setting up your account.`,
       actionUrl: args.verifyUrl,
       actionLabel: 'Verify Email Address',
-      expiryNote: 'This link expires in 24 hours.',
+      expiryNote: 'This link expires in 4 minutes and 59 seconds.',
       logoUrl: args.logoUrl,
     }),
   };
@@ -127,22 +143,21 @@ export function verificationEmail(args: {
 
 export function passwordResetEmail(args: {
   fullName: string | null;
-  resetUrl: string;
+  code: string;
   logoUrl?: string;
   productName?: string;
 }): { subject: string; html: string } {
   const productName = args.productName ?? 'NDY HUB';
   const greeting = args.fullName ? `Hello ${args.fullName},` : 'Hello,';
   return {
-    subject: `Reset Your ${productName} Password`,
+    subject: `Your ${productName} Password Reset Code`,
     html: emailLayout({
       productName,
-      preheader: 'Reset your NDY HUB password.',
+      preheader: 'Use this code to reset your NDY HUB password.',
       greeting,
-      intro: `We received a request to reset the password for your NDY Identity. Click below to choose a new one.`,
-      actionUrl: args.resetUrl,
-      actionLabel: 'Reset Password',
-      expiryNote: 'This link expires in 1 hour.',
+      intro: `We received a request to reset the password for your NDY Identity. Enter the code below to continue.`,
+      code: args.code,
+      expiryNote: 'This code expires in 4 minutes and 59 seconds.',
       logoUrl: args.logoUrl,
     }),
   };

@@ -246,11 +246,20 @@ export class AuthController {
     return this.auth.forgotPassword(dto);
   }
 
-  // Public: the token itself is the credential, same as email verification.
+  // Public: the code itself is the credential, same as email verification.
   @Throttle(BRUTE_FORCE_GUARD)
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.auth.resetPassword(dto);
+  }
+
+  // Same account-enumeration-safe shape as forgot-password (which this
+  // just delegates to) — the "Resend code" button on the enter-code
+  // screen calls this.
+  @Throttle(BRUTE_FORCE_GUARD)
+  @Post('reset-password/resend')
+  resendPasswordResetCode(@Body() dto: ForgotPasswordDto) {
+    return this.auth.resendPasswordResetCode(dto.email);
   }
 
   @UseGuards(JwtAuthGuard)

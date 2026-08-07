@@ -109,10 +109,15 @@ model User {
   emailVerificationTokenHash String?   @unique
   emailVerificationExpiresAt DateTime?
 
-  // Same single-use/TTL shape again, for the forgot-password flow. Shorter
-  // TTL than email verification (1h vs 24h) — a password reset link is a
-  // more sensitive credential than an email-confirm link, worth a tighter
-  // window.
+  // Same single-use/TTL shape again, for the forgot-password flow — now a
+  // typed-in 6-digit code rather than a link token (see AuthService.
+  // resetPassword), so lookup is scoped by email first, then this hash is
+  // checked against that one account; @unique is no longer load-bearing
+  // for the lookup itself (a 6-digit space is too small to rely on
+  // uniqueness the way the 32-char email-verification token can), just
+  // kept as a defense-in-depth constraint. Both TTLs are 4:59, per
+  // explicit direction — one mental model app-wide for "how long do I
+  // have."
   passwordResetTokenHash String?   @unique
   passwordResetExpiresAt DateTime?
 

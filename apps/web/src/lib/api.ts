@@ -205,7 +205,12 @@ export type RegisterPassportFields = Omit<UpdateProfileInput, "fullName" | "prof
 // No session is issued at registration anymore — the account only
 // becomes usable once its email is confirmed, so this always resolves to
 // the "go check your inbox" shape rather than real tokens.
-export type RegisterResult = { requiresEmailVerification: true; email: string };
+// expiresInSeconds drives the countdown on the "check your email" screen.
+export type RegisterResult = {
+  requiresEmailVerification: true;
+  email: string;
+  expiresInSeconds: number;
+};
 
 export function registerWithPassword(
   email: string,
@@ -219,20 +224,33 @@ export function registerWithPassword(
   });
 }
 
-export function forgotPassword(email: string): Promise<void> {
-  return apiFetch<void>("/auth/forgot-password", {
+export function forgotPassword(
+  email: string,
+): Promise<{ expiresInSeconds: number }> {
+  return apiFetch<{ expiresInSeconds: number }>("/auth/forgot-password", {
     method: "POST",
     body: JSON.stringify({ email }),
   });
 }
 
+export function resendPasswordResetCode(
+  email: string,
+): Promise<{ expiresInSeconds: number }> {
+  return apiFetch<{ expiresInSeconds: number }>("/auth/reset-password/resend", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+// Typed-in 6-digit code, not a link token — see ResetPasswordDto server-side.
 export function resetPassword(
-  token: string,
+  email: string,
+  code: string,
   newPassword: string,
 ): Promise<void> {
   return apiFetch<void>("/auth/reset-password", {
     method: "POST",
-    body: JSON.stringify({ token, newPassword }),
+    body: JSON.stringify({ email, code, newPassword }),
   });
 }
 
@@ -696,11 +714,16 @@ export function resendEmailVerification(): Promise<void> {
 
 // Pre-login counterpart: a freshly registered or not-yet-verified account
 // has no session to authenticate resendEmailVerification's request with.
-export function resendEmailVerificationByEmail(email: string): Promise<void> {
-  return apiFetch<void>("/auth/verify-email/resend-by-email", {
-    method: "POST",
-    body: JSON.stringify({ email }),
-  });
+export function resendEmailVerificationByEmail(
+  email: string,
+): Promise<{ expiresInSeconds: number }> {
+  return apiFetch<{ expiresInSeconds: number }>(
+    "/auth/verify-email/resend-by-email",
+    {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    },
+  );
 }
 
 // --- GDPR: data export + account deletion ---

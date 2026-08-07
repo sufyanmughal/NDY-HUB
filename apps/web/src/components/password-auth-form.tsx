@@ -12,6 +12,7 @@ import {
 import { loginWithPasskey, browserSupportsWebAuthn } from "@/lib/passkey";
 import { useAuth } from "@/lib/auth-context";
 import { COUNTRIES } from "@/lib/countries";
+import { useCountdown, formatCountdown } from "@/lib/use-countdown";
 import { TwoFactorChallengeForm } from "./two-factor-challenge-form";
 
 /**
@@ -51,6 +52,10 @@ export function PasswordAuthForm() {
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<
     string | null
   >(null);
+  // Changing this (not just the countdown value itself) is what restarts
+  // useCountdown's interval on every resend — see its own comment.
+  const [verificationExpirySeed, setVerificationExpirySeed] = useState(0);
+  const { secondsLeft, expired } = useCountdown(verificationExpirySeed);
   const [resendBusy, setResendBusy] = useState(false);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
@@ -116,6 +121,16 @@ export function PasswordAuthForm() {
       }
       if ("requiresEmailVerification" in result) {
         setPendingVerificationEmail(result.email);
+        // login()'s requiresEmailVerification doesn't carry a fresh
+        // expiresInSeconds (it's reporting existing state, not sending a
+        // new email) — 0 means "expired," which correctly shows the
+        // resend button immediately rather than a stale/guessed countdown.
+        setVerificationExpirySeed(
+          "expiresInSeconds" in result &&
+            typeof result.expiresInSeconds === "number"
+            ? result.expiresInSeconds
+            : 0,
+        );
         setBusy(false);
         return;
       }
@@ -131,7 +146,10 @@ export function PasswordAuthForm() {
     setResendBusy(true);
     setResendMessage(null);
     try {
-      await resendEmailVerificationByEmail(pendingVerificationEmail);
+      const { expiresInSeconds } = await resendEmailVerificationByEmail(
+        pendingVerificationEmail,
+      );
+      setVerificationExpirySeed(expiresInSeconds);
       setResendMessage("Verification email sent — check your inbox.");
     } catch (err) {
       setResendMessage((err as Error).message);
@@ -160,13 +178,25 @@ export function PasswordAuthForm() {
           </span>
           . Click it to activate your account, then sign in.
         </p>
+        <p className="mt-3 text-sm font-medium tabular-nums">
+          {expired ? (
+            <span className="text-critical">Link expired</span>
+          ) : (
+            <>
+              Expires in{" "}
+              <span className="text-foreground">
+                {formatCountdown(secondsLeft)}
+              </span>
+            </>
+          )}
+        </p>
         {resendMessage && (
           <p className="mt-3 text-sm text-accent">{resendMessage}</p>
         )}
         <button
           type="button"
           onClick={handleResendVerification}
-          disabled={resendBusy}
+          disabled={resendBusy || !expired}
           className="mt-4 w-full rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {resendBusy ? "Sending…" : "Resend verification email"}

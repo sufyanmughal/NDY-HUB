@@ -45,12 +45,26 @@ const SALT_ROUNDS = 12;
 // address.
 const DEV_SHORTCUT_EMAIL = 'dev-test@ndyhub.local';
 const LOGIN_REQUEST_TTL_MS = 90_000; // 90 seconds, per the desktop-QR / deep-link spec
-const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour — tighter than email verification on purpose
+// 4 minutes 59 seconds — deliberately short, per explicit direction. Same
+// window for both the verification link and the password-reset code
+// below, one mental model app-wide: "you have under 5 minutes." Exported
+// so the API response can tell the frontend exactly how long to count
+// down, rather than the client guessing/hardcoding a matching number.
+export const EMAIL_VERIFICATION_TTL_SECONDS = 4 * 60 + 59;
+const EMAIL_VERIFICATION_TTL_MS = EMAIL_VERIFICATION_TTL_SECONDS * 1000;
+export const PASSWORD_RESET_TTL_SECONDS = 4 * 60 + 59;
+const PASSWORD_RESET_TTL_MS = PASSWORD_RESET_TTL_SECONDS * 1000;
 const generateToken = customAlphabet(
   'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789',
   32,
 );
+// Password reset now shows the user a typed-in code (not a clickable
+// link) — 6 digits, matching the shape described in the original spec
+// doc's "654321" example. Numeric-only rather than reusing the alphanumeric
+// generateToken above, since a code the user has to type in by hand from
+// an email should be short and unambiguous (no 0/O, 1/l confusion to
+// worry about either, since it's digits only).
+const generateResetCode = customAlphabet('0123456789', 6);
 
 @Injectable()
 export class AuthService {
@@ -81,7 +95,12 @@ export class AuthService {
     dto: RegisterDto,
     meta: SessionMeta,
   ): Promise<
-    IssuedSession | { requiresEmailVerification: true; email: string }
+    | IssuedSession
+    | {
+        requiresEmailVerification: true;
+        email: string;
+        expiresInSeconds: number;
+      }
   > {
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const isDevShortcut = dto.email === DEV_SHORTCUT_EMAIL;
@@ -119,7 +138,11 @@ export class AuthService {
       user.email,
       user.fullName,
     );
-    return { requiresEmailVerification: true, email: user.email };
+    return {
+      requiresEmailVerification: true,
+      email: user.email,
+      expiresInSeconds: EMAIL_VERIFICATION_TTL_SECONDS,
+    };
   }
 
   /**
@@ -288,27 +311,41 @@ export class AuthService {
    * return with a different shape for that case, just silently doing
    * nothing further.
    */
-  async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
+  async forgotPassword(
+    dto: ForgotPasswordDto,
+  ): Promise<{ expiresInSeconds: number }> {
     const user = await this.identity.findByEmail(dto.email);
     // No account, a Google/Apple/NDYAPPS-only account with no password to
     // reset, or a deleted/anonymized account — nothing to email, and the
     // caller can't distinguish this from a real send either way.
-    if (!user || !user.passwordHash || user.deletedAt) return;
+    if (user && user.passwordHash && !user.deletedAt) {
+      await this.issueAndSendPasswordResetCode(
+        user.id,
+        user.email,
+        user.fullName,
+      );
+    }
+    // Same reasoning as requestEmailVerificationByEmail: a constant, not
+    // account-specific data, safe to return unconditionally.
+    return { expiresInSeconds: PASSWORD_RESET_TTL_SECONDS };
+  }
 
-    const token = generateToken();
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        passwordResetTokenHash: hashToken(token),
-        passwordResetExpiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
-      },
-    });
-    this.sendPasswordResetEmail(user.email, user.fullName, token);
+  /** Resend, called from the "Enter code" screen if the first email didn't
+   * arrive in time — same account-enumeration-safe shape as forgotPassword
+   * itself (this is the only way to trigger a resend, there's no session
+   * to gate it behind at this point in the flow). */
+  async resendPasswordResetCode(
+    email: string,
+  ): Promise<{ expiresInSeconds: number }> {
+    return this.forgotPassword({ email });
   }
 
   /**
-   * The click-through from the reset link. Public by design — the token
-   * itself is the credential, same reasoning as confirmEmailVerification.
+   * Redeems the typed-in code. Public by design — same reasoning as
+   * confirmEmailVerification, except a 6-digit code isn't globally unique
+   * enough to look up on its own (unlike the 32-char link token this
+   * replaced), so the lookup is scoped by email first, then the code's
+   * hash is checked against that one account — not a global findUnique.
    * Redeeming it also revokes every existing session on the account: a
    * password reset is exactly the moment something might be compromised,
    * so whoever had the old password gets signed out everywhere, not just
@@ -316,23 +353,20 @@ export class AuthService {
    * revoke-all already gives a user who does this deliberately.
    */
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
-    const tokenHash = hashToken(dto.token);
-    const user = await this.prisma.user.findUnique({
-      where: { passwordResetTokenHash: tokenHash },
-    });
+    const user = await this.identity.findByEmail(dto.email);
+    const codeHash = hashToken(dto.code);
     if (
       !user ||
+      user.passwordResetTokenHash !== codeHash ||
       !user.passwordResetExpiresAt ||
       user.passwordResetExpiresAt < new Date()
     ) {
-      throw new BadRequestException(
-        'This password reset link is invalid or has expired.',
-      );
+      throw new BadRequestException('This code is invalid or has expired.');
     }
 
     const newHash = await bcrypt.hash(dto.newPassword, SALT_ROUNDS);
     const result = await this.prisma.user.updateMany({
-      where: { id: user.id, passwordResetTokenHash: tokenHash },
+      where: { id: user.id, passwordResetTokenHash: codeHash },
       data: {
         passwordHash: newHash,
         passwordResetTokenHash: null,
@@ -340,7 +374,7 @@ export class AuthService {
       },
     });
     if (result.count === 0) {
-      throw new ConflictException('This password reset link was already used.');
+      throw new ConflictException('This code was already used.');
     }
 
     await this.prisma.session.updateMany({
@@ -349,20 +383,27 @@ export class AuthService {
     });
   }
 
-  private sendPasswordResetEmail(
+  private async issueAndSendPasswordResetCode(
+    userId: string,
     email: string,
     fullName: string | null,
-    token: string,
-  ): void {
+  ): Promise<void> {
+    const code = generateResetCode();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordResetTokenHash: hashToken(code),
+        passwordResetExpiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+      },
+    });
     const webAppUrl = this.config.getOrThrow<string>('WEB_APP_URL');
-    const link = `${webAppUrl}/reset-password?token=${token}`;
     const { subject, html } = passwordResetEmail({
       fullName,
-      resetUrl: link,
+      code,
       logoUrl: `${webAppUrl}/logo-mark.png`,
     });
     // Fire-and-forget: a slow/failed email provider shouldn't hold up the
-    // response to a request that already succeeded server-side (the token
+    // response to a request that already succeeded server-side (the code
     // is persisted regardless) — same reasoning MailService itself
     // documents for why send() never throws.
     void this.mail.send({ to: email, subject, html });
@@ -392,14 +433,23 @@ export class AuthService {
    * way whether or not the email exists/is already verified, so a caller
    * can't use this to probe which emails are registered.
    */
-  async requestEmailVerificationByEmail(email: string): Promise<void> {
+  async requestEmailVerificationByEmail(
+    email: string,
+  ): Promise<{ expiresInSeconds: number }> {
     const user = await this.identity.findByEmail(email);
-    if (!user || user.emailVerifiedAt || user.deletedAt) return;
-    await this.issueAndSendVerificationEmail(
-      user.id,
-      user.email,
-      user.fullName,
-    );
+    if (user && !user.emailVerifiedAt && !user.deletedAt) {
+      await this.issueAndSendVerificationEmail(
+        user.id,
+        user.email,
+        user.fullName,
+      );
+    }
+    // Always the same constant regardless of whether a real send just
+    // happened — safe to return unconditionally (it's not
+    // account-specific data), and lets the frontend restart its
+    // countdown on every resend click without needing to know whether
+    // the account was real.
+    return { expiresInSeconds: EMAIL_VERIFICATION_TTL_SECONDS };
   }
 
   /**
