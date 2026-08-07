@@ -12,6 +12,7 @@ import { LoginRequestGateway } from './login-request.gateway';
 import { IdentityModule } from '../identity/identity.module';
 import { GeoIpService } from '../common/geo-ip.service';
 import { PhotoStorageService } from '../common/photo-storage.service';
+import { MailService } from '../common/mail.service';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { PhotoStorageService } from '../common/photo-storage.service';
     LoginRequestGateway,
     GeoIpService,
     PhotoStorageService,
+    MailService,
   ],
   // JwtModule (for JwtService) and JwtAuthGuard itself need to be visible to
   // any other module that guards a route with @UseGuards(JwtAuthGuard) —

@@ -18,6 +18,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { GeoIpService } from '../common/geo-ip.service';
 import { PhotoStorageService } from '../common/photo-storage.service';
+import { MailService } from '../common/mail.service';
+import {
+  verificationEmail,
+  passwordResetEmail,
+} from '../common/mail-templates';
 import { isPassportVerified } from '../common/passport-verification.util';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
 import { TotpService } from './totp.service';
@@ -53,6 +58,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly geoIp: GeoIpService,
     private readonly photoStorage: PhotoStorageService,
+    private readonly mail: MailService,
   ) {}
 
   async register(dto: RegisterDto, meta: SessionMeta): Promise<IssuedSession> {
@@ -77,7 +83,11 @@ export class AuthService {
       businessIsPublic: dto.businessIsPublic,
       phoneIsPublic: dto.phoneIsPublic,
     });
-    await this.issueAndSendVerificationEmail(user.id, user.email);
+    await this.issueAndSendVerificationEmail(
+      user.id,
+      user.email,
+      user.fullName,
+    );
     return this.sessions.issueSession(user.id, user.ndyId, meta);
   }
 
@@ -251,7 +261,7 @@ export class AuthService {
         passwordResetExpiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
       },
     });
-    this.sendPasswordResetEmail(user.email, token);
+    this.sendPasswordResetEmail(user.email, user.fullName, token);
   }
 
   /**
@@ -297,12 +307,23 @@ export class AuthService {
     });
   }
 
-  private sendPasswordResetEmail(email: string, token: string): void {
+  private sendPasswordResetEmail(
+    email: string,
+    fullName: string | null,
+    token: string,
+  ): void {
     const webAppUrl = this.config.getOrThrow<string>('WEB_APP_URL');
     const link = `${webAppUrl}/reset-password?token=${token}`;
-    this.logger.warn(
-      `No email provider configured — password reset link for ${email}: ${link}`,
-    );
+    const { subject, html } = passwordResetEmail({
+      fullName,
+      resetUrl: link,
+      logoUrl: `${webAppUrl}/logo-mark.png`,
+    });
+    // Fire-and-forget: a slow/failed email provider shouldn't hold up the
+    // response to a request that already succeeded server-side (the token
+    // is persisted regardless) — same reasoning MailService itself
+    // documents for why send() never throws.
+    void this.mail.send({ to: email, subject, html });
   }
 
   /** Resend, called from Settings — register() already sends the first one. */
@@ -311,7 +332,11 @@ export class AuthService {
     if (user.emailVerifiedAt) {
       throw new BadRequestException('This email address is already verified.');
     }
-    await this.issueAndSendVerificationEmail(user.id, user.email);
+    await this.issueAndSendVerificationEmail(
+      user.id,
+      user.email,
+      user.fullName,
+    );
   }
 
   /**
@@ -369,6 +394,7 @@ export class AuthService {
   private async issueAndSendVerificationEmail(
     userId: string,
     email: string,
+    fullName: string | null,
   ): Promise<void> {
     const token = generateToken();
     await this.prisma.user.update({
@@ -380,21 +406,23 @@ export class AuthService {
         ),
       },
     });
-    this.sendVerificationEmail(email, token);
+    this.sendVerificationEmail(email, fullName, token);
   }
 
-  /** No email provider is configured (no SMTP/SendGrid key exists in this
-   * environment) — same dev-mode-fallback pattern as MembershipService's
-   * Stripe warning. Logs the link a real email would contain instead of
-   * silently doing nothing, so the flow is still testable end-to-end
-   * locally. Swap this for a real provider call before this goes anywhere
-   * near production traffic. */
-  private sendVerificationEmail(email: string, token: string): void {
+  private sendVerificationEmail(
+    email: string,
+    fullName: string | null,
+    token: string,
+  ): void {
     const webAppUrl = this.config.getOrThrow<string>('WEB_APP_URL');
     const link = `${webAppUrl}/verify-email?token=${token}`;
-    this.logger.warn(
-      `No email provider configured — verification link for ${email}: ${link}`,
-    );
+    const { subject, html } = verificationEmail({
+      fullName,
+      verifyUrl: link,
+      logoUrl: `${webAppUrl}/logo-mark.png`,
+    });
+    // Fire-and-forget — see sendPasswordResetEmail's comment for why.
+    void this.mail.send({ to: email, subject, html });
   }
 
   /**
