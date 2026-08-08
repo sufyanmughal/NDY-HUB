@@ -15,13 +15,11 @@ const FEATURES = [
 ] as const;
 
 /**
- * A one-time, 5-second brand moment shown right after login — never on a
- * plain page refresh or dashboard navigation. sessionStorage (not a React
- * state flag) is what makes "once per login session" survive a hard
- * reload of /dashboard itself; AuthProvider clears nothing on logout, so
- * the natural reset is that a fresh browser tab/session has no key set at
- * all, and a brand-new login after logout goes through LoginPage → here
- * again exactly once.
+ * A one-time, 5-second brand moment shown when a visitor first lands on
+ * /login — not on every visit to the page. sessionStorage (not a React
+ * state flag) is what makes "once per browser session" survive a hard
+ * reload of /login itself; a fresh tab/browser session has no key set at
+ * all, so the splash plays again for a genuinely new visit.
  */
 export function useShouldShowSplash(): [boolean, () => void] {
   // Lazy initializer, not an effect: sessionStorage is only readable

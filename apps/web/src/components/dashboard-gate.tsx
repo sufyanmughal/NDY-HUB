@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { EcosystemSplash, useShouldShowSplash } from "./ecosystem-splash";
 
 /**
  * Everything under (dashboard) requires a session. The session itself is
@@ -24,7 +23,6 @@ import { EcosystemSplash, useShouldShowSplash } from "./ecosystem-splash";
 export function DashboardGate({ children }: { children: React.ReactNode }) {
   const { auth } = useAuth();
   const router = useRouter();
-  const [showSplash, dismissSplash] = useShouldShowSplash();
 
   useEffect(() => {
     if (auth.status === "unauthenticated") {
@@ -44,13 +42,6 @@ export function DashboardGate({ children }: { children: React.ReactNode }) {
           : "Redirecting…"}
       </div>
     );
-  }
-
-  // Shown exactly once per login session, right after the gate first lets
-  // a real session through — not on a plain refresh/navigation once
-  // dismissed (useShouldShowSplash tracks that via sessionStorage).
-  if (showSplash) {
-    return <EcosystemSplash onDone={dismissSplash} />;
   }
 
   return <>{children}</>;

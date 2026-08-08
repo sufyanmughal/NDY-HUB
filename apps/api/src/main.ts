@@ -38,6 +38,12 @@ async function bootstrap() {
     'https://ndy-hub-web.vercel.app',
     'https://web-six-eta-15.vercel.app',
     'https://web-ndy-hub.vercel.app',
+    // Partner sites integrating directly against this API (see
+    // docs/WEBSITE-INTEGRATION.md) — each addition here is a real access
+    // grant, not a formality, since credentials: true means this also
+    // controls who can receive the httpOnly session cookies.
+    'https://cryndy-nextjs.vercel.app',
+    'https://ndjoyit-landing.vercel.app',
   ];
   app.enableCors({
     origin: (origin, callback) => {
