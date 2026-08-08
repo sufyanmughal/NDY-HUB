@@ -8,6 +8,7 @@ import {
   resendEmailVerificationByEmail,
   getOAuthProviders,
   buildOAuthStartUrl,
+  type TwoFactorMethod,
 } from "@/lib/api";
 import { loginWithPasskey, browserSupportsWebAuthn } from "@/lib/passkey";
 import { useAuth } from "@/lib/auth-context";
@@ -46,6 +47,9 @@ export function PasswordAuthForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [challengeMethods, setChallengeMethods] = useState<TwoFactorMethod[]>(
+    [],
+  );
   // Set once register() or login() reports requiresEmailVerification —
   // swaps the form out for a "check your inbox" screen, same pattern as
   // challengeToken swapping in TwoFactorChallengeForm below.
@@ -116,6 +120,7 @@ export function PasswordAuthForm() {
             });
       if ("requires2fa" in result) {
         setChallengeToken(result.challengeToken);
+        setChallengeMethods(result.methods);
         setBusy(false);
         return;
       }
@@ -162,6 +167,7 @@ export function PasswordAuthForm() {
     return (
       <TwoFactorChallengeForm
         challengeToken={challengeToken}
+        methods={challengeMethods}
         onCancel={() => setChallengeToken(null)}
       />
     );

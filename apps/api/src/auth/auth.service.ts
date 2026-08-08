@@ -27,6 +27,8 @@ import { isPassportVerified } from '../common/passport-verification.util';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
 import { SecurityEventService } from './security-event.service';
 import { TotpService } from './totp.service';
+import { Sms2faService } from './sms-2fa.service';
+import { enabledTwoFactorMethods, TwoFactorMethod } from './two-factor.util';
 import { LoginRequestGateway } from './login-request.gateway';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -77,6 +79,7 @@ export class AuthService {
     private readonly sessions: SessionService,
     private readonly securityEvents: SecurityEventService,
     private readonly totp: TotpService,
+    private readonly sms2fa: Sms2faService,
     private readonly gateway: LoginRequestGateway,
     private readonly config: ConfigService,
     private readonly geoIp: GeoIpService,
@@ -169,7 +172,7 @@ export class AuthService {
     meta: SessionMeta,
   ): Promise<
     | IssuedSession
-    | { requires2fa: true; challengeToken: string }
+    | { requires2fa: true; challengeToken: string; methods: TwoFactorMethod[] }
     | { requiresEmailVerification: true; email: string }
   > {
     const user = await this.identity.findByEmail(dto.email);
@@ -186,9 +189,18 @@ export class AuthService {
     if (!user.emailVerifiedAt) {
       return { requiresEmailVerification: true, email: user.email };
     }
-    if (user.totpEnabledAt) {
+    const methods = enabledTwoFactorMethods(user);
+    if (methods.length > 0) {
       const challengeToken = await this.totp.issueChallenge(user.id);
-      return { requires2fa: true, challengeToken };
+      // SMS is the only method with something to actively send — TOTP
+      // just reads whatever the user's authenticator app is already
+      // showing. Send it now only when SMS is the sole option; if both
+      // are enabled, wait for the frontend's method picker to ask via
+      // 2fa/send-sms so choosing TOTP never costs a real SMS send.
+      if (methods.length === 1 && methods[0] === 'SMS') {
+        void this.sms2fa.sendChallengeCode(user.id);
+      }
+      return { requires2fa: true, challengeToken, methods };
     }
     const isNewDevice = await this.securityEvents.isNewDevice(user.id, meta);
     const session = await this.sessions.issueSession(user.id, user.ndyId, meta);
@@ -218,6 +230,8 @@ export class AuthService {
       verificationLevel: user.verificationLevel,
       ndyappsConnected: user.ndyappsConnected,
       twoFactorEnabled: Boolean(user.totpEnabledAt),
+      smsTwoFactorEnabled: Boolean(user.smsEnabledAt),
+      smsPhoneMasked: maskPhone(user.smsPhoneE164),
       role: user.role,
       createdAt: user.createdAt,
       bio: user.bio,
@@ -707,6 +721,14 @@ export class AuthService {
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+/** Shows just enough of the verified SMS 2FA number for a user to
+ * recognize it's theirs on the Settings page, without displaying the
+ * full number back to anyone who can read a response body. */
+function maskPhone(phoneE164: string | null): string | null {
+  if (!phoneE164) return null;
+  return `${phoneE164.slice(0, 3)}••••${phoneE164.slice(-2)}`;
 }
 
 /**

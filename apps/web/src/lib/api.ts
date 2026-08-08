@@ -181,9 +181,11 @@ export function getPublicPassport(ndyId: string): Promise<PublicPassport> {
 // on the server enforces that); the dev shortcut just gets one the same way
 // NDYAPPS would, without a phone in the loop, for local testing.
 
+export type TwoFactorMethod = "TOTP" | "SMS";
+
 export type LoginResult =
   | IssuedSession
-  | { requires2fa: true; challengeToken: string }
+  | { requires2fa: true; challengeToken: string; methods: TwoFactorMethod[] }
   | { requiresEmailVerification: true; email: string };
 
 export function loginWithPassword(
@@ -434,6 +436,8 @@ export type SecurityEventType =
   | "PASSKEY_REMOVED"
   | "TOTP_ENABLED"
   | "TOTP_DISABLED"
+  | "SMS_2FA_ENABLED"
+  | "SMS_2FA_DISABLED"
   | "RECOVERY_CODE_USED"
   | "EMAIL_CHANGED"
   | "OAUTH_APP_CONNECTED"
@@ -462,6 +466,8 @@ export interface MeProfile {
   verificationLevel: string;
   ndyappsConnected: boolean;
   twoFactorEnabled: boolean;
+  smsTwoFactorEnabled: boolean;
+  smsPhoneMasked: string | null;
   role: UserRole;
   createdAt: string;
   bio: string | null;
@@ -588,6 +594,45 @@ export function disable2fa(
   return authedFetch<void>("/auth/2fa/disable", {
     method: "POST",
     body: JSON.stringify({ currentPassword, code }),
+  });
+}
+
+// --- Two-factor authentication (SMS) ---
+// A second, independent 2FA method alongside TOTP above — a user can
+// enable either, both, or neither. Unlike TOTP there's no local secret:
+// Sinch owns the OTP itself, so setup is just "send a code, confirm it."
+
+export function beginSmsSetup(phoneE164: string): Promise<void> {
+  return authedFetch<void>("/auth/sms-2fa/setup", {
+    method: "POST",
+    body: JSON.stringify({ phoneE164 }),
+  });
+}
+
+export function confirmSmsSetup(
+  phoneE164: string,
+  code: string,
+): Promise<void> {
+  return authedFetch<void>("/auth/sms-2fa/enable", {
+    method: "POST",
+    body: JSON.stringify({ phoneE164, code }),
+  });
+}
+
+export function disableSms2fa(currentPassword: string): Promise<void> {
+  return authedFetch<void>("/auth/sms-2fa/disable", {
+    method: "POST",
+    body: JSON.stringify({ currentPassword }),
+  });
+}
+
+// Login-time "text me a code" — called once the user picks SMS on the
+// method picker (when both TOTP and SMS are enabled), or automatically
+// by the challenge form when SMS is the account's only method.
+export function sendSmsChallenge(challengeToken: string): Promise<void> {
+  return apiFetch<void>("/auth/2fa/send-sms", {
+    method: "POST",
+    body: JSON.stringify({ challengeToken }),
   });
 }
 

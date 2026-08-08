@@ -23,6 +23,8 @@ const SECURITY_EVENT_LABELS: Record<SecurityEventType, string> = {
   PASSKEY_REMOVED: "Passkey removed",
   TOTP_ENABLED: "Two-factor authentication enabled",
   TOTP_DISABLED: "Two-factor authentication disabled",
+  SMS_2FA_ENABLED: "SMS two-factor authentication enabled",
+  SMS_2FA_DISABLED: "SMS two-factor authentication disabled",
   RECOVERY_CODE_USED: "Recovery code used to sign in",
   EMAIL_CHANGED: "Email address changed",
   OAUTH_APP_CONNECTED: "Connected a new app",

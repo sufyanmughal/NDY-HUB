@@ -23,6 +23,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
 import { SecurityEventService } from './security-event.service';
+import { Sms2faService } from './sms-2fa.service';
 import {
   encryptTotpSecret,
   decryptTotpSecret,
@@ -55,6 +56,7 @@ export class TotpService {
     private readonly identity: IdentityService,
     private readonly sessions: SessionService,
     private readonly securityEvents: SecurityEventService,
+    private readonly sms2fa: Sms2faService,
     private readonly config: ConfigService,
   ) {}
 
@@ -195,10 +197,34 @@ export class TotpService {
     return token;
   }
 
+  /** Resolves a still-pending challenge token to the user it belongs to —
+   * used by the public 2fa/send-sms endpoint, which only has the
+   * challenge token (no session) and needs to know who to text. Doesn't
+   * consume the token; verifyChallenge is still what redeems it. */
+  async resolveUserIdForChallenge(challengeToken: string): Promise<string> {
+    const user = await this.prisma.user.findUnique({
+      where: { twoFactorChallengeTokenHash: hashChallengeToken(challengeToken) },
+      select: { id: true, twoFactorChallengeExpiresAt: true },
+    });
+    if (!user || !user.twoFactorChallengeExpiresAt || user.twoFactorChallengeExpiresAt < new Date()) {
+      throw new UnauthorizedException(
+        'This login attempt has expired — sign in again.',
+      );
+    }
+    return user.id;
+  }
+
   /**
-   * Step 2 of a 2FA login — trades the challenge token plus a TOTP or
-   * backup code for a real session. Single-use, enforced the same
-   * atomic way as every other one-time token in this schema.
+   * Step 2 of a 2FA login — trades the challenge token plus a code for a
+   * real session. The token itself doesn't say which method it's for
+   * (TOTP/backup or SMS); this dispatches based on which method(s) are
+   * actually enabled on the account the token resolves to, trying TOTP
+   * first when both are enabled (mirrors how verifyCodeOrBackupCode
+   * already tries TOTP then falls back to a backup code). Single-use,
+   * enforced the same atomic way as every other one-time token in this
+   * schema — the redemption itself lives here regardless of which
+   * verifier matched, so there's exactly one place that can consume a
+   * twoFactorChallengeTokenHash.
    */
   async verifyChallenge(
     dto: Verify2faDto,
@@ -211,20 +237,29 @@ export class TotpService {
     if (
       !user ||
       !user.twoFactorChallengeExpiresAt ||
-      user.twoFactorChallengeExpiresAt < new Date() ||
-      !user.totpSecretEncrypted
+      user.twoFactorChallengeExpiresAt < new Date()
     ) {
       throw new UnauthorizedException(
         'This login attempt has expired — sign in again.',
       );
     }
 
-    const matched = await this.verifyCodeOrBackupCode(
-      user.id,
-      user.totpSecretEncrypted,
-      dto.code,
-    );
-    if (matched === null) {
+    let matched: 'totp' | 'backup' | 'sms' | null = null;
+    if (user.totpEnabledAt && user.totpSecretEncrypted) {
+      matched = await this.verifyCodeOrBackupCode(
+        user.id,
+        user.totpSecretEncrypted,
+        dto.code,
+      );
+    }
+    if (!matched && user.smsEnabledAt && user.smsPhoneE164) {
+      const smsValid = await this.sms2fa.checkChallengeCode(
+        user.smsPhoneE164,
+        dto.code,
+      );
+      if (smsValid) matched = 'sms';
+    }
+    if (!matched) {
       throw new UnauthorizedException('Incorrect code.');
     }
 

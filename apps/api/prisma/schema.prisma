@@ -134,6 +134,19 @@ model User {
   totpEnabledAt        DateTime?
   totpBackupCodes      TotpBackupCode[]
 
+  // SMS 2FA via Sinch's Verification API — Sinch owns the OTP itself (we
+  // never generate/store/hash a code for this flow, unlike email
+  // verification/password reset above). smsPhoneE164 is the *verified*
+  // number this factor is bound to — deliberately separate from the
+  // free-text `phone` Passport Card contact field above, since a user's
+  // public contact number and their private 2FA number aren't guaranteed
+  // to be the same. phoneVerifiedAt (already on this model, previously
+  // dead) is set the moment this number is first confirmed, and
+  // verificationLevel moves to LEVEL_2 the same way emailVerifiedAt moves
+  // it to LEVEL_1.
+  smsPhoneE164 String?   @unique
+  smsEnabledAt DateTime?
+
   // Same single-use-token shape as the others, but proving factor 1
   // (password) passed rather than proving identity outright — login()
   // issues this instead of a session when 2FA is enabled, and
@@ -665,6 +678,8 @@ enum SecurityEventType {
   PASSKEY_REMOVED
   TOTP_ENABLED
   TOTP_DISABLED
+  SMS_2FA_ENABLED
+  SMS_2FA_DISABLED
   RECOVERY_CODE_USED
   EMAIL_CHANGED
   OAUTH_APP_CONNECTED

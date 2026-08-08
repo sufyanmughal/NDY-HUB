@@ -12,6 +12,8 @@ import { IdentityService } from '../identity/identity.service';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
 import { SecurityEventService } from './security-event.service';
 import { TotpService } from './totp.service';
+import { Sms2faService } from './sms-2fa.service';
+import { enabledTwoFactorMethods } from './two-factor.util';
 import type { AppleCallbackDto } from './dto/apple-callback.dto';
 
 export type SocialProvider = 'GOOGLE' | 'APPLE';
@@ -57,6 +59,7 @@ export class SocialAuthService {
     private readonly sessions: SessionService,
     private readonly securityEvents: SecurityEventService,
     private readonly totp: TotpService,
+    private readonly sms2fa: Sms2faService,
     private readonly config: ConfigService,
   ) {}
 
@@ -533,6 +536,7 @@ export class SocialAuthService {
       id: string;
       ndyId: string;
       totpEnabledAt: Date | null;
+      smsEnabledAt: Date | null;
       suspended: boolean;
     },
     redirectPath: string,
@@ -540,11 +544,16 @@ export class SocialAuthService {
     if (user.suspended) {
       return this.errorRedirect(redirectPath, 'account_suspended');
     }
-    if (user.totpEnabledAt) {
+    const methods = enabledTwoFactorMethods(user);
+    if (methods.length > 0) {
       const challengeToken = await this.totp.issueChallenge(user.id);
+      if (methods.length === 1 && methods[0] === 'SMS') {
+        void this.sms2fa.sendChallengeCode(user.id);
+      }
       return this.callbackUrl(redirectPath, {
         requires2fa: '1',
         challengeToken,
+        methods: methods.join(','),
       });
     }
     const { id: code } = await this.prisma.oAuthLoginExchange.create({

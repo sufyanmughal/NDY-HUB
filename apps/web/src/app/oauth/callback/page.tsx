@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { exchangeOAuthCode } from "@/lib/api";
+import { exchangeOAuthCode, type TwoFactorMethod } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { TwoFactorChallengeForm } from "@/components/two-factor-challenge-form";
 
@@ -48,6 +48,8 @@ function OAuthCallbackInner() {
   const next = sanitizeNext(searchParams.get("next"));
   const error = searchParams.get("error");
   const challengeToken = searchParams.get("challengeToken");
+  const methods = (searchParams.get("methods")?.split(",").filter(Boolean) ??
+    []) as TwoFactorMethod[];
   const code = searchParams.get("code");
 
   const [exchangeError, setExchangeError] = useState<string | null>(null);
@@ -68,7 +70,12 @@ function OAuthCallbackInner() {
   }, [code, login]);
 
   if (challengeToken) {
-    return <TwoFactorChallengeForm challengeToken={challengeToken} />;
+    return (
+      <TwoFactorChallengeForm
+        challengeToken={challengeToken}
+        methods={methods}
+      />
+    );
   }
 
   if (error) {

@@ -15,6 +15,9 @@ import {
   begin2faSetup,
   confirm2faSetup,
   disable2fa,
+  beginSmsSetup,
+  confirmSmsSetup,
+  disableSms2fa,
   getMyPasskeys,
   removeMyPasskey,
   getOAuthProviders,
@@ -67,6 +70,9 @@ export default function SettingsPage() {
       {profile && <ProfileForm profile={profile} onSaved={setProfile} />}
       <PasswordForm />
       {profile && <TwoFactorSection profile={profile} onChanged={setProfile} />}
+      {profile && (
+        <SmsTwoFactorSection profile={profile} onChanged={setProfile} />
+      )}
       <PasskeysSection />
       <ConnectedAccountsSection />
       {profile && (
@@ -758,6 +764,208 @@ function TwoFactorSection({
             I&apos;ve saved these codes
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * SMS's own equivalent of TwoFactorSection above — a second, independent
+ * 2FA method (a user can have both TOTP and SMS enabled, or either
+ * alone). No backup-codes step: unlike TOTP there's no local secret to
+ * lose access to, Sinch owns the OTP itself, so there's nothing to show
+ * once here.
+ */
+function SmsTwoFactorSection({
+  profile,
+  onChanged,
+}: {
+  profile: MeProfile;
+  onChanged: (profile: MeProfile) => void;
+}) {
+  const [setupStep, setSetupStep] = useState<"idle" | "confirm">("idle");
+  const [phoneE164, setPhoneE164] = useState("");
+  const [confirmCode, setConfirmCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [disableOpen, setDisableOpen] = useState(false);
+  const [disablePassword, setDisablePassword] = useState("");
+  const [disableBusy, setDisableBusy] = useState(false);
+  const [disableError, setDisableError] = useState<string | null>(null);
+
+  async function handleStartSetup(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await beginSmsSetup(phoneE164);
+      setSetupStep("confirm");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleConfirmSetup(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await confirmSmsSetup(phoneE164, confirmCode);
+      setSetupStep("idle");
+      setPhoneE164("");
+      setConfirmCode("");
+      onChanged({ ...profile, smsTwoFactorEnabled: true });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDisable(e: React.FormEvent) {
+    e.preventDefault();
+    setDisableBusy(true);
+    setDisableError(null);
+    try {
+      await disableSms2fa(disablePassword);
+      setDisableOpen(false);
+      setDisablePassword("");
+      onChanged({
+        ...profile,
+        smsTwoFactorEnabled: false,
+        smsPhoneMasked: null,
+      });
+    } catch (err) {
+      setDisableError((err as Error).message);
+    } finally {
+      setDisableBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-surface p-5">
+      <h2 className="text-sm font-medium text-foreground-muted">
+        SMS two-factor authentication
+      </h2>
+
+      {profile.smsTwoFactorEnabled && setupStep === "idle" && (
+        <div className="mt-3">
+          <p className="text-sm text-foreground-muted">
+            Enabled — signing in can send a code to{" "}
+            {profile.smsPhoneMasked ?? "your phone"}.
+          </p>
+          {!disableOpen ? (
+            <button
+              onClick={() => setDisableOpen(true)}
+              className="mt-3 rounded-md border border-critical/40 px-4 py-2 text-sm font-medium text-critical hover:bg-critical/10"
+            >
+              Disable SMS two-factor authentication
+            </button>
+          ) : (
+            <form onSubmit={handleDisable} className="mt-3 space-y-3">
+              <div>
+                <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                  Current password
+                </label>
+                <input
+                  type="password"
+                  value={disablePassword}
+                  onChange={(e) => setDisablePassword(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              {disableError && (
+                <p className="text-sm text-critical">{disableError}</p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDisableOpen(false)}
+                  className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={disableBusy || !disablePassword}
+                  className="rounded-md bg-critical px-4 py-2 text-sm font-medium text-white hover:bg-critical/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {disableBusy ? "Disabling…" : "Disable"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {!profile.smsTwoFactorEnabled && setupStep === "idle" && (
+        <form onSubmit={handleStartSetup} className="mt-3 space-y-3">
+          <p className="text-sm text-foreground-muted">
+            Not enabled. Receive a text message code as a second step when
+            signing in — independent of the authenticator app above, you can
+            use either.
+          </p>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+              Phone number
+            </label>
+            <input
+              value={phoneE164}
+              onChange={(e) => setPhoneE164(e.target.value)}
+              required
+              placeholder="+31 6 12345678"
+              className="mt-1 w-full max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          {error && <p className="text-sm text-critical">{error}</p>}
+          <button
+            type="submit"
+            disabled={busy || !phoneE164}
+            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? "Sending code…" : "Send verification code"}
+          </button>
+        </form>
+      )}
+
+      {setupStep === "confirm" && (
+        <form onSubmit={handleConfirmSetup} className="mt-3 space-y-3">
+          <p className="text-sm text-foreground-muted">
+            We texted a code to {phoneE164}. Enter it below.
+          </p>
+          <input
+            value={confirmCode}
+            onChange={(e) => setConfirmCode(e.target.value)}
+            autoFocus
+            required
+            placeholder="123456"
+            className="w-full max-w-[200px] rounded-md border border-border bg-background px-3 py-2 text-center text-lg tracking-widest"
+          />
+          {error && <p className="text-sm text-critical">{error}</p>}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setSetupStep("idle");
+                setConfirmCode("");
+                setError(null);
+              }}
+              className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy || !confirmCode}
+              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy ? "Confirming…" : "Confirm"}
+            </button>
+          </div>
+        </form>
       )}
     </div>
   );

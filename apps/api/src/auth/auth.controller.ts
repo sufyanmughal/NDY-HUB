@@ -28,6 +28,7 @@ import {
 } from './session-cookie.util';
 import { AuthService } from './auth.service';
 import { TotpService } from './totp.service';
+import { Sms2faService } from './sms-2fa.service';
 import { PasskeyService } from './passkey.service';
 import { SocialAuthService, type SocialProvider } from './social-auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -43,6 +44,10 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ConfirmTotpDto } from './dto/confirm-totp.dto';
 import { DisableTotpDto } from './dto/disable-totp.dto';
 import { Verify2faDto } from './dto/verify-2fa.dto';
+import { Sms2faSetupDto } from './dto/sms-2fa-setup.dto';
+import { ConfirmSms2faDto } from './dto/confirm-sms-2fa.dto';
+import { DisableSms2faDto } from './dto/disable-sms-2fa.dto';
+import { SendSmsChallengeDto } from './dto/send-sms-challenge.dto';
 import { PasskeyRegisterVerifyDto } from './dto/passkey-register-verify.dto';
 import { PasskeyLoginVerifyDto } from './dto/passkey-login-verify.dto';
 import { AppleCallbackDto } from './dto/apple-callback.dto';
@@ -73,6 +78,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly totp: TotpService,
+    private readonly sms2fa: Sms2faService,
     private readonly passkeys: PasskeyService,
     private readonly social: SocialAuthService,
   ) {}
@@ -289,10 +295,51 @@ export class AuthController {
   // Public: step 2 of a 2FA login. The challenge token (issued by
   // AuthService.login once the password already checked out) is the
   // proof of factor 1 — there's no session yet for a guard to check.
+  // Method-agnostic: TotpService.verifyChallenge accepts a TOTP code, a
+  // backup code, or an SMS code, dispatching based on which method(s) are
+  // enabled on the account the token resolves to.
   @Throttle(BRUTE_FORCE_GUARD)
   @Post('2fa/verify')
   verify2fa(@Body() dto: Verify2faDto, @Req() req: Request) {
     return this.totp.verifyChallenge(dto, sessionMeta(req));
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('sms-2fa/setup')
+  beginSms2faSetup(
+    @Body() dto: Sms2faSetupDto,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.sms2fa.beginSetup(user.sub, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('sms-2fa/enable')
+  confirmSms2faSetup(
+    @Body() dto: ConfirmSms2faDto,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.sms2fa.confirmSetup(user.sub, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('sms-2fa/disable')
+  disableSms2fa(
+    @Body() dto: DisableSms2faDto,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.sms2fa.disable(user.sub, dto);
+  }
+
+  // Public, login-time: lets the frontend's method picker request an SMS
+  // send only once the user actually chooses "text me a code" — when both
+  // TOTP and SMS are enabled, AuthService.login() doesn't send an SMS
+  // proactively, so picking TOTP instead never costs a real send.
+  @Throttle(BRUTE_FORCE_GUARD)
+  @Post('2fa/send-sms')
+  async sendSms2faChallenge(@Body() dto: SendSmsChallengeDto) {
+    const userId = await this.totp.resolveUserIdForChallenge(dto.challengeToken);
+    return this.sms2fa.sendChallengeCode(userId);
   }
 
   @UseGuards(JwtAuthGuard)
