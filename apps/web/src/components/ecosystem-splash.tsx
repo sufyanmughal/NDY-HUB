@@ -71,12 +71,7 @@ export function EcosystemSplash({ onDone }: { onDone: () => void }) {
       }}
     >
       <div className="m-auto flex w-full max-w-2xl flex-col items-center">
-        {/* eslint-disable-next-line @next/next/no-img-element -- a static brand asset from /public, not worth next/image's overhead on a screen shown once for 5s */}
-        <img
-          src="/splash-nd-logo.png"
-          alt="NDJOYIT HUB"
-          className="h-auto w-64 sm:w-80"
-        />
+        <AnimatedNdLogo className="h-auto w-64 sm:w-80" />
 
         <div className="mt-4 font-[system-ui] text-4xl font-extrabold tracking-tight sm:text-5xl">
           <span
@@ -158,6 +153,292 @@ export function EcosystemSplash({ onDone }: { onDone: () => void }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * A genuinely animated circuit-board "ND" mark — every stroke draws
+ * itself in on mount (stroke-dashoffset, see .nd-logo-draw in
+ * globals.css), nodes pop in with a soft ongoing glow pulse, and small
+ * light particles continuously travel the main rails afterward via the
+ * CSS `offset-path` API. Original artwork in the same visual language as
+ * the brand mockup (gradient circuit rails, arrowheads, a fingerprint
+ * motif) — not a pixel recreation of it, which would need the source
+ * vector file.
+ */
+function AnimatedNdLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 560 260" fill="none" className={className}>
+      <defs>
+        <linearGradient id="nd-g1" x1="0" y1="0" x2="1" y2="0.2">
+          <stop offset="0%" stopColor="#f0abfc" />
+          <stop offset="35%" stopColor="#c084fc" />
+          <stop offset="65%" stopColor="#a78bfa" />
+          <stop offset="100%" stopColor="#7dd3fc" />
+        </linearGradient>
+        <linearGradient id="nd-g2" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#a78bfa" />
+          <stop offset="100%" stopColor="#60a5fa" />
+        </linearGradient>
+        <radialGradient id="nd-dot">
+          <stop offset="0%" stopColor="#fff" />
+          <stop offset="100%" stopColor="#c084fc" />
+        </radialGradient>
+        <filter id="nd-glow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="3.5" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id="nd-softglow" x="-150%" y="-150%" width="400%" height="400%">
+          <feGaussianBlur stdDeviation="10" />
+        </filter>
+      </defs>
+
+      <ellipse
+        className="nd-logo-ambient"
+        cx="260"
+        cy="130"
+        rx="260"
+        ry="130"
+        fill="#7c3aed"
+        opacity="0.5"
+        filter="url(#nd-softglow)"
+      />
+
+      {/* ================= N ================= */}
+      <path
+        className="nd-logo-draw"
+        d="M 34 220 L 34 32"
+        stroke="url(#nd-g1)"
+        strokeWidth="7"
+        strokeLinecap="round"
+        filter="url(#nd-glow)"
+        pathLength={1}
+        style={{ animationDelay: "0s" }}
+      />
+      <path
+        className="nd-logo-draw nd-logo-fade"
+        d="M 20 50 L 34 20 L 48 50"
+        stroke="url(#nd-g1)"
+        strokeWidth="7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        filter="url(#nd-glow)"
+        pathLength={1}
+        style={{ animationDelay: "0.9s" }}
+      />
+      <path
+        className="nd-logo-draw"
+        d="M 34 70 L 90 70 L 165 165 L 165 220"
+        stroke="url(#nd-g1)"
+        strokeWidth="7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        filter="url(#nd-glow)"
+        pathLength={1}
+        style={{ animationDelay: "0.15s" }}
+      />
+
+      <circle
+        className="nd-logo-node"
+        cx="90"
+        cy="70"
+        r="6"
+        fill="url(#nd-dot)"
+        style={{ color: "#e879f9", animationDelay: "0.5s, 2.5s" }}
+      />
+      <circle
+        className="nd-logo-node"
+        cx="128"
+        cy="118"
+        r="5.5"
+        fill="url(#nd-dot)"
+        style={{ color: "#c084fc", animationDelay: "0.7s, 2.7s" }}
+      />
+
+      {/* ================= D ================= */}
+      <path
+        className="nd-logo-draw"
+        d="M 235 220 L 235 40"
+        stroke="url(#nd-g1)"
+        strokeWidth="7"
+        strokeLinecap="round"
+        filter="url(#nd-glow)"
+        pathLength={1}
+        style={{ animationDelay: "0.3s" }}
+      />
+      <path
+        className="nd-logo-draw"
+        d="M 235 40 Q 340 40 340 90 Q 340 130 300 140 Q 340 150 340 190 Q 340 220 235 220"
+        stroke="url(#nd-g2)"
+        strokeWidth="7"
+        strokeLinecap="round"
+        fill="none"
+        filter="url(#nd-glow)"
+        pathLength={1}
+        style={{ animationDelay: "0.5s" }}
+      />
+
+      <path
+        className="nd-logo-draw"
+        d="M 340 90 L 455 90"
+        stroke="url(#nd-g2)"
+        strokeWidth="7"
+        strokeLinecap="round"
+        filter="url(#nd-glow)"
+        pathLength={1}
+        style={{ animationDelay: "0.75s" }}
+      />
+      <path
+        className="nd-logo-draw nd-logo-fade"
+        d="M 440 76 L 470 90 L 440 104"
+        stroke="url(#nd-g2)"
+        strokeWidth="7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        filter="url(#nd-glow)"
+        pathLength={1}
+        style={{ animationDelay: "1.3s" }}
+      />
+
+      <circle
+        className="nd-logo-node"
+        cx="380"
+        cy="90"
+        r="6"
+        fill="url(#nd-dot)"
+        style={{ color: "#93c5fd", animationDelay: "1s, 3s" }}
+      />
+      <circle
+        className="nd-logo-node"
+        cx="415"
+        cy="90"
+        r="5"
+        fill="url(#nd-dot)"
+        style={{ color: "#60a5fa", animationDelay: "1.15s, 3.15s" }}
+      />
+
+      <path
+        className="nd-logo-draw nd-logo-fade"
+        d="M 470 150 A 55 55 0 0 1 430 205"
+        stroke="url(#nd-g2)"
+        strokeWidth="6"
+        strokeLinecap="round"
+        fill="none"
+        filter="url(#nd-glow)"
+        pathLength={1}
+        style={{ animationDelay: "1.1s" }}
+      />
+      <path
+        className="nd-logo-draw nd-logo-fade"
+        d="M 442 190 L 428 207 L 448 214"
+        stroke="url(#nd-g2)"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        filter="url(#nd-glow)"
+        pathLength={1}
+        style={{ animationDelay: "1.6s" }}
+      />
+
+      <g
+        className="nd-logo-fade"
+        filter="url(#nd-glow)"
+        stroke="#93c5fd"
+        strokeWidth="2.2"
+        fill="none"
+        strokeLinecap="round"
+        style={{ animationDelay: "1.4s" }}
+      >
+        <path d="M 300 130 a 22 22 0 1 1 44 0 a 15 15 0 1 1 -30 0 a 8 8 0 1 1 16 0" />
+      </g>
+
+      <path
+        className="nd-logo-draw"
+        d="M 340 190 L 375 210"
+        stroke="url(#nd-g2)"
+        strokeWidth="4"
+        strokeLinecap="round"
+        filter="url(#nd-glow)"
+        pathLength={1}
+        style={{ animationDelay: "1.2s" }}
+      />
+      <path
+        className="nd-logo-draw"
+        d="M 375 210 L 405 225"
+        stroke="url(#nd-g2)"
+        strokeWidth="4"
+        strokeLinecap="round"
+        filter="url(#nd-glow)"
+        pathLength={1}
+        style={{ animationDelay: "1.35s" }}
+      />
+      <circle
+        className="nd-logo-node"
+        cx="375"
+        cy="210"
+        r="5"
+        fill="url(#nd-dot)"
+        style={{ color: "#a78bfa", animationDelay: "1.5s, 3.5s" }}
+      />
+      <circle
+        className="nd-logo-node"
+        cx="405"
+        cy="225"
+        r="5"
+        fill="url(#nd-dot)"
+        style={{ color: "#60a5fa", animationDelay: "1.65s, 3.65s" }}
+      />
+
+      {/* traveling light particles, looping forever along the main rails */}
+      <circle
+        r="4"
+        fill="#fff"
+        filter="url(#nd-glow)"
+        className="nd-logo-particle"
+        style={{
+          offsetPath: "path('M 34 220 L 34 32')",
+          animationDelay: "2.2s",
+        }}
+      />
+      <circle
+        r="4"
+        fill="#fff"
+        filter="url(#nd-glow)"
+        className="nd-logo-particle"
+        style={{
+          offsetPath: "path('M 34 70 L 90 70 L 165 165 L 165 220')",
+          animationDelay: "2.6s",
+        }}
+      />
+      <circle
+        r="4"
+        fill="#fff"
+        filter="url(#nd-glow)"
+        className="nd-logo-particle"
+        style={{
+          offsetPath: "path('M 340 90 L 455 90')",
+          animationDelay: "2.4s",
+        }}
+      />
+      <circle
+        r="4"
+        fill="#fff"
+        filter="url(#nd-glow)"
+        className="nd-logo-particle"
+        style={{
+          offsetPath:
+            "path('M 235 40 Q 340 40 340 90 Q 340 130 300 140 Q 340 150 340 190 Q 340 220 235 220')",
+          animationDelay: "3s",
+        }}
+      />
+    </svg>
   );
 }
 
