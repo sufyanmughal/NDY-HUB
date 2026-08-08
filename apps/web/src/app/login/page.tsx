@@ -7,6 +7,7 @@ import { QrLoginCard } from "@/components/qr-login-card";
 import { PasswordAuthForm } from "@/components/password-auth-form";
 import { Logo } from "@/components/logo";
 import { useAuth } from "@/lib/auth-context";
+import { EcosystemSplash, useShouldShowSplash } from "@/components/ecosystem-splash";
 import "@/styles/homepage.css";
 import "@/styles/login.css";
 
@@ -64,6 +65,7 @@ function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = sanitizeNext(searchParams.get("next"));
+  const [showSplash, dismissSplash] = useShouldShowSplash();
 
   useEffect(() => {
     if (auth.status === "authenticated") router.replace(next);
@@ -71,6 +73,13 @@ function LoginPageInner() {
 
   if (auth.status !== "unauthenticated") {
     return null;
+  }
+
+  // Plays once per browser session, right when a visitor first lands on
+  // /login — replaced by the real sign-in form below once it finishes (or
+  // immediately on any later visit within the same session).
+  if (showSplash) {
+    return <EcosystemSplash onDone={dismissSplash} />;
   }
 
   return (
