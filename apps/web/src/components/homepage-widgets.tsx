@@ -131,6 +131,69 @@ export interface LauncherCard {
   title: string;
   description: string;
   comingSoon?: boolean;
+  /** Renders as the large left-column NDYSPACE card (icon badge + "New"
+   * pill, quick-action icon row, gradient CTA button) instead of the
+   * standard centered small card — matches the reference mockup's
+   * featured treatment for the one entry that anchors the whole grid. */
+  featured?: boolean;
+}
+
+const QUICK_ACTION_ICONS: Record<string, ReactNode> = {
+  mail: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+      <path d="m4 7 8 6 8-6" />
+    </svg>
+  ),
+  calendar: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <rect x="3.5" y="5" width="17" height="15" rx="2" />
+      <path d="M3.5 9.5h17M8 3v4M16 3v4" />
+    </svg>
+  ),
+  drive: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path d="M6.5 4.5h11l4 8-4 8h-11l-4-8Z" />
+    </svg>
+  ),
+  contacts: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <circle cx="12" cy="8.3" r="3.3" />
+      <path d="M5 20c1.3-4 3.8-6 7-6s5.7 2 7 6" />
+    </svg>
+  ),
+  notifications: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path d="M12 3.5c-3 0-4.8 2.2-4.8 5.5 0 4-1.7 5.5-1.7 5.5h13s-1.7-1.5-1.7-5.5c0-3.3-1.8-5.5-4.8-5.5Z" />
+      <path d="M10 18a2 2 0 0 0 4 0" />
+    </svg>
+  ),
+};
+
+export function FeaturedNdyspaceCard({ card }: { card: LauncherCard }) {
+  const style = { "--card-c": card.color } as CSSProperties;
+  return (
+    <Link className="hp-card-featured" style={style} href={card.href}>
+      <div className="hp-card-featured-icon">{CARD_ICONS[card.icon]}</div>
+      <div className="hp-card-featured-heading">
+        <h3>{card.title}</h3>
+        <span className="hp-card-featured-badge">New</span>
+      </div>
+      <p>{card.description}</p>
+      <div className="hp-card-featured-actions">
+        {(["mail", "calendar", "drive", "contacts", "notifications"] as const).map(
+          (name) => (
+            <span key={name} className="hp-card-featured-action">
+              {QUICK_ACTION_ICONS[name]}
+            </span>
+          ),
+        )}
+      </div>
+      <span className="hp-card-featured-cta">
+        Enter NDYSPACE <CtaArrow />
+      </span>
+    </Link>
+  );
 }
 
 export function LauncherCardView({ card }: { card: LauncherCard }) {
@@ -184,11 +247,16 @@ export function FeatureCardGrid({ cards }: { cards: LauncherCard[] }) {
       {cards.map((card, i) => (
         <motion.div
           key={card.title}
+          className={card.featured ? "hp-cards-featured-slot" : undefined}
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: i * 0.05 }}
         >
-          <LauncherCardView card={card} />
+          {card.featured ? (
+            <FeaturedNdyspaceCard card={card} />
+          ) : (
+            <LauncherCardView card={card} />
+          )}
         </motion.div>
       ))}
     </section>

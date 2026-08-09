@@ -1,27 +1,41 @@
 import {
   LayoutDashboard,
-  IdCard,
-  Users,
-  Coins,
-  Boxes,
-  Link2,
-  ArrowLeftRight,
-  FileText,
+  LayoutGrid,
   ShieldCheck,
+  Rocket,
   Settings as SettingsIcon,
-  LifeBuoy,
-  Crown,
-  Wallet,
-  ShieldAlert,
+  Share2,
+  Link2,
+  Terminal,
+  CircleDollarSign,
+  HelpCircle,
   type LucideIcon,
 } from "lucide-react";
 import { useMe } from "./use-me";
 import { roleHasAnyPermission, type Permission } from "./permissions";
+import { API_BASE_URL } from "./api";
 
 export interface NavItem {
   href: string;
   label: string;
+  /** Small muted line under the label, e.g. "Digital Identity" under "NDY
+   * Passport" — matches the reference sidebar's two-line item treatment.
+   * Omitted for items that don't have one in the reference (Dashboard). */
+  sublabel?: string;
   icon: LucideIcon;
+  /** Per-item icon badge tint, sampled from the reference sidebar (each
+   * item has its own colored rounded-square icon background, not a
+   * shared neutral one). Falls back to the default muted treatment when
+   * omitted (e.g. Dashboard, which uses the active-state style instead). */
+  iconColor?: string;
+  /** External link (not a Next.js route) — renders as a plain <a> with
+   * target="_blank" instead of <Link>, same distinction homepage-widgets'
+   * LauncherCard already draws between internal/external launcher cards. */
+  external?: boolean;
+  /** Visually present but not yet a real destination — same "Coming
+   * soon" treatment as the Developer Portal launcher card on the
+   * dashboard (see homepage-widgets.tsx's comingSoon), not a new pattern. */
+  comingSoon?: boolean;
   /** Omitted for items every authenticated user can see. If set, the item
    * only shows for a viewer whose role grants at least one of these —
    * same permission map the pages themselves gate on, so the nav never
@@ -30,35 +44,39 @@ export interface NavItem {
 }
 
 // Shared between the desktop Sidebar and the mobile nav drawer — one list,
-// so a new destination only ever needs adding here.
+// so a new destination only ever needs adding here. Order/labels/icons
+// match the client's reference sidebar mockup exactly; colors sampled
+// directly from that image via pixel extraction, not eyeballed.
 const BASE_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/passport", label: "NDY Passport", icon: IdCard },
-  { href: "/memberships/manage", label: "Memberships", icon: Users },
-  { href: "/cryndy", label: "CRYNDY", icon: Coins },
-  { href: "/ndybits", label: "NDYBITS", icon: Boxes },
-  { href: "/platforms", label: "Connected Platforms", icon: Link2 },
-  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
-  { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/security", label: "Security", icon: ShieldCheck },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
-  { href: "/support", label: "Support", icon: LifeBuoy },
+  {
+    href: "/ndyspace",
+    label: "NDYSPACE™",
+    sublabel: "Mail, Calendar, Drive & more",
+    icon: LayoutGrid,
+    iconColor: "#8b5cf6",
+  },
+  {
+    href: "/passport",
+    label: "NDY Passport",
+    sublabel: "Digital Identity",
+    icon: ShieldCheck,
+    iconColor: "#4f7cff",
+  },
   {
     href: "/founder",
     label: "Founder Mission Control",
-    icon: Crown,
+    sublabel: "Dashboard for founders",
+    icon: Rocket,
+    iconColor: "#22c58b",
     anyOfPermissions: ["VIEW_FOUNDER_OVERVIEW"],
   },
   {
-    href: "/finance",
-    label: "Financials",
-    icon: Wallet,
-    anyOfPermissions: ["VIEW_FINANCIALS"],
-  },
-  {
     href: "/admin",
-    label: "Admin",
-    icon: ShieldAlert,
+    label: "Admin Center",
+    sublabel: "Platform Management",
+    icon: SettingsIcon,
+    iconColor: "#e0a83c",
     anyOfPermissions: [
       "MANAGE_USERS",
       "MANAGE_ROLES",
@@ -66,6 +84,51 @@ const BASE_NAV_ITEMS: NavItem[] = [
       "MANAGE_OAUTH_CLIENTS",
       "MANAGE_SUPPORT_TICKETS",
     ],
+  },
+  {
+    href: "/platforms",
+    label: "Connected Platforms",
+    sublabel: "Manage Integrations",
+    icon: Share2,
+    iconColor: "#8b5cf6",
+  },
+  {
+    href: `${API_BASE_URL}/.well-known/openid-configuration`,
+    label: "API",
+    sublabel: "Documentation & Tools",
+    icon: Link2,
+    iconColor: "#22d3ee",
+    external: true,
+  },
+  {
+    href: "#",
+    label: "Developer Portal",
+    sublabel: "SDK's & Developer Tools",
+    icon: Terminal,
+    iconColor: "#8b5cf6",
+    comingSoon: true,
+  },
+  {
+    href: "/security",
+    label: "Security",
+    sublabel: "Account & Access",
+    icon: ShieldCheck,
+    iconColor: "#8b5cf6",
+  },
+  {
+    href: "/finance",
+    label: "Financials",
+    sublabel: "Revenue, Tokens & Wallets",
+    icon: CircleDollarSign,
+    iconColor: "#e0a83c",
+    anyOfPermissions: ["VIEW_FINANCIALS"],
+  },
+  {
+    href: "/support",
+    label: "Help & Support",
+    sublabel: "Get Assistance",
+    icon: HelpCircle,
+    iconColor: "#22d3ee",
   },
 ];
 

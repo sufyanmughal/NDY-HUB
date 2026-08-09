@@ -1,43 +1,59 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useNavItems, isNavItemActive } from "@/lib/nav-items";
+import { NavItemLink } from "@/components/nav-item-link";
 import { Logo } from "@/components/logo";
+
+// Sampled directly from the client's reference sidebar mockup (pixel
+// extraction, not eyeballed) — deliberately scoped to this component
+// rather than promoted into globals.css's shared --surface token, since
+// that token backs cards on every other page in the app and the
+// reference mockup's darker tone is specific to the sidebar chrome.
+const SIDEBAR_BG = "#050b1b";
 
 export function Sidebar() {
   const pathname = usePathname();
   const navItems = useNavItems();
 
   return (
-    <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-surface">
+    <aside
+      className="hidden md:flex w-64 shrink-0 flex-col border-r border-border"
+      style={{ backgroundColor: SIDEBAR_BG }}
+    >
       <div className="px-6 py-6">
         <Logo />
       </div>
-      <nav className="flex-1 px-3 space-y-0.5">
-        {navItems.map((item) => {
-          const active = isNavItemActive(item.href, pathname);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                active
-                  ? "bg-accent/15 text-foreground font-medium"
-                  : "text-foreground-muted hover:bg-surface-2 hover:text-foreground"
-              }`}
-            >
-              <Icon
-                size={17}
-                strokeWidth={2}
-                className={active ? "text-accent" : "text-foreground-muted"}
-              />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
+        {navItems.map((item) => (
+          <NavItemLink
+            key={item.href}
+            item={item}
+            active={isNavItemActive(item.href, pathname)}
+          />
+        ))}
       </nav>
+      <MobileAppCard />
     </aside>
+  );
+}
+
+/** Static placeholder — no mobile app distribution link exists yet, same
+ * "visually present, honestly inert" treatment as the Developer Portal
+ * nav item and the dashboard's own comingSoon launcher cards. */
+function MobileAppCard() {
+  return (
+    <div className="mx-3 mb-4 rounded-lg bg-gradient-to-br from-accent-2 to-accent p-4 text-white">
+      <p className="text-sm font-semibold">NDY Mobile App</p>
+      <p className="mt-0.5 text-xs text-white/80">Your ecosystem. Anywhere.</p>
+      <button
+        type="button"
+        disabled
+        title="Coming soon"
+        className="mt-3 w-full cursor-default rounded-md bg-white/15 px-3 py-1.5 text-xs font-medium"
+      >
+        Download Now
+      </button>
+    </div>
   );
 }

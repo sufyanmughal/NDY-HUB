@@ -25,13 +25,13 @@ export default function DashboardPage() {
 
   const cards: LauncherCard[] = [
     {
-      href: "#",
+      href: "/ndyspace",
       icon: "ndyspace",
       color: "#6366f1",
       title: "NDYSPACE™",
       description:
-        "Your personal digital space. Mail, Calendar, Drive, Contacts, and more.",
-      comingSoon: true,
+        "Your personal digital space. Mail, Calendar, Drive, Contacts, and more – all in one secure place.",
+      featured: true,
     },
     {
       href: "/security",
@@ -103,32 +103,32 @@ export default function DashboardPage() {
       label: "Total Members",
       value: overview?.totalMembers,
       icon: "users" as const,
-      color: "#8b5cf6",
+      color: "#694dfa",
     },
     {
       label: "Connected Platforms",
       value: overview?.connectedPlatforms,
       icon: "layers" as const,
-      color: "#22c58b",
+      color: "#01e19a",
     },
     {
       label: "System Uptime",
       value: overview?.systemUptimePct,
       icon: "shieldCheck" as const,
-      color: "#4f7cff",
+      color: "#ff8623",
       suffix: "%",
     },
     {
       label: "Countries",
       value: overview?.countries,
       icon: "globe" as const,
-      color: "#e0a83c",
+      color: "#0b9afa",
     },
     {
       label: "Transactions (24h)",
       value: overview?.transactions24h,
       icon: "activity" as const,
-      color: "#ec4899",
+      color: "#fe3c90",
     },
   ];
 

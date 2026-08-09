@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Search, Bell, Menu, Grid3x3, ChevronDown, Sun } from "lucide-react";
+import { Search, Bell, Menu, ArrowLeft, ChevronDown, Sun } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { usePassport } from "@/lib/use-passport";
@@ -30,6 +30,16 @@ export function NdyspaceTopbar() {
       >
         <Menu size={20} strokeWidth={2} />
       </button>
+
+      <Link
+        href="/dashboard"
+        aria-label="Back to NDY HUB dashboard"
+        title="Back to NDY HUB dashboard"
+        className="ndyspace-icon-btn hidden shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium md:flex"
+      >
+        <ArrowLeft size={16} strokeWidth={2} />
+        Back to NDY HUB
+      </Link>
 
       <div className="relative hidden w-full max-w-sm md:block">
         <Search
@@ -75,11 +85,11 @@ export function NdyspaceTopbar() {
 
         <Link
           href="/dashboard"
-          aria-label="Back to NDY HUB"
-          title="Back to NDY HUB"
-          className="ndyspace-icon-btn p-1.5"
+          aria-label="Back to NDY HUB dashboard"
+          title="Back to NDY HUB dashboard"
+          className="ndyspace-icon-btn p-1.5 md:hidden"
         >
-          <Grid3x3 size={17} strokeWidth={2} />
+          <ArrowLeft size={17} strokeWidth={2} />
         </Link>
 
         <div className="relative ml-1">

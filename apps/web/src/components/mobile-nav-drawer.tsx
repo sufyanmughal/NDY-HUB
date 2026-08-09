@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { useNavItems, isNavItemActive } from "@/lib/nav-items";
 import { useMobileNav } from "@/lib/mobile-nav-context";
 import { Logo } from "@/components/logo";
+import { NavItemLink } from "@/components/nav-item-link";
 
 /**
  * Mobile-only counterpart to the desktop Sidebar (which is `hidden` below
@@ -60,30 +60,15 @@ export function MobileNavDrawer() {
             <X size={20} strokeWidth={2} />
           </button>
         </div>
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
-          {navItems.map((item) => {
-            const active = isNavItemActive(item.href, pathname);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={close}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                  active
-                    ? "bg-accent/15 text-foreground font-medium"
-                    : "text-foreground-muted hover:bg-surface-2 hover:text-foreground"
-                }`}
-              >
-                <Icon
-                  size={17}
-                  strokeWidth={2}
-                  className={active ? "text-accent" : "text-foreground-muted"}
-                />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3">
+          {navItems.map((item) => (
+            <NavItemLink
+              key={item.href}
+              item={item}
+              active={isNavItemActive(item.href, pathname)}
+              onClick={close}
+            />
+          ))}
         </nav>
       </aside>
     </div>
