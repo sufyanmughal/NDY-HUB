@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HardDrive } from "lucide-react";
 import { NDYSPACE_NAV_ITEMS, isNdyspaceNavItemActive } from "@/lib/ndyspace-nav-items";
-import { Logo } from "@/components/logo";
-import { useDriveStorage } from "@/lib/ndyspace-hooks";
+import { BrandMark } from "@/components/logo";
+import { useDriveStorage, useNdyspaceOverview } from "@/lib/ndyspace-hooks";
 
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return "0 MB";
@@ -19,29 +19,22 @@ function formatBytes(bytes: number): string {
 // render the exact same thing without duplicating the fetch/format logic.
 function StorageWidget() {
   const usage = useDriveStorage();
+  const percent = Math.min(100, usage?.percentUsed ?? 0);
 
   return (
-    <div className="mx-3 mb-3 rounded-lg border border-border bg-surface-2 p-3">
+    <div className="ndyspace-storage-widget mx-3 mb-3 p-3">
       <div className="flex items-center gap-2 text-xs font-medium text-foreground-muted">
         <HardDrive size={14} strokeWidth={2} />
         Storage
       </div>
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-background">
-        <div
-          className="h-full rounded-full bg-accent"
-          style={{ width: `${Math.min(100, usage?.percentUsed ?? 0)}%` }}
-        />
+      <div className="mt-2 text-xs font-medium text-foreground">
+        {usage ? `${formatBytes(usage.usedBytes)} / ${formatBytes(usage.totalBytes)}` : "…"}
       </div>
-      <div className="mt-1.5 flex items-center justify-between text-[11px] text-foreground-muted">
-        <span>
-          {usage ? `${formatBytes(usage.usedBytes)} of ${formatBytes(usage.totalBytes)}` : "…"}
-        </span>
-        <span>{usage ? `${usage.percentUsed}%` : ""}</span>
+      <div className="ndyspace-storage-track mt-2 h-1.5 w-full">
+        <div className="ndyspace-storage-fill h-full" style={{ width: `${percent}%` }} />
       </div>
-      <Link
-        href="/ndyspace/drive"
-        className="mt-2 block text-center text-[11px] font-medium text-accent hover:underline"
-      >
+      <div className="mt-1.5 text-[11px] text-foreground-muted">{usage ? `${percent}%` : ""}</div>
+      <Link href="/ndyspace/drive" className="ndyspace-storage-cta mt-2 px-3 py-1.5 text-xs">
         Go to Drive
       </Link>
     </div>
@@ -50,44 +43,52 @@ function StorageWidget() {
 
 export function NdyspaceSidebar() {
   const pathname = usePathname();
+  const { data: overview } = useNdyspaceOverview();
+  const mailBadge = overview?.unreadMailCount ?? 0;
+  const notificationsBadge = overview?.notifications.unreadCount ?? 0;
 
   return (
-    <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-surface">
-      <div className="px-6 py-6">
-        <Logo />
-        <p className="mt-1 text-[11px] uppercase tracking-wide text-foreground-muted">
-          NDYSPACE™ — Your Digital Space
-        </p>
+    <aside className="ndyspace-sidebar hidden md:flex w-[230px] shrink-0 flex-col">
+      <div className="px-5 py-6">
+        <BrandMark size={30} />
+        <p className="mt-2 text-sm font-semibold tracking-tight text-foreground">NDYSPACE™</p>
+        <p className="ndyspace-sidebar-brand-sub text-[11px]">Your Digital Space</p>
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
         {NDYSPACE_NAV_ITEMS.map((item) => {
           const active = !item.external && isNdyspaceNavItemActive(item.href, pathname);
           const Icon = item.icon;
+          const badge =
+            item.href === "/ndyspace/mail"
+              ? mailBadge
+              : item.href === "/ndyspace/notifications"
+                ? notificationsBadge
+                : 0;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                active
-                  ? "bg-accent/15 text-foreground font-medium"
-                  : "text-foreground-muted hover:bg-surface-2 hover:text-foreground"
-              }`}
+              className={`ndyspace-nav-item flex items-center gap-3 px-3 py-2 text-sm ${active ? "is-active" : ""}`}
             >
               <Icon
                 size={17}
                 strokeWidth={2}
-                className={active ? "text-accent" : "text-foreground-muted"}
+                className={`ndyspace-nav-icon ${active ? "text-accent" : "text-foreground-muted"}`}
               />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {badge > 0 && <span className="ndyspace-nav-badge">{badge}</span>}
             </Link>
           );
         })}
       </nav>
       <StorageWidget />
-      <div className="border-t border-border px-6 py-4 text-[11px] text-foreground-muted">
-        NDY HUB — Powered by NDJOYIT
-        <br />
-        NDYSPACE v0.1.0 (Phase 0/1)
+      <div className="ndyspace-sidebar-footer flex items-center gap-2 px-5 py-4 text-[11px]">
+        <BrandMark size={14} />
+        <span>
+          NDYSPACE™
+          <br />
+          <span className="ndyspace-footer-sub">v1.0.0</span>
+        </span>
       </div>
     </aside>
   );

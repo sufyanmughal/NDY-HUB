@@ -27,12 +27,12 @@ function ModalShell({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-xl">
+      <div className="ndyspace-card relative z-10 w-full max-w-md p-5 shadow-xl">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-md px-2 py-1 text-xs text-foreground-muted hover:bg-surface-2"
+            className="ndyspace-icon-btn rounded-md px-2 py-1 text-xs"
           >
             Close
           </button>

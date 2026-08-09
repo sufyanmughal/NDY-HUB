@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Search, Bell, Menu, Grid3x3, ChevronDown } from "lucide-react";
+import { Search, Bell, Menu, Grid3x3, ChevronDown, Sun } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { usePassport } from "@/lib/use-passport";
@@ -22,11 +22,11 @@ export function NdyspaceTopbar() {
   const unreadNotifications = overview?.notifications.unreadCount ?? 0;
 
   return (
-    <header className="flex items-center gap-3 border-b border-border bg-surface px-4 py-4 md:justify-between md:px-6">
+    <header className="ndyspace-topbar flex items-center gap-3 px-4 py-4 md:justify-between md:px-6">
       <button
         onClick={toggle}
         aria-label="Open menu"
-        className="rounded-md p-1.5 text-foreground-muted hover:bg-surface-2 hover:text-foreground md:hidden"
+        className="ndyspace-icon-btn rounded-md p-1.5 md:hidden"
       >
         <Menu size={20} strokeWidth={2} />
       </button>
@@ -39,30 +39,31 @@ export function NdyspaceTopbar() {
         />
         <input
           type="search"
-          placeholder="Search NDYSPACE…"
+          placeholder="Search in NDYSPACE…"
           disabled
           title="Global search — planned follow-up, not built in this pass"
-          className="w-full rounded-md border border-border bg-background py-1.5 pl-9 pr-14 text-sm text-foreground-muted placeholder:text-foreground-muted disabled:cursor-not-allowed"
+          className="ndyspace-search w-full rounded-md py-1.5 pl-9 pr-14 text-sm placeholder:text-foreground-muted disabled:cursor-not-allowed"
         />
         <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-[10px] text-foreground-muted">
           ⌘K
         </kbd>
       </div>
 
-      <div className="ml-auto flex items-center gap-3 text-sm text-foreground-muted md:ml-0">
-        <Link
-          href="/dashboard"
-          aria-label="Back to NDY HUB"
-          title="Back to NDY HUB"
-          className="rounded-md p-1.5 hover:bg-surface-2 hover:text-foreground"
+      <div className="ml-auto flex items-center gap-1.5 text-sm text-foreground-muted md:ml-0">
+        <button
+          type="button"
+          disabled
+          aria-label="Theme toggle"
+          title="Light mode — planned follow-up, not built in this pass (NDY HUB runs one committed dark theme)"
+          className="ndyspace-icon-btn p-1.5 disabled:cursor-not-allowed"
         >
-          <Grid3x3 size={17} strokeWidth={2} />
-        </Link>
+          <Sun size={17} strokeWidth={2} />
+        </button>
 
         <Link
           href="/ndyspace/notifications"
           aria-label="Notifications"
-          className="relative rounded-md p-1.5 hover:bg-surface-2 hover:text-foreground"
+          className="ndyspace-icon-btn relative p-1.5"
         >
           <Bell size={17} strokeWidth={2} />
           {unreadNotifications > 0 && (
@@ -72,10 +73,19 @@ export function NdyspaceTopbar() {
           )}
         </Link>
 
-        <div className="relative">
+        <Link
+          href="/dashboard"
+          aria-label="Back to NDY HUB"
+          title="Back to NDY HUB"
+          className="ndyspace-icon-btn p-1.5"
+        >
+          <Grid3x3 size={17} strokeWidth={2} />
+        </Link>
+
+        <div className="relative ml-1">
           <button
             onClick={() => setMenuOpen((v) => !v)}
-            className="flex items-center gap-2 rounded-md p-1 hover:bg-surface-2"
+            className="ndyspace-profile-chip flex items-center gap-2 rounded-md p-1"
           >
             <Avatar photoUrl={passport?.profilePhotoUrl} name={displayName} size={32} />
             <span className="hidden flex-col items-start leading-tight sm:flex">
@@ -87,7 +97,7 @@ export function NdyspaceTopbar() {
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 z-20 mt-2 w-48 rounded-md border border-border bg-surface py-1 shadow-xl">
+              <div className="ndyspace-card absolute right-0 z-20 mt-2 w-48 py-1 shadow-xl">
                 <Link
                   href="/passport"
                   className="block px-3 py-2 text-sm hover:bg-surface-2"

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { NDYSPACE_NAV_ITEMS, isNdyspaceNavItemActive } from "@/lib/ndyspace-nav-items";
 import { useNdyspaceMobileNav } from "@/lib/ndyspace-mobile-nav-context";
-import { Logo } from "@/components/logo";
+import { BrandMark } from "@/components/logo";
 
 export function NdyspaceMobileNavDrawer() {
   const { isOpen, close } = useNdyspaceMobileNav();
@@ -38,16 +38,20 @@ export function NdyspaceMobileNavDrawer() {
         }`}
       />
       <aside
-        className={`absolute inset-y-0 left-0 flex w-64 flex-col border-r border-border bg-surface shadow-xl transition-transform duration-200 ${
+        className={`ndyspace-sidebar absolute inset-y-0 left-0 flex w-64 flex-col shadow-xl transition-transform duration-200 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between px-6 py-6">
-          <Logo />
+        <div className="flex items-center justify-between px-5 py-6">
+          <div>
+            <BrandMark size={30} />
+            <p className="mt-2 text-sm font-semibold tracking-tight text-foreground">NDYSPACE™</p>
+            <p className="ndyspace-sidebar-brand-sub text-[11px]">Your Digital Space</p>
+          </div>
           <button
             onClick={close}
             aria-label="Close menu"
-            className="rounded-md p-1.5 text-foreground-muted hover:bg-surface-2 hover:text-foreground"
+            className="ndyspace-icon-btn rounded-md p-1.5"
           >
             <X size={20} strokeWidth={2} />
           </button>
@@ -61,16 +65,12 @@ export function NdyspaceMobileNavDrawer() {
                 key={item.href}
                 href={item.href}
                 onClick={close}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                  active
-                    ? "bg-accent/15 text-foreground font-medium"
-                    : "text-foreground-muted hover:bg-surface-2 hover:text-foreground"
-                }`}
+                className={`ndyspace-nav-item flex items-center gap-3 px-3 py-2 text-sm ${active ? "is-active" : ""}`}
               >
                 <Icon
                   size={17}
                   strokeWidth={2}
-                  className={active ? "text-accent" : "text-foreground-muted"}
+                  className={`ndyspace-nav-icon ${active ? "text-accent" : "text-foreground-muted"}`}
                 />
                 {item.label}
               </Link>

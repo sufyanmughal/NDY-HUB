@@ -69,23 +69,23 @@ export function MiniCalendar() {
     year === today.getFullYear() && month === today.getMonth() + 1 && day === today.getDate();
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
+    <div className="ndyspace-card p-4">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">
+        <span className="ndyspace-panel-title text-sm font-medium">
           {MONTH_LABELS[month - 1]} {year}
         </span>
         <div className="flex items-center gap-1">
           <button
             onClick={goPrevMonth}
             aria-label="Previous month"
-            className="rounded p-1 text-foreground-muted hover:bg-surface-2 hover:text-foreground"
+            className="ndyspace-icon-btn rounded p-1"
           >
             <ChevronLeft size={16} strokeWidth={2} />
           </button>
           <button
             onClick={goNextMonth}
             aria-label="Next month"
-            className="rounded p-1 text-foreground-muted hover:bg-surface-2 hover:text-foreground"
+            className="ndyspace-icon-btn rounded p-1"
           >
             <ChevronRight size={16} strokeWidth={2} />
           </button>
@@ -104,12 +104,12 @@ export function MiniCalendar() {
             <div
               key={day}
               className={`relative flex h-7 items-center justify-center rounded-full text-xs ${
-                isToday(day) ? "bg-accent text-white font-semibold" : "text-foreground"
+                isToday(day) ? "ndyspace-minical-today font-semibold" : "text-foreground"
               }`}
             >
               {day}
               {hasEvent && !isToday(day) && (
-                <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-accent" />
+                <span className="ndyspace-minical-dot absolute bottom-0.5 h-1 w-1 rounded-full" />
               )}
             </div>
           );

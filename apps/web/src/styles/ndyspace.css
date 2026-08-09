@@ -1,0 +1,266 @@
+/* NDYSPACE-scoped visual layer — mirrors the .ndy-homepage pattern in
+   homepage.css: colors/spacing transcribed 1:1 from the client's reference
+   mockup (pixel-sampled hex values) rather than approximated through the
+   shared app tokens in globals.css, since the mockup commits to its own
+   slightly darker/bluer palette than the rest of NDY HUB. Scoped under
+   .ndyspace-shell so these variables/rules never leak outside NDYSPACE. */
+
+.ndyspace-shell {
+  min-width: 0;
+
+  --ns-bg: #051121;
+  --ns-topbar-bg: #01030f;
+  --ns-sidebar-bg: #000b18;
+  --ns-sidebar-active: #0c0f32;
+  --ns-card-bg: #000618;
+  --ns-card-bg-2: #040c1f;
+  --ns-border: #1b2436;
+  --ns-fg: #eef1f8;
+  --ns-fg-muted: #8891a8;
+  --ns-fg-dim: #5c6479;
+  --ns-accent: #4f7cff;
+  --ns-accent-2: #8b5cf6;
+  --ns-purple: #5a31be;
+  --ns-badge-email: #31147e;
+  --ns-badge-event: #1a598c;
+  --ns-badge-upload: #29cb8f;
+
+  background: var(--ns-bg);
+  color: var(--ns-fg);
+}
+
+.ndyspace-shell * {
+  box-sizing: border-box;
+}
+
+/* ---------- topbar ---------- */
+.ndyspace-topbar {
+  background: var(--ns-topbar-bg);
+  border-bottom: 1px solid var(--ns-border);
+}
+
+.ndyspace-search {
+  background: var(--ns-bg);
+  border: 1px solid var(--ns-border);
+  color: var(--ns-fg-muted);
+}
+
+.ndyspace-icon-btn {
+  color: var(--ns-fg-muted);
+  border-radius: 8px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.ndyspace-icon-btn:hover {
+  background: var(--ns-card-bg-2);
+  color: var(--ns-fg);
+}
+
+.ndyspace-profile-chip:hover {
+  background: var(--ns-card-bg-2);
+}
+
+/* ---------- sidebar ---------- */
+.ndyspace-sidebar {
+  background: var(--ns-sidebar-bg);
+  border-right: 1px solid var(--ns-border);
+}
+
+.ndyspace-sidebar-brand-sub,
+.ndyspace-footer-sub {
+  color: var(--ns-fg-muted);
+}
+
+.ndyspace-nav-item {
+  color: var(--ns-fg-muted);
+  border-radius: 8px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.ndyspace-nav-item:hover {
+  background: var(--ns-card-bg-2);
+  color: var(--ns-fg);
+}
+.ndyspace-nav-item.is-active {
+  background: var(--ns-sidebar-active);
+  color: var(--ns-fg);
+  font-weight: 500;
+}
+.ndyspace-nav-item.is-active .ndyspace-nav-icon {
+  color: var(--ns-accent);
+}
+
+.ndyspace-nav-badge {
+  background: color-mix(in srgb, var(--ns-accent) 22%, transparent);
+  color: var(--ns-fg);
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 6px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.ndyspace-storage-widget {
+  background: var(--ns-card-bg-2);
+  border: 1px solid var(--ns-border);
+  border-radius: 10px;
+}
+
+.ndyspace-storage-track {
+  background: var(--ns-bg);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ndyspace-storage-fill {
+  background: linear-gradient(90deg, var(--ns-purple), var(--ns-accent-2));
+  border-radius: 999px;
+}
+
+.ndyspace-storage-cta {
+  background: var(--ns-purple);
+  color: #fff;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background-color 0.15s ease;
+  display: block;
+  text-align: center;
+}
+.ndyspace-storage-cta:hover {
+  background: #6c3ce0;
+}
+
+.ndyspace-sidebar-footer {
+  border-top: 1px solid var(--ns-border);
+  color: var(--ns-fg-dim);
+}
+
+/* ---------- main content ---------- */
+.ndyspace-main {
+  background: var(--ns-bg);
+}
+
+.ndyspace-card {
+  background: var(--ns-card-bg);
+  border: 1px solid var(--ns-border);
+  border-radius: 12px;
+}
+
+.ndyspace-card-alt {
+  background: var(--ns-card-bg-2);
+  border: 1px solid var(--ns-border);
+  border-radius: 12px;
+}
+
+.ndyspace-customize-btn {
+  border: 1px solid var(--ns-border);
+  color: var(--ns-fg-muted);
+  border-radius: 999px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.ndyspace-customize-btn:hover:not(:disabled) {
+  background: var(--ns-card-bg-2);
+  color: var(--ns-fg);
+}
+
+/* ---------- quick action tiles ---------- */
+.ndyspace-quick-tile {
+  background: var(--ns-card-bg);
+  border: 1px solid var(--ns-border);
+  border-radius: 12px;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.ndyspace-quick-tile:hover {
+  border-color: var(--qt-c, var(--ns-border));
+  transform: translateY(-1px);
+}
+.ndyspace-quick-tile-icon {
+  background: var(--qt-c);
+  color: #fff;
+  border-radius: 999px;
+}
+
+/* ---------- panel header / tabs ---------- */
+.ndyspace-panel-title {
+  color: var(--ns-fg);
+}
+.ndyspace-panel-link {
+  color: var(--ns-accent);
+}
+.ndyspace-panel-link:hover {
+  text-decoration: underline;
+}
+.ndyspace-count-pill {
+  background: color-mix(in srgb, var(--ns-accent) 20%, transparent);
+  color: var(--ns-fg);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+}
+
+.ndyspace-tabs {
+  border-bottom: 1px solid var(--ns-border);
+}
+.ndyspace-tab {
+  color: var(--ns-fg-muted);
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.ndyspace-tab.is-active {
+  color: var(--ns-fg);
+  border-bottom-color: var(--ns-accent);
+  font-weight: 600;
+}
+
+.ndyspace-row-divider {
+  border-top: 1px solid var(--ns-border);
+}
+.ndyspace-row-divider:first-child {
+  border-top: none;
+}
+
+.ndyspace-footer-link {
+  border-top: 1px solid var(--ns-border);
+  color: var(--ns-accent);
+}
+.ndyspace-footer-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- priority pills (reuse app-wide status tokens) ---------- */
+.ndyspace-priority-high {
+  background: color-mix(in srgb, var(--color-critical, #f0605a) 18%, transparent);
+  color: var(--color-critical, #f0605a);
+}
+.ndyspace-priority-medium {
+  background: color-mix(in srgb, var(--color-warn, #e0a83c) 18%, transparent);
+  color: var(--color-warn, #e0a83c);
+}
+.ndyspace-priority-low {
+  background: color-mix(in srgb, var(--color-good, #22c58b) 18%, transparent);
+  color: var(--color-good, #22c58b);
+}
+
+/* ---------- mini calendar ---------- */
+.ndyspace-minical-today {
+  background: var(--ns-accent-2);
+  color: #fff;
+}
+.ndyspace-minical-dot {
+  background: var(--ns-accent-2);
+}
+
+/* ---------- global footer ---------- */
+.ndyspace-footer {
+  border-top: 1px solid var(--ns-border);
+  background: var(--ns-topbar-bg);
+  color: var(--ns-fg-dim);
+}
+.ndyspace-footer a {
+  color: var(--ns-fg-muted);
+  text-decoration: none;
+}
+.ndyspace-footer a:hover {
+  color: var(--ns-fg);
+}
