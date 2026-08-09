@@ -460,6 +460,82 @@
   flex-shrink: 0;
 }
 
+/* ---------- recent activity ---------- */
+.ndy-homepage .hp-activity {
+  margin: 20px 40px 0;
+  background: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  border-radius: 14px;
+  padding: 22px 24px;
+}
+.ndy-homepage .hp-activity-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.ndy-homepage .hp-activity-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.ndy-homepage .hp-activity-viewall {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hp-accent);
+  text-decoration: none;
+}
+.ndy-homepage .hp-activity-viewall:hover {
+  text-decoration: underline;
+}
+.ndy-homepage .hp-activity-empty {
+  margin: 14px 0 4px;
+  font-size: 13px;
+  color: var(--hp-fg-muted);
+}
+.ndy-homepage .hp-activity-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.ndy-homepage .hp-activity-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--hp-border);
+}
+.ndy-homepage .hp-activity-item:first-child {
+  border-top: none;
+}
+.ndy-homepage .hp-activity-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--act-c) 15%, transparent);
+  color: var(--act-c);
+}
+.ndy-homepage .hp-activity-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.ndy-homepage .hp-activity-body {
+  min-width: 0;
+}
+.ndy-homepage .hp-activity-label {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.ndy-homepage .hp-activity-time {
+  font-size: 11.5px;
+  color: var(--hp-fg-muted);
+  margin-top: 1px;
+}
+
 /* Grid/flex items default to min-width:auto, which refuses to shrink
    below content size — the exact bug this file had. Let every card/item
    shrink with its track instead of forcing the track (and everything
@@ -469,7 +545,8 @@
 .ndy-homepage .hp-token-card,
 .ndy-homepage .hp-eco-item,
 .ndy-homepage .hp-token-name,
-.ndy-homepage .hp-token-sub {
+.ndy-homepage .hp-token-sub,
+.ndy-homepage .hp-activity-body {
   min-width: 0;
 }
 
@@ -605,15 +682,14 @@
   .ndy-homepage .hp-stats {
     grid-template-columns: repeat(3, 1fr);
   }
-  .ndy-homepage .hp-stat:nth-child(3) {
+  .ndy-homepage .hp-stat:nth-child(3n) {
     border-right: none;
   }
   .ndy-homepage .hp-stat {
     border-bottom: 1px solid var(--hp-border);
   }
-  .ndy-homepage .hp-stat:nth-child(4),
-  .ndy-homepage .hp-stat:nth-child(5),
-  .ndy-homepage .hp-stat:nth-child(6) {
+  .ndy-homepage .hp-stat:nth-last-child(-n + 3):nth-child(3n + 1),
+  .ndy-homepage .hp-stat:nth-last-child(-n + 3):nth-child(3n + 1) ~ .hp-stat {
     border-bottom: none;
   }
   .ndy-homepage .hp-eco-grid {
@@ -637,6 +713,7 @@
   .ndy-homepage .hp-cards,
   .ndy-homepage .hp-stats,
   .ndy-homepage .hp-tokens,
+  .ndy-homepage .hp-activity,
   .ndy-homepage .hp-eco-grid {
     margin-left: 20px;
     margin-right: 20px;

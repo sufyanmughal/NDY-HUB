@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/lib/auth-context";
 import { useEcosystemOverview } from "@/lib/use-ecosystem-overview";
+import { useMyActivity } from "@/lib/use-my-activity";
 import { useMe } from "@/lib/use-me";
 import { API_BASE_URL } from "@/lib/api";
 import {
@@ -9,6 +10,7 @@ import {
   FeatureCardGrid,
   StatsBar,
   TokenCard,
+  RecentActivityPanel,
   EcosystemDirectory,
   type LauncherCard,
 } from "@/components/homepage-widgets";
@@ -18,9 +20,19 @@ export default function DashboardPage() {
   const { auth } = useAuth();
   const me = useMe();
   const overview = useEcosystemOverview();
+  const activity = useMyActivity();
   if (auth.status !== "authenticated") return null;
 
   const cards: LauncherCard[] = [
+    {
+      href: "#",
+      icon: "ndyspace",
+      color: "#6366f1",
+      title: "NDYSPACE™",
+      description:
+        "Your personal digital space. Mail, Calendar, Drive, Contacts, and more.",
+      comingSoon: true,
+    },
     {
       href: "/security",
       icon: "login",
@@ -88,16 +100,10 @@ export default function DashboardPage() {
 
   const stats = [
     {
-      label: "Total Users",
-      value: overview?.totalUsers,
+      label: "Total Members",
+      value: overview?.totalMembers,
       icon: "users" as const,
       color: "#8b5cf6",
-    },
-    {
-      label: "New Today",
-      value: overview?.newUsersToday,
-      icon: "users" as const,
-      color: "#4f7cff",
     },
     {
       label: "Connected Platforms",
@@ -106,16 +112,17 @@ export default function DashboardPage() {
       color: "#22c58b",
     },
     {
-      label: "CRYNDY Sold",
-      value: overview?.cryndy.totalSold,
-      icon: "coins" as const,
-      color: "#e0a83c",
+      label: "System Uptime",
+      value: overview?.systemUptimePct,
+      icon: "shieldCheck" as const,
+      color: "#4f7cff",
+      suffix: "%",
     },
     {
-      label: "NDYBITS Issued",
-      value: overview?.ndybitsIssued,
-      icon: "boxes" as const,
-      color: "#4f7cff",
+      label: "Countries",
+      value: overview?.countries,
+      icon: "globe" as const,
+      color: "#e0a83c",
     },
     {
       label: "Transactions (24h)",
@@ -171,6 +178,8 @@ export default function DashboardPage() {
             chartValues={overview?.bitcoin?.sparkline7d ?? null}
           />
         </section>
+
+        <RecentActivityPanel items={activity} />
 
         <EcosystemDirectory />
 

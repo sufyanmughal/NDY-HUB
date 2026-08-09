@@ -29,39 +29,40 @@ export class EcosystemService {
 
   /**
    * Homepage stats — deliberately only real, currently-tracked numbers.
-   * The design mockup this backs also showed a live CRYNDY price ticker and
-   * a 99.9% uptime figure; neither is real (CRYNDY has no market yet, and
-   * there's no uptime-tracking system), so both are replaced here with
-   * real equivalents (a purchase-activity trend, and an actual DB health
-   * check) rather than fabricated to match the mockup exactly.
+   * The design mockup this backs shows 5 tiles (Total Members, Connected
+   * Platforms, System Uptime, Countries, Transactions 24h) plus a live
+   * CRYNDY price ticker; neither the uptime % nor CRYNDY's price is a
+   * real tracked metric (CRYNDY has no market yet, and there's no
+   * historical uptime-tracking table), so both are backed by the closest
+   * honest equivalent instead of a fabricated number: uptime reflects the
+   * current DB health check rather than a real historical percentage
+   * (100% healthy / 0% down — no history table exists to compute a true
+   * rolling percentage yet), and the CRYNDY card (built elsewhere, see
+   * `cryndy` below) shows a purchase-activity trend instead of a price.
    */
   async getOverview() {
     const now = new Date();
-    const startOfToday = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-    );
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const saleStatusFilter = { in: [...CONFIRMED_SALE_STATUSES] };
 
     const [
-      totalUsers,
-      newUsersToday,
+      totalMembers,
       connectedPlatforms,
+      countryRows,
       membershipTx24h,
       cryndyTx24h,
       cryndySoldAgg,
       cryndyDailySeries,
-      ndybitsIssuedAgg,
       databaseOk,
       bitcoin,
     ] = await Promise.all([
       this.prisma.user.count({ where: { deletedAt: null } }),
-      this.prisma.user.count({
-        where: { deletedAt: null, createdAt: { gte: startOfToday } },
-      }),
       this.prisma.oAuthClient.count({ where: { isActive: true } }),
+      this.prisma.user.findMany({
+        where: { deletedAt: null, country: { not: null } },
+        select: { country: true },
+        distinct: ['country'],
+      }),
       this.prisma.membership.count({ where: { createdAt: { gte: last24h } } }),
       this.prisma.cryndyPurchase.count({
         where: { status: saleStatusFilter, createdAt: { gte: last24h } },
@@ -71,20 +72,16 @@ export class EcosystemService {
         _sum: { cryndyAmount: true, bonusAmount: true },
       }),
       this.getCryndyDailySeries(),
-      this.prisma.ndybitsLedgerEntry.aggregate({
-        where: { amount: { gt: 0 } },
-        _sum: { amount: true },
-      }),
       this.checkDatabaseHealth(),
       this.bitcoinPrice.getPrice(),
     ]);
 
     return {
-      totalUsers,
-      newUsersToday,
+      totalMembers,
       connectedPlatforms,
+      systemUptimePct: databaseOk ? 100 : 0,
+      countries: countryRows.length,
       transactions24h: membershipTx24h + cryndyTx24h,
-      ndybitsIssued: ndybitsIssuedAgg._sum.amount ?? 0,
       cryndy: {
         totalSold:
           Number(cryndySoldAgg._sum?.cryndyAmount ?? 0) +

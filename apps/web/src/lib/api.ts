@@ -1286,11 +1286,11 @@ export function getFinancialSummary(): Promise<FinancialSummary> {
 // before anyone has signed in.
 
 export interface EcosystemOverview {
-  totalUsers: number;
-  newUsersToday: number;
+  totalMembers: number;
   connectedPlatforms: number;
+  systemUptimePct: number;
+  countries: number;
   transactions24h: number;
-  ndybitsIssued: number;
   cryndy: { totalSold: number; dailySeries: number[] };
   bitcoin: {
     priceUsd: number;
@@ -1303,4 +1303,26 @@ export interface EcosystemOverview {
 
 export function getEcosystemOverview(): Promise<EcosystemOverview> {
   return apiFetch("/ecosystem/overview");
+}
+
+// --- Recent Activity: the current user's own activity feed, merged from
+// security events, CRYNDY purchases, NDYBITS ledger entries, and
+// membership changes. Not an ecosystem-wide/all-users feed.
+
+export type ActivityType =
+  | "SECURITY"
+  | "CRYNDY_PURCHASE"
+  | "NDYBITS"
+  | "MEMBERSHIP";
+
+export interface ActivityItem {
+  id: string;
+  type: ActivityType;
+  label: string;
+  createdAt: string;
+  meta?: Record<string, unknown>;
+}
+
+export function getMyActivity(): Promise<ActivityItem[]> {
+  return authedFetch("/activity/me");
 }

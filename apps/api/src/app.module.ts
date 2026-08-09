@@ -46,6 +46,7 @@ import { NdyspaceModule } from './ndyspace/ndyspace.module';
     SupportModule,
     FounderModule,
     EcosystemModule,
+    ActivityModule,
     NdyspaceModule,
   ],
   controllers: [AppController],

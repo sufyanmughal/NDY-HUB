@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { motion } from "framer-motion";
 import { AreaSparkline } from "./area-sparkline";
 import { BrandMark } from "./logo";
+import type { ActivityItem, ActivityType } from "@/lib/api";
 
 /** Shared between the public landing page (app/page.tsx) and the
  * authenticated dashboard home ((dashboard)/dashboard/page.tsx). Markup
@@ -105,6 +106,17 @@ const CARD_ICONS = {
     >
       <circle cx="12" cy="12" r="8.5" />
       <path d="M12 7.5v9M14.8 9.8c0-1.3-1.3-2.3-2.8-2.3s-2.8.9-2.8 2.1c0 3 5.6 1.5 5.6 4.4 0 1.2-1.3 2.1-2.8 2.1s-2.8-1-2.8-2.3" />
+    </svg>
+  ),
+  ndyspace: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path d="M12 3 4 7v10l8 4 8-4V7Z" />
+      <path d="M4 7l8 4 8-4M12 11v10" />
     </svg>
   ),
 } as const;
@@ -253,6 +265,17 @@ const STAT_ICONS = {
       <path d="M5 20V10M12 20V4M19 20v-7" />
     </svg>
   ),
+  globe: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c2.4 2.3 3.7 5.3 3.7 8.5s-1.3 6.2-3.7 8.5c-2.4-2.3-3.7-5.3-3.7-8.5S9.6 5.8 12 3.5Z" />
+    </svg>
+  ),
 } as const;
 
 export type StatIconName = keyof typeof STAT_ICONS;
@@ -262,6 +285,10 @@ export interface StatItem {
   value: number | undefined;
   icon: StatIconName;
   color: string;
+  /** Appended directly after the formatted number, e.g. "%" for a
+   * percentage stat — kept out of the number itself so toLocaleString()
+   * still applies to the numeric part only. */
+  suffix?: string;
 }
 
 export function StatsBar({ items }: { items: StatItem[] }) {
@@ -276,7 +303,9 @@ export function StatsBar({ items }: { items: StatItem[] }) {
           <div className="hp-stat-icon">{STAT_ICONS[item.icon]}</div>
           <div>
             <div className="hp-stat-value">
-              {item.value === undefined ? "…" : item.value.toLocaleString()}
+              {item.value === undefined
+                ? "…"
+                : `${item.value.toLocaleString()}${item.suffix ?? ""}`}
             </div>
             <div className="hp-stat-label">{item.label}</div>
           </div>
@@ -343,6 +372,87 @@ export function TokenCard({
         <span style={{ fontSize: 11, color: "var(--hp-fg-muted)" }}>
           No data yet
         </span>
+      )}
+    </div>
+  );
+}
+
+// ---------- recent activity ----------
+const ACTIVITY_ICONS: Record<ActivityType, ReactNode> = {
+  SECURITY: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path d="M12 2.5 19 5.5v5.5c0 5-3 8.2-7 9.5-4-1.3-7-4.5-7-9.5V5.5Z" />
+      <path d="m9 11.5 2 2 4-4.2" />
+    </svg>
+  ),
+  CRYNDY_PURCHASE: <span style={{ fontWeight: 800, fontSize: 13 }}>C</span>,
+  NDYBITS: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path d="M12 3 4 7v10l8 4 8-4V7Z" />
+      <path d="M4 7l8 4 8-4M12 11v10" />
+    </svg>
+  ),
+  MEMBERSHIP: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <circle cx="9" cy="9" r="3.2" />
+      <path d="M3.5 19c1-3 3-4.5 5.5-4.5s4.5 1.5 5.5 4.5" />
+    </svg>
+  ),
+};
+
+const ACTIVITY_COLORS: Record<ActivityType, string> = {
+  SECURITY: "#4f7cff",
+  CRYNDY_PURCHASE: "#8b5cf6",
+  NDYBITS: "#22c58b",
+  MEMBERSHIP: "#e0a83c",
+};
+
+function relativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+export function RecentActivityPanel({
+  items,
+}: {
+  items: ActivityItem[] | null;
+}) {
+  return (
+    <div className="hp-activity">
+      <div className="hp-activity-head">
+        <h3>Recent Activity</h3>
+        <Link href="/security" className="hp-activity-viewall">
+          View all
+        </Link>
+      </div>
+      {items && items.length === 0 ? (
+        <p className="hp-activity-empty">No recent activity yet.</p>
+      ) : (
+        <ul className="hp-activity-list">
+          {items?.map((item) => (
+            <li key={item.id} className="hp-activity-item">
+              <div
+                className="hp-activity-icon"
+                style={{ "--act-c": ACTIVITY_COLORS[item.type] } as CSSProperties}
+              >
+                {ACTIVITY_ICONS[item.type]}
+              </div>
+              <div className="hp-activity-body">
+                <div className="hp-activity-label">{item.label}</div>
+                <div className="hp-activity-time">
+                  {relativeTime(item.createdAt)}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
