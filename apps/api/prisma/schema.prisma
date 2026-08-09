@@ -191,6 +191,21 @@ model User {
   externalAuthLinkStates  ExternalAuthState[]
   supportTickets          SupportTicket[]
 
+  // --- NDYSPACE ("Your Digital Space") ---
+  // Every NDYSPACE row hangs off this same User — there is no separate
+  // NDYSPACE account/identity concept, same relational pattern as
+  // NdybitsLedgerEntry/CryndyPurchase/Membership/SecurityEvent above.
+  sentEmails              Email[]              @relation("EmailSender")
+  emailRecipients         EmailRecipient[]
+  calendarEvents          CalendarEvent[]
+  driveFolders            DriveFolder[]
+  driveFiles              DriveFile[]
+  contacts                Contact[]
+  tasks                   Task[]
+  notes                   Note[]
+  bookmarks               Bookmark[]
+  ndyspaceNotifications   NdyspaceNotification[]
+
   @@index([ndyId])
 }
 
@@ -724,4 +739,236 @@ model SupportTicket {
 enum SupportTicketStatus {
   OPEN
   RESOLVED
+}
+
+// --- NDYSPACE ("Your Digital Space") ---
+// A unified productivity workspace (mail, calendar, drive, contacts, tasks,
+// notes, bookmarks, notifications) layered on top of the existing NDY HUB
+// identity — every model below FKs to the same User above, guarded by the
+// same JwtAuthGuard, exactly like every other per-user module in this file.
+// No new auth/session/identity concept is introduced anywhere in this block.
+
+// --- NDYMAIL ---
+// Internal-only mail: NDYSPACE users emailing other NDYSPACE users. There is
+// deliberately no SMTP/IMAP integration here — see NdyspaceMailService for
+// what "send" actually does (creates a delivered EmailRecipient row for
+// each recipient in the same request, no outbound transport involved).
+// Real external email federation is a later-phase concern.
+enum EmailFolder {
+  INBOX
+  SENT
+  DRAFTS
+  TRASH
+}
+
+// Dashboard widget tabs (§2.4 of the spec) group by this — every message
+// defaults to PRIMARY since there's no real classification model yet; this
+// is a static field, not inferred, and that's an explicit, documented
+// scope cut for this pass.
+enum EmailCategory {
+  PRIMARY
+  SOCIAL
+  UPDATES
+  PROMOTIONS
+}
+
+// One row per sent message; delivery to each recipient is a separate
+// EmailRecipient row below (its own read/starred/folder state) rather than
+// duplicating the message body per recipient — the same "one fact, one
+// place" reasoning as every append-only/normalized table elsewhere in this
+// schema. Attachments are explicitly out of scope for this pass (see spec
+// §3 "Attachment (optional)") — no attachment storage model exists yet.
+model Email {
+  id          String   @id @default(uuid())
+  senderId    String
+  sender      User     @relation("EmailSender", fields: [senderId], references: [id], onDelete: Cascade)
+  subject     String
+  body        String
+  category    EmailCategory @default(PRIMARY)
+  createdAt   DateTime @default(now())
+
+  recipients  EmailRecipient[]
+
+  @@index([senderId, createdAt])
+}
+
+// The recipient-side mailbox row — read/starred/folder state is per
+// recipient (deleting from your own Trash must never affect the sender's
+// Sent view or another recipient's Inbox), same reasoning as why this isn't
+// just a boolean column on Email itself.
+model EmailRecipient {
+  id        String      @id @default(uuid())
+  emailId   String
+  email     Email       @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder    EmailFolder @default(INBOX)
+  isRead    Boolean     @default(false)
+  isStarred Boolean     @default(false)
+  createdAt DateTime    @default(now())
+
+  @@unique([emailId, userId])
+  @@index([userId, folder, createdAt])
+}
+
+// --- Calendar ---
+// Simple non-recurring events for v1 — see spec §3: "Attendee/Recurrence
+// can be a follow-up." attendeeEmails is a plain string array rather than a
+// join table for the same reason: an attendee here doesn't need to be an
+// NDYSPACE user, just an email address shown on the event.
+model CalendarEvent {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  startAt        DateTime
+  endAt          DateTime
+  // Hex color for the widget's accent bar (§2.5) — free-form rather than an
+  // enum so the palette can grow without a migration.
+  color          String   @default("#4f7cff")
+  attendeeEmails String[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, startAt])
+}
+
+// --- Drive ---
+// Folders are a flat, single-level owner-scoped list for this pass — a
+// folder can hold files but not other folders (nested folders are a
+// reasonable follow-up, not required by the spec's UI inventory, which only
+// ever shows a flat "Folder rows" list in the Drive widget, §2.7).
+model DriveFolder {
+  id        String     @id @default(uuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime   @default(now())
+
+  files     DriveFile[]
+
+  @@index([userId])
+}
+
+// storageKey is what PhotoStorageService-style storage (Vercel Blob in
+// prod, local disk in dev — see DriveStorageService) hands back; url is the
+// actual fetchable location, kept alongside storageKey the same way
+// PhotoStorageService's callers keep just a URL, but this also needs the
+// key/local-path shape preserved for deletion. folderId is nullable — a
+// file can live directly at Drive's root, same "optional parent" shape as
+// nothing-required elsewhere in this schema.
+model DriveFile {
+  id          String       @id @default(uuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId    String?
+  folder      DriveFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  name        String
+  mimeType    String
+  sizeBytes   Int
+  url         String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([userId, folderId])
+  @@index([userId, createdAt])
+}
+
+// --- Contacts ---
+model Contact {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName  String
+  email     String?
+  phone     String?
+  company   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// --- Tasks ---
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TaskStatus {
+  OPEN
+  COMPLETED
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(OPEN)
+  dueAt       DateTime?
+  completedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([userId, status])
+}
+
+// --- Notes ---
+model Note {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+// --- Bookmarks ---
+model Bookmark {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  url       String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// --- Notifications ---
+// Deliberately its own model rather than reusing SecurityEvent: SecurityEvent
+// is specifically an account-security audit trail with a fixed, security-only
+// type enum (see its own doc comment) and no read/unread state — bolting a
+// generic "mark as read" notification concept onto it would blur that
+// boundary for every existing security-page consumer. NdyspaceNotification
+// instead follows the same per-user, typed, timestamped shape but adds the
+// read state and free-form message a general notification feed needs.
+// Generated by NDYSPACE modules themselves for now (e.g. NDYMAIL send —
+// see NdyspaceMailService) rather than any cross-cutting event bus.
+enum NdyspaceNotificationType {
+  MAIL
+  CALENDAR
+  TASK
+  SYSTEM
+}
+
+model NdyspaceNotification {
+  id        String                   @id @default(uuid())
+  userId    String
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NdyspaceNotificationType
+  message   String
+  isRead    Boolean                  @default(false)
+  createdAt DateTime                 @default(now())
+
+  @@index([userId, isRead, createdAt])
 }
