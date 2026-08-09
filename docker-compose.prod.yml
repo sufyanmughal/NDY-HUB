@@ -69,6 +69,14 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    environment:
+      # next.config.ts's rewrites() reads this at request time inside the
+      # running container (not just at build time for the client bundle),
+      # to proxy /api/* server-side to the real API origin. Without this,
+      # it falls back to http://localhost:3000, which doesn't exist inside
+      # this container (the API is the separate `api` service) — every
+      # /api/* call 404s, breaking login entirely.
+      NEXT_PUBLIC_API_URL: ${API_URL}
     expose:
       - "3001"
 
