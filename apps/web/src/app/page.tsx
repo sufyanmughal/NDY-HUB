@@ -75,9 +75,9 @@ function HomePageInner() {
     return null;
   }
 
-  // Plays once per browser session, right when a visitor first lands on
-  // the homepage — replaced by the real sign-in form below once it
-  // finishes (or immediately on any later visit within the same session).
+  // Plays on every load of the homepage for a logged-out visitor —
+  // every fresh visit and every refresh — then is replaced by the real
+  // sign-in form below once it finishes.
   if (showSplash) {
     return <EcosystemSplash onDone={dismissSplash} />;
   }

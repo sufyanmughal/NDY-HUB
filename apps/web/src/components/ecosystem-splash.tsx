@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 const SPLASH_DURATION_MS = 5000;
-const SPLASH_SESSION_KEY = "ndyhub-splash-shown";
 
 const FEATURES = [
   { label: "One Identity", sub: "Your unique NDY ID" },
@@ -15,24 +14,19 @@ const FEATURES = [
 ] as const;
 
 /**
- * A one-time, 5-second brand moment shown when a visitor first lands on
- * /login — not on every visit to the page. sessionStorage (not a React
- * state flag) is what makes "once per browser session" survive a hard
- * reload of /login itself; a fresh tab/browser session has no key set at
- * all, so the splash plays again for a genuinely new visit.
+ * The 5-second brand moment plays on every load of the homepage for a
+ * logged-out visitor — every fresh visit, every refresh — not just once.
+ * No persistence (sessionStorage, etc.) on purpose: the caller only ever
+ * mounts EcosystemSplash while auth.status === "unauthenticated", so a
+ * fresh mount already means "a logged-out visitor is looking at this
+ * page right now," which is exactly the condition that should replay it.
+ * Once a session exists, the caller stops rendering this at all — that's
+ * what actually stops it from showing, not a dismissed-once flag.
  */
 export function useShouldShowSplash(): [boolean, () => void] {
-  // Lazy initializer, not an effect: sessionStorage is only readable
-  // client-side, but reading it here (rather than after mount) means
-  // showSplash is correct on the very first render instead of flashing
-  // dashboard content for one frame before flipping true.
-  const [show, setShow] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !sessionStorage.getItem(SPLASH_SESSION_KEY);
-  });
+  const [show, setShow] = useState(true);
 
   function dismiss() {
-    sessionStorage.setItem(SPLASH_SESSION_KEY, "1");
     setShow(false);
   }
 
