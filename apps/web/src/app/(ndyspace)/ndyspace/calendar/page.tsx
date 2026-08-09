@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { NewEventModal } from "@/components/ndyspace/quick-action-modals";
+import { NewEventModal, EditEventModal } from "@/components/ndyspace/quick-action-modals";
 import { listCalendarEvents, deleteCalendarEvent, type CalendarEvent } from "@/lib/ndyspace-api";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -24,6 +24,7 @@ export default function NdyspaceCalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date>(today);
 
   function load() {
@@ -227,13 +228,22 @@ export default function NdyspaceCalendarPage() {
                         <p className="mt-1 text-xs text-foreground-muted">{ev.description}</p>
                       )}
                     </div>
-                    <button
-                      onClick={() => handleDelete(ev.id)}
-                      aria-label="Delete event"
-                      className="text-foreground-muted hover:text-critical"
-                    >
-                      <Trash2 size={14} strokeWidth={2} />
-                    </button>
+                    <div className="flex shrink-0 items-start gap-2">
+                      <button
+                        onClick={() => setEditingEvent(ev)}
+                        aria-label="Edit event"
+                        className="text-foreground-muted hover:text-accent"
+                      >
+                        <Pencil size={14} strokeWidth={2} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(ev.id)}
+                        aria-label="Delete event"
+                        className="text-foreground-muted hover:text-critical"
+                      >
+                        <Trash2 size={14} strokeWidth={2} />
+                      </button>
+                    </div>
                   </div>
                 ))
             )}
@@ -242,6 +252,13 @@ export default function NdyspaceCalendarPage() {
       </div>
 
       {createOpen && <NewEventModal onClose={() => setCreateOpen(false)} onCreated={load} />}
+      {editingEvent && (
+        <EditEventModal
+          event={editingEvent}
+          onClose={() => setEditingEvent(null)}
+          onUpdated={load}
+        />
+      )}
     </div>
   );
 }

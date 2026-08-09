@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { NewNoteModal } from "@/components/ndyspace/quick-action-modals";
+import { NewNoteModal, EditNoteModal } from "@/components/ndyspace/quick-action-modals";
 import { listNotes, deleteNote, type Note } from "@/lib/ndyspace-api";
 
 export default function NdyspaceNotesPage() {
@@ -11,6 +11,7 @@ export default function NdyspaceNotesPage() {
   const [notes, setNotes] = useState<Note[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
 
   function load() {
     if (auth.status !== "authenticated") return;
@@ -65,13 +66,22 @@ export default function NdyspaceNotesPage() {
             <div key={n.id} className="rounded-lg border border-border bg-surface p-4">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="text-sm font-medium">{n.title}</h2>
-                <button
-                  onClick={() => handleDelete(n.id)}
-                  aria-label={`Delete ${n.title}`}
-                  className="shrink-0 text-foreground-muted hover:text-critical"
-                >
-                  <Trash2 size={14} strokeWidth={2} />
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={() => setEditingNote(n)}
+                    aria-label={`Edit ${n.title}`}
+                    className="text-foreground-muted hover:text-accent"
+                  >
+                    <Pencil size={14} strokeWidth={2} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(n.id)}
+                    aria-label={`Delete ${n.title}`}
+                    className="text-foreground-muted hover:text-critical"
+                  >
+                    <Trash2 size={14} strokeWidth={2} />
+                  </button>
+                </div>
               </div>
               <p className="mt-2 whitespace-pre-wrap text-xs text-foreground-muted line-clamp-6">
                 {n.body || "Empty note."}
@@ -85,6 +95,13 @@ export default function NdyspaceNotesPage() {
       )}
 
       {createOpen && <NewNoteModal onClose={() => setCreateOpen(false)} onCreated={load} />}
+      {editingNote && (
+        <EditNoteModal
+          note={editingNote}
+          onClose={() => setEditingNote(null)}
+          onUpdated={load}
+        />
+      )}
     </div>
   );
 }

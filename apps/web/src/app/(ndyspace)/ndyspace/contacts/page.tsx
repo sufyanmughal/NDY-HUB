@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Avatar } from "@/components/avatar";
-import { NewContactModal } from "@/components/ndyspace/quick-action-modals";
+import { NewContactModal, EditContactModal } from "@/components/ndyspace/quick-action-modals";
 import { listContacts, deleteContact, type Contact } from "@/lib/ndyspace-api";
 
 export default function NdyspaceContactsPage() {
@@ -12,6 +12,7 @@ export default function NdyspaceContactsPage() {
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [query, setQuery] = useState("");
 
   function load() {
@@ -85,6 +86,13 @@ export default function NdyspaceContactsPage() {
                   </p>
                 </div>
                 <button
+                  onClick={() => setEditingContact(c)}
+                  aria-label={`Edit ${c.fullName}`}
+                  className="text-foreground-muted hover:text-accent"
+                >
+                  <Pencil size={16} strokeWidth={2} />
+                </button>
+                <button
                   onClick={() => handleDelete(c.id)}
                   aria-label={`Delete ${c.fullName}`}
                   className="text-foreground-muted hover:text-critical"
@@ -98,6 +106,13 @@ export default function NdyspaceContactsPage() {
       </div>
 
       {createOpen && <NewContactModal onClose={() => setCreateOpen(false)} onCreated={load} />}
+      {editingContact && (
+        <EditContactModal
+          contact={editingContact}
+          onClose={() => setEditingContact(null)}
+          onUpdated={load}
+        />
+      )}
     </div>
   );
 }

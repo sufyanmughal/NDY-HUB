@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { NewTaskModal } from "@/components/ndyspace/quick-action-modals";
+import { NewTaskModal, EditTaskModal } from "@/components/ndyspace/quick-action-modals";
 import {
   listTasks,
   setTaskComplete,
@@ -24,6 +24,7 @@ export default function NdyspaceTasksPage() {
   const [tasks, setTasks] = useState<NdyspaceTask[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<NdyspaceTask | null>(null);
 
   function load() {
     if (auth.status !== "authenticated") return;
@@ -126,6 +127,13 @@ export default function NdyspaceTasksPage() {
                   {t.priority}
                 </span>
                 <button
+                  onClick={() => setEditingTask(t)}
+                  aria-label={`Edit ${t.title}`}
+                  className="text-foreground-muted hover:text-accent"
+                >
+                  <Pencil size={16} strokeWidth={2} />
+                </button>
+                <button
                   onClick={() => handleDelete(t.id)}
                   aria-label={`Delete ${t.title}`}
                   className="text-foreground-muted hover:text-critical"
@@ -139,6 +147,13 @@ export default function NdyspaceTasksPage() {
       </div>
 
       {createOpen && <NewTaskModal onClose={() => setCreateOpen(false)} onCreated={load} />}
+      {editingTask && (
+        <EditTaskModal
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onUpdated={load}
+        />
+      )}
     </div>
   );
 }
