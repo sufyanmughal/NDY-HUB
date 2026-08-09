@@ -24,3 +24,6 @@ export const UPLOADS_ROOT_DIR = join(
   'uploads',
 );
 export const PROFILE_PHOTOS_DIR = join(UPLOADS_ROOT_DIR, 'profile-photos');
+// NDYSPACE Drive — same durability caveat as PROFILE_PHOTOS_DIR above (dev
+// only; DriveStorageService uses Vercel Blob on Vercel instead).
+export const DRIVE_FILES_DIR = join(UPLOADS_ROOT_DIR, 'drive-files');

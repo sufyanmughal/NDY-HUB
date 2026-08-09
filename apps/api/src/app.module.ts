@@ -19,6 +19,8 @@ import { GdprModule } from './gdpr/gdpr.module';
 import { SupportModule } from './support/support.module';
 import { FounderModule } from './founder/founder.module';
 import { EcosystemModule } from './ecosystem/ecosystem.module';
+import { ActivityModule } from './activity/activity.module';
+import { NdyspaceModule } from './ndyspace/ndyspace.module';
 
 @Module({
   imports: [
@@ -44,6 +46,7 @@ import { EcosystemModule } from './ecosystem/ecosystem.module';
     SupportModule,
     FounderModule,
     EcosystemModule,
+    NdyspaceModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

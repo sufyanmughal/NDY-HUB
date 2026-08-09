@@ -4,12 +4,17 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { mkdirSync } from 'fs';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
-import { UPLOADS_ROOT_DIR, PROFILE_PHOTOS_DIR } from './common/upload-dir.util';
+import {
+  UPLOADS_ROOT_DIR,
+  PROFILE_PHOTOS_DIR,
+  DRIVE_FILES_DIR,
+} from './common/upload-dir.util';
 
 async function bootstrap() {
   // multer's diskStorage won't create its destination directory itself —
   // needs to exist before the first upload request lands.
   mkdirSync(PROFILE_PHOTOS_DIR, { recursive: true });
+  mkdirSync(DRIVE_FILES_DIR, { recursive: true });
 
   // rawBody: true keeps the exact request bytes around on req.rawBody
   // alongside the parsed body — CryndyWebhookSignatureGuard verifies the
