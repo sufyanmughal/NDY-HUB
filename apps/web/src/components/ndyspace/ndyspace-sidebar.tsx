@@ -48,7 +48,7 @@ export function NdyspaceSidebar() {
   const notificationsBadge = overview?.notifications.unreadCount ?? 0;
 
   return (
-    <aside className="ndyspace-sidebar hidden md:flex w-[230px] shrink-0 flex-col">
+    <aside className="ndyspace-sidebar hidden md:flex w-64 shrink-0 flex-col">
       <div className="px-5 py-6">
         <BrandMark size={30} />
         <p className="mt-2 text-sm font-semibold tracking-tight text-foreground">NDYSPACE™</p>
