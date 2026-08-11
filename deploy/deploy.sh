@@ -17,16 +17,27 @@ time $COMPOSE build api web
 echo "== Restarting containers =="
 $COMPOSE up -d api web
 
-echo "== Waiting for containers to report healthy/running =="
-sleep 3
 docker ps --format 'table {{.Names}}\t{{.Status}}' | grep ndy-hub
 
 echo "== Verifying API is actually reachable through the web proxy =="
-STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST https://ndyhub.com/api/auth/login-request \
-  -H 'Content-Type: application/json' -d '{}')
+# Fresh containers take a few seconds to open their listening socket —
+# retry instead of a single fixed sleep, so a slow-but-healthy start isn't
+# mistaken for a real failure (that cost real debugging time once already).
+STATUS=""
+for i in $(seq 1 10); do
+  STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST https://ndyhub.com/api/auth/login-request \
+    -H 'Content-Type: application/json' -d '{}' || echo "000")
+  if [ "$STATUS" = "400" ] || [ "$STATUS" = "401" ]; then
+    break
+  fi
+  echo "  attempt $i: got $STATUS, retrying..."
+  sleep 2
+done
+
 if [ "$STATUS" != "400" ] && [ "$STATUS" != "401" ]; then
-  echo "FAIL: /api/auth/login-request returned $STATUS (expected 400/401 — a real API response, not a 404 from Next's own catch-all)."
-  echo "This usually means NEXT_PUBLIC_API_URL was blank at build time. Check docker-compose.prod.yml's web service environment: block and .env.prod's API_URL."
+  echo "FAIL: /api/auth/login-request returned $STATUS after 10 retries (expected 400/401 — a real API response)."
+  echo "502/504 => containers likely still unhealthy, check 'docker logs ndy-hub-api' / 'docker logs ndy-hub-web'."
+  echo "404 from Next's own catch-all page => NEXT_PUBLIC_API_URL was blank at build time. Check docker-compose.prod.yml's web service environment: block and .env.prod's API_URL."
   exit 1
 fi
 echo "OK: API proxy responding correctly ($STATUS)."
