@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsOptional,
   IsString,
@@ -15,6 +16,11 @@ export class SendEmailDto {
   @IsString({ each: true })
   recipientNdyIds!: string[];
 
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  ccNdyIds?: string[];
+
   @IsString()
   @MinLength(1)
   @MaxLength(300)
@@ -24,6 +30,71 @@ export class SendEmailDto {
   @MinLength(1)
   @MaxLength(20000)
   body!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachmentDriveFileIds?: string[];
+}
+
+export class SaveDraftDto {
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  recipientNdyIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  ccNdyIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  subject?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  body?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachmentDriveFileIds?: string[];
+
+  // Present when editing an existing draft (its EmailRecipient row id) —
+  // absent means "create a new draft".
+  @IsOptional()
+  @IsString()
+  draftId?: string;
+}
+
+export class SendDraftDto {
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  recipientNdyIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  ccNdyIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  subject?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  body?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachmentDriveFileIds?: string[];
 }
 
 export class UpdateEmailRecipientDto {
@@ -32,8 +103,10 @@ export class UpdateEmailRecipientDto {
   folder?: 'INBOX' | 'SENT' | 'DRAFTS' | 'TRASH';
 
   @IsOptional()
+  @IsBoolean()
   isRead?: boolean;
 
   @IsOptional()
+  @IsBoolean()
   isStarred?: boolean;
 }

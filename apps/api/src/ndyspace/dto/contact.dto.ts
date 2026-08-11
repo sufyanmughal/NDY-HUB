@@ -30,6 +30,11 @@ export class CreateContactDto {
   @IsString()
   @MaxLength(5000)
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  ndyId?: string;
 }
 
 export class UpdateContactDto {
@@ -57,4 +62,9 @@ export class UpdateContactDto {
   @IsString()
   @MaxLength(5000)
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  ndyId?: string;
 }

@@ -776,8 +776,8 @@ enum EmailCategory {
 // EmailRecipient row below (its own read/starred/folder state) rather than
 // duplicating the message body per recipient — the same "one fact, one
 // place" reasoning as every append-only/normalized table elsewhere in this
-// schema. Attachments are explicitly out of scope for this pass (see spec
-// §3 "Attachment (optional)") — no attachment storage model exists yet.
+// schema. Attachments are handled by EmailAttachment below (server-resolved
+// against the sender's Drive, since DriveFile is otherwise owner-only).
 model Email {
   id          String   @id @default(uuid())
   senderId    String
@@ -788,6 +788,7 @@ model Email {
   createdAt   DateTime @default(now())
 
   recipients  EmailRecipient[]
+  attachments EmailAttachment[]
 
   @@index([senderId, createdAt])
 }
@@ -795,20 +796,45 @@ model Email {
 // The recipient-side mailbox row — read/starred/folder state is per
 // recipient (deleting from your own Trash must never affect the sender's
 // Sent view or another recipient's Inbox), same reasoning as why this isn't
-// just a boolean column on Email itself.
+// just a boolean column on Email itself. isCc distinguishes To vs Cc for
+// display only — both get a normal INBOX copy, delivery is identical.
+// draftToNdyIds/draftCcNdyIds hold the not-yet-resolved recipient list while
+// a message sits in DRAFTS (folder = DRAFTS, no other EmailRecipient rows
+// exist yet for this Email) — sending converts the draft into the real
+// SENT/INBOX rows and clears these back to empty.
 model EmailRecipient {
-  id        String      @id @default(uuid())
-  emailId   String
-  email     Email       @relation(fields: [emailId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  folder    EmailFolder @default(INBOX)
-  isRead    Boolean     @default(false)
-  isStarred Boolean     @default(false)
-  createdAt DateTime    @default(now())
+  id            String      @id @default(uuid())
+  emailId       String
+  email         Email       @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder        EmailFolder @default(INBOX)
+  isRead        Boolean     @default(false)
+  isStarred     Boolean     @default(false)
+  isCc          Boolean     @default(false)
+  draftToNdyIds String[]    @default([])
+  draftCcNdyIds String[]    @default([])
+  createdAt     DateTime    @default(now())
 
   @@unique([emailId, userId])
   @@index([userId, folder, createdAt])
+}
+
+// Links a sent Email to one of the sender's DriveFile rows. Deliberately not
+// routed through the normal owner-scoped Drive endpoints — a recipient has
+// no Drive ACL on the sender's files, so the mail read path resolves
+// DriveFile rows itself (server-side, using the Email's senderId) and hands
+// back a plain {name, mimeType, sizeBytes, url} in the message payload.
+model EmailAttachment {
+  id          String    @id @default(uuid())
+  emailId     String
+  email       Email     @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  driveFileId String
+  driveFile   DriveFile @relation(fields: [driveFileId], references: [id], onDelete: Cascade)
+  addedAt     DateTime  @default(now())
+
+  @@index([emailId])
+  @@index([driveFileId])
 }
 
 // --- Calendar ---
@@ -871,11 +897,17 @@ model DriveFile {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
+  emailAttachments EmailAttachment[]
+
   @@index([userId, folderId])
   @@index([userId, createdAt])
 }
 
 // --- Contacts ---
+// ndyId is optional: Contacts are the user's personal address book (not
+// NDY HUB accounts) and normally have no NDY ID at all. When a contact is
+// linked to a real NDYSPACE user, NDYMAIL's compose recipient picker can
+// suggest it by NDY ID; unlinked contacts just don't show up there.
 model Contact {
   id        String   @id @default(uuid())
   userId    String
@@ -885,6 +917,7 @@ model Contact {
   phone     String?
   company   String?
   notes     String?
+  ndyId     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

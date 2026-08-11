@@ -71,8 +71,25 @@ export interface OverviewMailItem {
   folder: EmailFolder;
   isRead: boolean;
   isStarred: boolean;
+  isCc: boolean;
   createdAt: string;
   sender: { ndyId: string; fullName: string | null; profilePhotoUrl: string | null };
+  draftTo: string[];
+  draftCc: string[];
+}
+
+export interface MailAttachment {
+  id: string;
+  driveFileId: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  url: string;
+}
+
+export interface MailDetail extends OverviewMailItem {
+  recipients: { ndyId: string; fullName: string | null; isCc: boolean }[];
+  attachments: MailAttachment[];
 }
 
 export interface CalendarEvent {
@@ -120,6 +137,7 @@ export interface Contact {
   phone: string | null;
   company: string | null;
   notes: string | null;
+  ndyId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -188,16 +206,46 @@ export function getMailUnreadCount(): Promise<{ count: number }> {
   return authedFetch("/ndyspace/mail/unread-count");
 }
 
-export function getMailItem(id: string): Promise<OverviewMailItem> {
+export function getMailItem(id: string): Promise<MailDetail> {
   return authedFetch(`/ndyspace/mail/${id}`);
 }
 
-export function sendMail(params: {
+export interface SendMailParams {
   recipientNdyIds: string[];
+  ccNdyIds?: string[];
   subject: string;
   body: string;
-}): Promise<{ id: string }> {
+  attachmentDriveFileIds?: string[];
+}
+
+export function sendMail(params: SendMailParams): Promise<{ id: string }> {
   return authedFetch("/ndyspace/mail", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export interface SaveDraftParams {
+  draftId?: string;
+  recipientNdyIds?: string[];
+  ccNdyIds?: string[];
+  subject?: string;
+  body?: string;
+  attachmentDriveFileIds?: string[];
+}
+
+export function saveMailDraft(params: SaveDraftParams): Promise<OverviewMailItem> {
+  return authedFetch("/ndyspace/mail/drafts", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export function sendMailDraft(
+  draftId: string,
+  params: Omit<SaveDraftParams, "draftId">,
+): Promise<{ id: string }> {
+  return authedFetch(`/ndyspace/mail/drafts/${draftId}/send`, {
     method: "POST",
     body: JSON.stringify(params),
   });
@@ -211,6 +259,14 @@ export function updateMailItem(
     method: "PATCH",
     body: JSON.stringify(updates),
   });
+}
+
+export function deleteMailItem(id: string): Promise<{ id: string }> {
+  return authedFetch(`/ndyspace/mail/${id}`, { method: "DELETE" });
+}
+
+export function emptyMailTrash(): Promise<{ deletedCount: number }> {
+  return authedFetch("/ndyspace/mail/trash/empty", { method: "POST" });
 }
 
 // --- Calendar ---
@@ -330,6 +386,7 @@ export function createContact(params: {
   phone?: string;
   company?: string;
   notes?: string;
+  ndyId?: string;
 }): Promise<Contact> {
   return authedFetch("/ndyspace/contacts", {
     method: "POST",
@@ -345,6 +402,7 @@ export function updateContact(
     phone: string;
     company: string;
     notes: string;
+    ndyId: string;
   }>,
 ): Promise<Contact> {
   return authedFetch(`/ndyspace/contacts/${id}`, {
