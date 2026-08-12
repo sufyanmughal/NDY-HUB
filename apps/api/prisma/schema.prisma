@@ -58,7 +58,18 @@ enum Role {
 
 model User {
   id                String            @id @default(uuid())
-  ndyId             String            @unique // e.g. NDY-4F82XK — generated once, never reused, never editable
+  // The permanent, never-regenerated identity — six characters, generated
+  // once at signup. This is the real lookup/join key everywhere internally
+  // (never ndyId below), so a role change can never break a URL, OAuth
+  // claim, or anything else built from a user's public ID. See
+  // common/ndy-id.util.ts.
+  ndyCoreId         String            @unique
+  // Denormalized display string, e.g. "NDY-FND-4F82XK" — rebuilt from
+  // ndyCoreId + the current role (via ndyIdTypeForRole) every time role
+  // changes, so every *read* just returns a ready-to-display value instead
+  // of recomputing the type on every request. Never used as a lookup key —
+  // see ndyCoreId above for why.
+  ndyId             String            @unique
   email             String            @unique
   passwordHash      String?           // null for users who only ever sign in via Google/Apple/NDYAPPS
   fullName          String?

@@ -7,6 +7,7 @@ import {
 import { Role, RoleChangeRequestStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AdminActor } from './admin.service';
+import { formatNdyId, ndyIdTypeForRole } from '../common/ndy-id.util';
 
 const FOUNDER_ONLY_ASSIGNABLE: readonly Role[] = [
   Role.FOUNDER,
@@ -90,10 +91,19 @@ export class RoleChangeRequestService {
     });
     if (!target) throw new NotFoundException('No user with that id.');
 
+    // Only the displayed Type segment changes here — ndyCoreId (the
+    // permanent identity) is never touched by a role change, per the
+    // client's explicit requirement. ndyId is rebuilt from it so every
+    // subsequent read gets the new type without a separate migration step.
+    const newNdyId = formatNdyId(
+      target.ndyCoreId,
+      ndyIdTypeForRole(request.requestedRole),
+    );
+
     const [, updatedRequest] = await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: request.targetUserId },
-        data: { role: request.requestedRole },
+        data: { role: request.requestedRole, ndyId: newNdyId },
       }),
       this.prisma.roleChangeRequest.update({
         where: { id: request.id },

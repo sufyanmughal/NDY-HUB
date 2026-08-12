@@ -7,7 +7,7 @@ const digits = customAlphabet('0123456789', 6);
  * "CRY-2026-07-000184". Looks sequential but isn't — the suffix is random,
  * which is fine since `reference` is a display value, not the idempotency
  * key (that's `providerTransactionId`). Callers must retry on unique-
- * constraint collision, same as generateNdyId.
+ * constraint collision, same as ndy-id.util.ts's generateCoreId.
  */
 export function generatePurchaseReference(date: Date = new Date()): string {
   const year = date.getUTCFullYear();

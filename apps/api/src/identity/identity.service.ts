@@ -4,7 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { generateNdyId } from '../common/ndy-id.util';
+import {
+  generateCoreId,
+  formatNdyId,
+  ndyIdTypeForRole,
+  parseNdyId,
+} from '../common/ndy-id.util';
+import { Role } from '@prisma/client';
 
 const MAX_NDY_ID_ATTEMPTS = 5;
 
@@ -54,10 +60,15 @@ export class IdentityService {
     }
 
     for (let attempt = 0; attempt < MAX_NDY_ID_ATTEMPTS; attempt++) {
-      const ndyId = generateNdyId();
+      const coreId = generateCoreId();
+      // New signups always start as USER (MBR) — nothing creates a
+      // FOUNDER/BIZ account at signup time, so the type is fixed here
+      // rather than accepted as a caller-supplied param.
+      const ndyId = formatNdyId(coreId, ndyIdTypeForRole(Role.USER));
       try {
         return await this.prisma.user.create({
           data: {
+            ndyCoreId: coreId,
             ndyId,
             email: params.email,
             passwordHash: params.passwordHash,
@@ -81,7 +92,8 @@ export class IdentityService {
         });
       } catch (err: unknown) {
         if (
-          isUniqueConstraintError(err, 'ndyId') &&
+          (isUniqueConstraintError(err, 'ndyCoreId') ||
+            isUniqueConstraintError(err, 'ndyId')) &&
           attempt < MAX_NDY_ID_ATTEMPTS - 1
         ) {
           continue;
@@ -95,8 +107,23 @@ export class IdentityService {
     );
   }
 
+  /**
+   * Looks up a user by NDY ID. Tries an exact match first (the common
+   * case), then falls back to the permanent ndyCoreId if that fails — a
+   * link shared before a role change (e.g. Member -> Business) still
+   * resolves after the Type segment updates, since the Core ID inside it
+   * never changes. See common/ndy-id.util.ts's parseNdyId.
+   */
   async findByNdyId(ndyId: string) {
-    const user = await this.prisma.user.findUnique({ where: { ndyId } });
+    let user = await this.prisma.user.findUnique({ where: { ndyId } });
+    if (!user) {
+      const parsed = parseNdyId(ndyId);
+      if (parsed) {
+        user = await this.prisma.user.findUnique({
+          where: { ndyCoreId: parsed.coreId },
+        });
+      }
+    }
     if (!user) throw new NotFoundException('No account with that NDY ID.');
     return user;
   }
