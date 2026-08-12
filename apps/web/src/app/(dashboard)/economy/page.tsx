@@ -25,6 +25,11 @@ import {
 } from "./mock-data";
 import "@/styles/economy.css";
 
+// NDYX has no backend model yet (see mock-data.ts's TODO / docs/ndy-
+// economy-implementation-plan.md's Phase 2) — this is a visual-only
+// placeholder for the progression bar, not derived from real holdings.
+const NDYX_PLACEHOLDER_PROGRESS_PCT = 50;
+
 function formatEuro(amount: number): string {
   return `€${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -265,7 +270,10 @@ export default function EconomyPage() {
                   label: "Strategic Asset",
                   current: ndyxBalance,
                   target: 0,
-                  percent: 0,
+                  // NDYX has no backend yet (see mock-data.ts's TODO) — this
+                  // 50% is a visual placeholder only, not derived from real
+                  // holdings, unlike CRYNDY's percent above.
+                  percent: NDYX_PLACEHOLDER_PROGRESS_PCT,
                 }}
                 glyph="X"
                 colorHex={ASSET_COLORS.NDYX}
