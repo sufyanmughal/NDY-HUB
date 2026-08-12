@@ -1,15 +1,14 @@
 "use client";
 
-import type { ProgressionData } from "@/app/(dashboard)/economy/mock-data";
+import Image from "next/image";
+import { ASSET_LOGOS, type ProgressionData } from "@/app/(dashboard)/economy/mock-data";
 
 export function ProgressionStep({
   data,
-  glyph,
   colorHex,
   isLast,
 }: {
   data: ProgressionData;
-  glyph: string;
   colorHex: string;
   isLast?: boolean;
 }) {
@@ -22,7 +21,7 @@ export function ProgressionStep({
     <>
       <div className="eco-progress-row" style={{ "--card-c": colorHex } as React.CSSProperties}>
         <div className="eco-progress-icon" aria-hidden="true">
-          {glyph}
+          <Image src={ASSET_LOGOS[data.symbol]} alt="" width={40} height={40} />
         </div>
         <div className="eco-progress-body">
           <div className="eco-progress-name">{data.symbol}</div>

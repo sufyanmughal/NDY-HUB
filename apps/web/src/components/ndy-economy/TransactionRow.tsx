@@ -1,7 +1,7 @@
 "use client";
 
-import type { Transaction } from "@/app/(dashboard)/economy/mock-data";
-import { ASSET_COLORS } from "@/app/(dashboard)/economy/mock-data";
+import Image from "next/image";
+import { ASSET_COLORS, ASSET_LOGOS, type Transaction } from "@/app/(dashboard)/economy/mock-data";
 
 function relativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -17,12 +17,11 @@ function relativeTime(iso: string): string {
 export function TransactionRow({ tx }: { tx: Transaction }) {
   const isPositive = tx.amount >= 0;
   const colorHex = ASSET_COLORS[tx.symbol];
-  const glyph = tx.symbol === "NDYX" ? "X" : tx.symbol.charAt(0);
 
   return (
     <div className="eco-tx-row" style={{ "--card-c": colorHex } as React.CSSProperties}>
       <div className="eco-tx-icon" aria-hidden="true">
-        {glyph}
+        <Image src={ASSET_LOGOS[tx.symbol]} alt="" width={30} height={30} />
       </div>
       <div className="eco-tx-body">
         <div className={`eco-tx-amount ${isPositive ? "eco-tx-positive" : "eco-tx-negative"}`}>

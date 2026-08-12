@@ -46,3 +46,13 @@ export const ASSET_COLORS: Record<AssetBalance["symbol"], string> = {
   CRYNDY: "#3ecf6a",
   NDYX: "#7e34e9",
 };
+
+// Real logo assets (client-provided coin art, cropped/masked to a
+// transparent circle — see apps/web/scripts/process-economy-logos.js for
+// how these were produced from the source files). Served from /public,
+// not the hand-drawn letter badges used elsewhere on this page before.
+export const ASSET_LOGOS: Record<AssetBalance["symbol"], string> = {
+  NDYBITS: "/economy-logos/ndybits.png",
+  CRYNDY: "/economy-logos/cryndy.png",
+  NDYX: "/economy-logos/ndyx.png",
+};

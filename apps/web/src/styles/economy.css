@@ -98,15 +98,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
-  font-size: 15px;
   flex-shrink: 0;
-  color: #0a0d16;
-  background: radial-gradient(
-    circle at 35% 30%,
-    color-mix(in srgb, var(--card-c) 55%, #fff),
-    var(--card-c)
-  );
+  overflow: hidden;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--card-c) 40%, transparent);
+}
+.ndy-economy .eco-asset-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .ndy-economy .eco-eye-toggle {
   background: none;
@@ -189,11 +188,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  font-weight: 800;
-  color: #0a0d16;
-  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--card-c) 60%, #fff), var(--card-c));
+  overflow: hidden;
   box-shadow: 0 0 26px color-mix(in srgb, var(--card-c) 55%, transparent);
+}
+.ndy-economy .eco-token-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .ndy-economy .eco-token-amount {
   font-size: 26px;
@@ -374,15 +375,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
-  font-size: 20px;
-  color: #0a0d16;
-  background: radial-gradient(
-    circle at 35% 30%,
-    color-mix(in srgb, var(--card-c) 55%, #fff),
-    var(--card-c)
-  );
+  overflow: hidden;
   box-shadow: 0 0 20px color-mix(in srgb, var(--card-c) 55%, transparent);
+}
+.ndy-economy .eco-how-badge-coin img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .ndy-economy .eco-how-sparkle {
   position: absolute;
@@ -517,11 +516,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
-  font-size: 15px;
-  color: #0a0d16;
-  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--card-c) 60%, #fff), var(--card-c));
+  overflow: hidden;
   box-shadow: 0 0 14px color-mix(in srgb, var(--card-c) 45%, transparent);
+}
+.ndy-economy .eco-progress-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .ndy-economy .eco-progress-body {
   flex: 1;
@@ -610,10 +611,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
-  font-size: 12px;
-  color: #0a0d16;
-  background: var(--card-c);
+  overflow: hidden;
+}
+.ndy-economy .eco-tx-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .ndy-economy .eco-tx-body {
   flex: 1;

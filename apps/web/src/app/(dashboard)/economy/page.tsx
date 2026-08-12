@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { RefreshCw, ArrowLeftRight, ArrowDown, Send, Download, ShieldCheck, Eye, Lock, BadgeCheck, Rocket } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useCryndySummary } from "@/lib/use-cryndy";
@@ -15,6 +16,7 @@ import { ReferenceRow } from "@/components/ndy-economy/ReferenceRow";
 import { TrustStripItem } from "@/components/ndy-economy/TrustStripItem";
 import {
   ASSET_COLORS,
+  ASSET_LOGOS,
   NDYBITS_REF_VALUE_EUR,
   CRYNDY_REF_VALUE_EUR,
   NDYX_REF_VALUE_EUR,
@@ -106,7 +108,7 @@ export default function EconomyPage() {
                   colorHex={ASSET_COLORS.NDYBITS}
                   symbol="NDYBITS"
                   layerLabel="Reward Layer"
-                  glyph="N"
+                  glyph={<Image src={ASSET_LOGOS.NDYBITS} alt="" width={64} height={64} />}
                   amount={ndybits ? ndybitsBalance.toLocaleString() : "…"}
                   euroValue={formatEuro(ndybitsBalance * NDYBITS_REF_VALUE_EUR)}
                   actions={[[{ label: "Earn More", variant: "solid" }]]}
@@ -122,7 +124,7 @@ export default function EconomyPage() {
                   colorHex={ASSET_COLORS.CRYNDY}
                   symbol="CRYNDY"
                   layerLabel="Utility Layer"
-                  glyph="C"
+                  glyph={<Image src={ASSET_LOGOS.CRYNDY} alt="" width={64} height={64} />}
                   amount={cryndy ? cryndyBalance.toLocaleString() : "…"}
                   euroValue={formatEuro(cryndyBalance * CRYNDY_REF_VALUE_EUR)}
                   actions={[
@@ -147,7 +149,7 @@ export default function EconomyPage() {
                   colorHex={ASSET_COLORS.NDYX}
                   symbol="NDYX"
                   layerLabel="Strategic Asset"
-                  glyph="X"
+                  glyph={<Image src={ASSET_LOGOS.NDYX} alt="" width={64} height={64} />}
                   amount={ndyxBalance.toFixed(2)}
                   euroValue={formatEuro(ndyxBalance * NDYX_REF_VALUE_EUR)}
                   actions={[
@@ -169,7 +171,7 @@ export default function EconomyPage() {
                 {
                   title: "Earn NDYBITS",
                   colorHex: ASSET_COLORS.NDYBITS,
-                  glyph: "N",
+                  glyph: <Image src={ASSET_LOGOS.NDYBITS} alt="" width={54} height={54} />,
                   bullets: [
                     "NDYQUIZ",
                     "NDJOYITSTEPS",
@@ -182,13 +184,13 @@ export default function EconomyPage() {
                 {
                   title: "Convert to CRYNDY",
                   colorHex: ASSET_COLORS.CRYNDY,
-                  glyph: "C",
+                  glyph: <Image src={ASSET_LOGOS.CRYNDY} alt="" width={54} height={54} />,
                   paragraph: "Use NDYBITS to convert to CRYNDY via Bridge 1 or buy CRYNDY directly.",
                 },
                 {
                   title: "Upgrade to NDYX",
                   colorHex: ASSET_COLORS.NDYX,
-                  glyph: "X",
+                  glyph: <Image src={ASSET_LOGOS.NDYX} alt="" width={54} height={54} />,
                   paragraph: "Convert your CRYNDY to NDYX via Bridge 2 and hold a piece of the future.",
                 },
               ]}
@@ -250,7 +252,6 @@ export default function EconomyPage() {
                   target: 0,
                   percent: 100,
                 }}
-                glyph="N"
                 colorHex={ASSET_COLORS.NDYBITS}
               />
               <ProgressionStep
@@ -261,7 +262,6 @@ export default function EconomyPage() {
                   target: CRYNDY_PER_NDYX,
                   percent: cryndyProgressPct,
                 }}
-                glyph="C"
                 colorHex={ASSET_COLORS.CRYNDY}
               />
               <ProgressionStep
@@ -275,7 +275,6 @@ export default function EconomyPage() {
                   // holdings, unlike CRYNDY's percent above.
                   percent: NDYX_PLACEHOLDER_PROGRESS_PCT,
                 }}
-                glyph="X"
                 colorHex={ASSET_COLORS.NDYX}
                 isLast
               />

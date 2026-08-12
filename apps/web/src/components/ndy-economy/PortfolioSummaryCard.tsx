@@ -1,8 +1,9 @@
 "use client";
 
 import { Eye, EyeOff } from "lucide-react";
+import Image from "next/image";
 import { useState } from "react";
-import type { AssetBalance } from "@/app/(dashboard)/economy/mock-data";
+import { ASSET_LOGOS, type AssetBalance } from "@/app/(dashboard)/economy/mock-data";
 
 function formatEuro(amount: number): string {
   return `€${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -37,7 +38,7 @@ export function PortfolioSummaryCard({ assets }: { assets: AssetBalance[] }) {
             style={{ "--card-c": asset.colorHex } as React.CSSProperties}
             aria-hidden="true"
           >
-            {asset.symbol.charAt(0) === "N" && asset.symbol === "NDYX" ? "X" : asset.symbol.charAt(0)}
+            <Image src={ASSET_LOGOS[asset.symbol]} alt="" width={40} height={40} />
           </div>
           <div>
             <div className="eco-portfolio-asset-name">{asset.name}</div>
