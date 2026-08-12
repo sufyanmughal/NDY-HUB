@@ -1,0 +1,629 @@
+/* NDY Economy page — colors/spacing transcribed from the client's reference
+   mockup (pixel-sampled hex values), following the same scoped-stylesheet
+   architecture as homepage.css's .ndy-homepage and ndyspace.css's
+   .ndyspace-shell: one wrapper class, CSS custom properties for the
+   palette, styles never leak outside it. */
+
+.ndy-economy {
+  min-width: 0;
+
+  --eco-bg: #06090e;
+  --eco-card-bg: #0d1117;
+  --eco-card-bg-2: #0f1316;
+  --eco-border: #1c222c;
+  --eco-fg: #eef1f8;
+  --eco-fg-muted: #8891a8;
+  --eco-fg-dim: #5c6479;
+
+  --eco-gold: #f6b503;
+  --eco-gold-dim: #7a5a02;
+  --eco-green: #3ecf6a;
+  --eco-purple: #7e34e9;
+
+  background: var(--eco-bg);
+  color: var(--eco-fg);
+  font-variant-numeric: tabular-nums;
+}
+.ndy-economy * {
+  box-sizing: border-box;
+}
+
+.ndy-economy .eco-page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 32px 40px 40px;
+}
+
+.ndy-economy .eco-header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.ndy-economy .eco-header p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--eco-fg-muted);
+}
+
+/* ---------- portfolio value bar ---------- */
+.ndy-economy .eco-portfolio {
+  margin-top: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 36px;
+  padding: 20px 26px;
+  background: var(--eco-card-bg);
+  border: 1px solid var(--eco-border);
+  border-radius: 14px;
+}
+.ndy-economy .eco-portfolio-value {
+  min-width: 200px;
+}
+.ndy-economy .eco-portfolio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--eco-fg-muted);
+}
+.ndy-economy .eco-portfolio-label svg {
+  width: 14px;
+  height: 14px;
+}
+.ndy-economy .eco-portfolio-amount {
+  margin-top: 6px;
+  font-size: 32px;
+  font-weight: 800;
+}
+.ndy-economy .eco-portfolio-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--eco-fg-dim);
+}
+
+.ndy-economy .eco-portfolio-asset {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ndy-economy .eco-asset-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.ndy-economy .eco-portfolio-asset-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--eco-fg-muted);
+}
+.ndy-economy .eco-portfolio-asset-value {
+  font-size: 16px;
+  font-weight: 700;
+}
+.ndy-economy .eco-portfolio-asset-sub {
+  font-size: 12px;
+  color: var(--eco-fg-dim);
+}
+
+/* ---------- economic journey ---------- */
+.ndy-economy .eco-journey-panel {
+  margin-top: 20px;
+  padding: 24px;
+  background: var(--eco-card-bg);
+  border: 1px solid var(--eco-border);
+  border-radius: 14px;
+}
+.ndy-economy .eco-journey-title {
+  margin: 0 0 18px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--eco-fg-muted);
+}
+
+.ndy-economy .eco-journey-row {
+  display: grid;
+  grid-template-columns: 1.3fr 0.8fr 1.3fr 0.8fr 1.3fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.ndy-economy .eco-token-card {
+  border-radius: 14px;
+  padding: 22px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--card-c) 45%, var(--eco-border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--card-c) 14%, var(--eco-card-bg)) 0%,
+    var(--eco-card-bg) 65%
+  );
+}
+.ndy-economy .eco-token-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--card-c);
+  letter-spacing: 0.01em;
+}
+.ndy-economy .eco-token-layer {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--eco-fg-muted);
+}
+.ndy-economy .eco-token-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  margin: 16px 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 800;
+  color: #0a0d16;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--card-c) 60%, #fff), var(--card-c));
+  box-shadow: 0 0 26px color-mix(in srgb, var(--card-c) 55%, transparent);
+}
+.ndy-economy .eco-token-amount {
+  font-size: 26px;
+  font-weight: 800;
+}
+.ndy-economy .eco-token-ref {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--eco-fg-muted);
+}
+.ndy-economy .eco-token-actions {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.ndy-economy .eco-token-actions-row {
+  display: flex;
+  gap: 8px;
+}
+.ndy-economy .eco-token-btn {
+  flex: 1;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  border: 1px solid color-mix(in srgb, var(--card-c) 40%, transparent);
+  background: color-mix(in srgb, var(--card-c) 14%, transparent);
+  color: var(--card-c);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.ndy-economy .eco-token-btn:hover {
+  background: color-mix(in srgb, var(--card-c) 24%, transparent);
+}
+.ndy-economy .eco-token-btn.eco-token-btn-solid {
+  background: var(--card-c);
+  color: #0a0d16;
+  border-color: transparent;
+}
+.ndy-economy .eco-token-btn.eco-token-btn-solid:hover {
+  filter: brightness(1.08);
+}
+.ndy-economy .eco-token-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.ndy-economy .eco-bridge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.ndy-economy .eco-bridge-box {
+  width: 100%;
+  padding: 16px 10px;
+  text-align: center;
+  border: 1px solid var(--eco-border);
+  border-radius: 12px;
+  background: var(--eco-card-bg-2);
+}
+.ndy-economy .eco-bridge-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--eco-fg-muted);
+}
+.ndy-economy .eco-bridge-icon {
+  margin: 10px auto;
+  width: 34px;
+  height: 34px;
+  color: var(--eco-fg-dim);
+}
+.ndy-economy .eco-bridge-rate {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.ndy-economy .eco-bridge-arrow {
+  color: var(--card-c);
+  width: 22px;
+  height: 22px;
+}
+
+/* ---------- how it works ---------- */
+.ndy-economy .eco-how {
+  margin-top: 16px;
+  padding: 22px 24px;
+  background: var(--eco-card-bg);
+  border: 1px solid var(--eco-border);
+  border-radius: 14px;
+}
+.ndy-economy .eco-how-title {
+  margin: 0 0 16px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ndy-economy .eco-how-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.ndy-economy .eco-how-col h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--card-c);
+}
+.ndy-economy .eco-how-col ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--eco-fg-muted);
+  line-height: 1.8;
+}
+.ndy-economy .eco-how-col p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--eco-fg-muted);
+  line-height: 1.7;
+}
+
+/* ---------- quick actions ---------- */
+.ndy-economy .eco-actions {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+.ndy-economy .eco-action-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: var(--eco-card-bg);
+  border: 1px solid var(--eco-border);
+  border-radius: 12px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.ndy-economy .eco-action-card:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--card-c) 50%, var(--eco-border));
+  transform: translateY(-1px);
+}
+.ndy-economy .eco-action-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ndy-economy .eco-action-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--card-c);
+  background: color-mix(in srgb, var(--card-c) 16%, transparent);
+}
+.ndy-economy .eco-action-icon svg {
+  width: 17px;
+  height: 17px;
+}
+.ndy-economy .eco-action-title {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.ndy-economy .eco-action-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--eco-fg-muted);
+  line-height: 1.4;
+}
+
+/* ---------- footer trust strip ---------- */
+.ndy-economy .eco-trust {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+  padding-top: 22px;
+  border-top: 1px solid var(--eco-border);
+}
+.ndy-economy .eco-trust-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ndy-economy .eco-trust-item svg {
+  width: 18px;
+  height: 18px;
+  color: var(--eco-fg-muted);
+  flex-shrink: 0;
+}
+.ndy-economy .eco-trust-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+.ndy-economy .eco-trust-sub {
+  font-size: 11.5px;
+  color: var(--eco-fg-dim);
+}
+
+/* ---------- right column ---------- */
+.ndy-economy .eco-panel {
+  padding: 20px;
+  background: var(--eco-card-bg);
+  border: 1px solid var(--eco-border);
+  border-radius: 14px;
+}
+.ndy-economy .eco-panel + .eco-panel {
+  margin-top: 16px;
+}
+.ndy-economy .eco-panel-title {
+  margin: 0 0 16px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.ndy-economy .eco-progress-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.ndy-economy .eco-progress-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 15px;
+  color: #0a0d16;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--card-c) 60%, #fff), var(--card-c));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--card-c) 45%, transparent);
+}
+.ndy-economy .eco-progress-body {
+  flex: 1;
+  min-width: 0;
+}
+.ndy-economy .eco-progress-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--card-c);
+}
+.ndy-economy .eco-progress-value {
+  margin-top: 2px;
+  font-size: 17px;
+  font-weight: 800;
+}
+.ndy-economy .eco-progress-caption {
+  font-size: 12px;
+  color: var(--eco-fg-muted);
+}
+.ndy-economy .eco-progress-track {
+  margin-top: 8px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--eco-card-bg-2);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ndy-economy .eco-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--card-c);
+}
+.ndy-economy .eco-progress-pct {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--eco-fg-muted);
+  white-space: nowrap;
+}
+.ndy-economy .eco-progress-connector {
+  margin: 6px 0 6px 19px;
+  color: var(--eco-fg-dim);
+  width: 16px;
+  height: 16px;
+}
+.ndy-economy .eco-progress-cta {
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: var(--eco-fg-muted);
+  text-align: center;
+}
+
+.ndy-economy .eco-tx-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ndy-economy .eco-tx-viewall {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--eco-accent, #4f7cff);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.ndy-economy .eco-tx-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--eco-border);
+}
+.ndy-economy .eco-tx-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.ndy-economy .eco-tx-row:first-child {
+  padding-top: 0;
+}
+.ndy-economy .eco-tx-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 12px;
+  color: #0a0d16;
+  background: var(--card-c);
+}
+.ndy-economy .eco-tx-body {
+  flex: 1;
+  min-width: 0;
+}
+.ndy-economy .eco-tx-amount {
+  font-size: 13px;
+  font-weight: 700;
+}
+.ndy-economy .eco-tx-amount.eco-tx-positive {
+  color: var(--eco-green);
+}
+.ndy-economy .eco-tx-amount.eco-tx-negative {
+  color: var(--eco-fg);
+}
+.ndy-economy .eco-tx-reason {
+  font-size: 12px;
+  color: var(--eco-fg-muted);
+}
+.ndy-economy .eco-tx-time {
+  font-size: 11px;
+  color: var(--eco-fg-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ndy-economy .eco-tx-empty {
+  font-size: 13px;
+  color: var(--eco-fg-muted);
+  padding: 8px 0;
+}
+
+.ndy-economy .eco-ref-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--card-c) 35%, var(--eco-border));
+  background: color-mix(in srgb, var(--card-c) 8%, transparent);
+}
+.ndy-economy .eco-ref-row + .eco-ref-row {
+  margin-top: 10px;
+}
+.ndy-economy .eco-ref-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--card-c);
+}
+.ndy-economy .eco-ref-sub {
+  font-size: 11.5px;
+  color: var(--eco-fg-muted);
+}
+.ndy-economy .eco-ref-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--card-c);
+}
+
+/* ---------- grid shell ---------- */
+.ndy-economy .eco-grid {
+  margin-top: 0;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1180px) {
+  .ndy-economy .eco-grid {
+    grid-template-columns: 1fr;
+  }
+  .ndy-economy .eco-journey-row {
+    grid-template-columns: 1fr;
+  }
+  .ndy-economy .eco-bridge {
+    flex-direction: row;
+    padding: 4px 0;
+  }
+  .ndy-economy .eco-bridge-box {
+    flex: 1;
+  }
+  .ndy-economy .eco-how-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .ndy-economy .eco-actions {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ndy-economy .eco-trust {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .ndy-economy .eco-page {
+    padding: 20px 16px 32px;
+  }
+  .ndy-economy .eco-portfolio {
+    padding: 16px;
+    gap: 18px;
+  }
+  .ndy-economy .eco-actions {
+    grid-template-columns: 1fr;
+  }
+  .ndy-economy .eco-trust {
+    grid-template-columns: 1fr;
+  }
+}

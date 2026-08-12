@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   LayoutGrid,
   ShieldCheck,
+  Landmark,
   Rocket,
   Settings as SettingsIcon,
   Share2,
@@ -62,6 +63,13 @@ const BASE_NAV_ITEMS: NavItem[] = [
     sublabel: "Digital Identity",
     icon: ShieldCheck,
     iconColor: "#4f7cff",
+  },
+  {
+    href: "/economy",
+    label: "NDY Economy",
+    sublabel: "Rewards, Tokens & Assets",
+    icon: Landmark,
+    iconColor: "#f6b503",
   },
   {
     href: "/founder",
