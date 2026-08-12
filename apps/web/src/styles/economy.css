@@ -101,6 +101,21 @@
   font-weight: 800;
   font-size: 15px;
   flex-shrink: 0;
+  color: #0a0d16;
+  background: radial-gradient(
+    circle at 35% 30%,
+    color-mix(in srgb, var(--card-c) 55%, #fff),
+    var(--card-c)
+  );
+}
+.ndy-economy .eco-eye-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  padding: 0;
 }
 .ndy-economy .eco-portfolio-asset-name {
   font-size: 12px;
@@ -262,10 +277,14 @@
   font-weight: 600;
   line-height: 1.5;
 }
-.ndy-economy .eco-bridge-arrow {
+.ndy-economy .eco-bridge-arrow-h,
+.ndy-economy .eco-bridge-arrow-v {
   color: var(--card-c);
   width: 22px;
   height: 22px;
+}
+.ndy-economy .eco-bridge-arrow-v {
+  display: none;
 }
 
 /* ---------- how it works ---------- */
@@ -275,6 +294,8 @@
   background: var(--eco-card-bg);
   border: 1px solid var(--eco-border);
   border-radius: 14px;
+  position: relative;
+  overflow: hidden;
 }
 .ndy-economy .eco-how-title {
   margin: 0 0 16px;
@@ -286,26 +307,100 @@
 .ndy-economy .eco-how-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+}
+.ndy-economy .eco-how-col {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 20px;
+  border-left: 1px solid var(--eco-border);
+}
+.ndy-economy .eco-how-col:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+.ndy-economy .eco-how-col:last-child {
+  padding-right: 0;
+}
+.ndy-economy .eco-how-col-text {
+  min-width: 0;
+  flex: 1;
 }
 .ndy-economy .eco-how-col h3 {
   margin: 0 0 10px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   color: var(--card-c);
 }
 .ndy-economy .eco-how-col ul {
   margin: 0;
-  padding-left: 18px;
-  font-size: 13px;
+  padding-left: 16px;
+  font-size: 12.5px;
   color: var(--eco-fg-muted);
-  line-height: 1.8;
+  line-height: 1.85;
 }
 .ndy-economy .eco-how-col p {
   margin: 0;
   font-size: 13px;
   color: var(--eco-fg-muted);
-  line-height: 1.7;
+  line-height: 1.6;
+}
+
+/* Ring + coin + sparkle badge, transcribed from the reference mockup's
+   "How It Works" column illustrations. */
+.ndy-economy .eco-how-badge {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ndy-economy .eco-how-badge-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px dashed color-mix(in srgb, var(--card-c) 55%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--card-c) 25%, transparent);
+}
+.ndy-economy .eco-how-badge-coin {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 20px;
+  color: #0a0d16;
+  background: radial-gradient(
+    circle at 35% 30%,
+    color-mix(in srgb, var(--card-c) 55%, #fff),
+    var(--card-c)
+  );
+  box-shadow: 0 0 20px color-mix(in srgb, var(--card-c) 55%, transparent);
+}
+.ndy-economy .eco-how-sparkle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  color: var(--card-c);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--card-c) 70%, transparent));
+}
+.ndy-economy .eco-how-sparkle-1 {
+  top: -2px;
+  right: 2px;
+}
+.ndy-economy .eco-how-sparkle-2 {
+  width: 7px;
+  height: 7px;
+  bottom: 14px;
+  left: -4px;
+  opacity: 0.75;
 }
 
 /* ---------- quick actions ---------- */
@@ -600,9 +695,23 @@
   .ndy-economy .eco-bridge-box {
     flex: 1;
   }
+  .ndy-economy .eco-bridge-arrow-h {
+    display: none;
+  }
+  .ndy-economy .eco-bridge-arrow-v {
+    display: block;
+  }
   .ndy-economy .eco-how-grid {
     grid-template-columns: 1fr;
-    gap: 24px;
+  }
+  .ndy-economy .eco-how-col {
+    border-left: none;
+    border-top: 1px solid var(--eco-border);
+    padding: 18px 0 0;
+  }
+  .ndy-economy .eco-how-col:first-child {
+    border-top: none;
+    padding-top: 0;
   }
   .ndy-economy .eco-actions {
     grid-template-columns: repeat(2, 1fr);
