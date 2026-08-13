@@ -46,16 +46,16 @@ async function main() {
     256,
   );
 
-  // NDIX: cropped out of the composite ecosystem badge -- measured
-  // precisely against a 6x-scaled reference render of the source region
-  // to find the badge's own outer-ring boundary (not just "roughly
-  // centered" like earlier passes), so the ring touches all four edges
-  // of this square and the circular alpha mask below has no black
-  // margin left inside it.
+  // NDIX: cropped out of the composite ecosystem badge. The exact ring
+  // boundary crop still left a hairline of black margin on 1-2 sides due
+  // to sub-pixel measurement error, so this deliberately zooms in ~9%
+  // past that boundary (badge slightly overflows the square) -- any
+  // residual overflow is cropped away by the circular alpha mask below,
+  // but there is now zero risk of a visible gap on any side.
   await makeCircularPng(
     "C:/Users/n8n/Downloads/ndyx.jpeg",
     path.join(outDir, "ndyx.png"),
-    { left: 927, top: 360, width: 129, height: 129 },
+    { left: 935, top: 368, width: 116, height: 116 },
     256,
   );
 }
