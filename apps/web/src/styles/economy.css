@@ -728,14 +728,56 @@
   .ndy-economy .eco-page {
     padding: 20px 16px 32px;
   }
+  .ndy-economy .eco-header h1 {
+    font-size: 22px;
+  }
   .ndy-economy .eco-portfolio {
     padding: 16px;
     gap: 18px;
+  }
+  .ndy-economy .eco-portfolio-value {
+    min-width: 0;
+    width: 100%;
+  }
+  .ndy-economy .eco-portfolio-amount {
+    font-size: 26px;
+  }
+  .ndy-economy .eco-journey-panel,
+  .ndy-economy .eco-how,
+  .ndy-economy .eco-panel {
+    padding: 16px;
+  }
+  /* The badge-beside-text row from desktop (see base .eco-how-col rule)
+     gets cramped once the card itself drops under ~360px wide — stack
+     the badge above the text instead, same reasoning as the journey
+     cards already collapsing to one column at the 1180px breakpoint. */
+  .ndy-economy .eco-how-col {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .ndy-economy .eco-how-badge {
+    align-self: center;
+  }
+  .ndy-economy .eco-token-actions-row {
+    flex-direction: column;
   }
   .ndy-economy .eco-actions {
     grid-template-columns: 1fr;
   }
   .ndy-economy .eco-trust {
     grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+
+@media (max-width: 380px) {
+  /* Genuinely narrow phones — the portfolio bar's per-asset stat blocks
+     (NDYBITS/CRYNDY/NDYX) still sit in a wrapped flex row from the base
+     .eco-portfolio rule; give each one room to be a full-width row
+     instead of trying to fit two per line, which was clipping the euro
+     sub-value on the narrowest devices. */
+  .ndy-economy .eco-portfolio-asset {
+    width: 100%;
   }
 }
