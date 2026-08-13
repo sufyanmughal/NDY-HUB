@@ -696,8 +696,17 @@ export function NewEventModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setError(null);
+    // Both fields are separate <input type="time"> pickers with no
+    // browser-enforced ordering between them — catch "end before start"
+    // here, with a message that names the actual mistake, instead of
+    // letting it round-trip to the server's generic "endAt must not be
+    // before startAt" and back.
+    if (endTime <= startTime) {
+      setError("End time must be after start time.");
+      return;
+    }
+    setBusy(true);
     try {
       await createCalendarEvent({
         title,
@@ -770,8 +779,12 @@ export function EditEventModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setError(null);
+    if (endTime <= startTime) {
+      setError("End time must be after start time.");
+      return;
+    }
+    setBusy(true);
     try {
       await updateCalendarEvent(event.id, {
         title,
