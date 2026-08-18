@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "path";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   // Silences the "multiple lockfiles" warning: this app is an npm workspace
@@ -34,4 +35,26 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// withSentryConfig wraps the build to upload source maps and inject the
+// release/tunnel config Sentry needs — genuinely inert without a real
+// SENTRY_AUTH_TOKEN (source-map upload) or NEXT_PUBLIC_SENTRY_DSN (runtime
+// reporting), same "ready but not activated" pattern as the rest of this
+// pass. silent:true keeps a missing token from spamming build logs with
+// "would upload source maps but..." on every build until one is added.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+  widenClientFileUpload: true,
+  // Current option shape (disableLogger/automaticVercelMonitors top-level
+  // flags are deprecated as of this SDK version, and unsupported under
+  // Turbopack — this build uses Turbopack, see the `turbopack` key above).
+  webpack: {
+    treeshake: { removeDebugLogging: true },
+    // This app deploys via self-hosted Docker as well as Vercel (see
+    // `output` above) — a no-op off Vercel, safe to leave on for both
+    // targets.
+    automaticVercelMonitors: true,
+  },
+});

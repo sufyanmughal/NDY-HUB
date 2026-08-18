@@ -108,24 +108,46 @@ that. Verify the whole chain without burning a real renewal:
 
 ## Disaster recovery
 
+Hardened Aug 2026 per the client's explicit "treat backup storage as
+urgent" instruction — a real ~800-byte empty/truncated dump had sat
+unnoticed in `~/ndy-hub-backups/` for 12 days before this pass caught it.
+Every piece below exists specifically to make that class of failure
+impossible to miss again.
+
 **Backups**: `deploy/backup.sh` runs automatically every night at 03:00 UTC
 (installed as a cron job by `server-setup.sh`), dumping the database with
 `pg_dump` and keeping 14 days of gzipped backups in `~/ndy-hub-backups/` on
-the server itself.
+the server itself. It now also:
+- **Verifies the dump is non-trivial** (rejects anything under ~2KB as a
+  failed/empty dump rather than silently keeping/uploading it) before
+  treating it as a real backup.
+- **Alerts on any failure** — a failed pipeline, an undersized dump, or a
+  failed off-server upload all POST to `/internal/backup-alert` (gated by
+  `INTERNAL_ALERT_SECRET` in `.env.prod`), which fans out an EMAIL
+  notification to every FOUNDER/SUPER_ADMIN via the same NotificationService
+  every other cross-cutting alert uses. A local `~/ndy-hub-backups/FAILURE`
+  marker file is also written as a fallback signal even if the API call
+  itself fails.
+- **Uploads off-server to DigitalOcean Spaces**, once configured. Set
+  `SPACES_BUCKET`/`SPACES_REGION`/`SPACES_ACCESS_KEY`/`SPACES_SECRET_KEY` in
+  `.env.prod` (create a Space + access key in the DO dashboard first,
+  ~$5/mo) and every future nightly backup uploads automatically — no code
+  change needed. Until those are set, this is a documented, alerted-on gap
+  (see `backup.sh`'s own header), not a silent one — local-disk backups
+  still run regardless.
 
-This is a deliberate starting point, not the end state: local-only backups
-mean a lost or corrupted server takes its backups down with it. The
-standard fix is pushing each dump to off-server object storage
-(DigitalOcean Spaces, ~$5/mo) — worth doing before any real user data is on
-this server. `backup.sh` is written so that's a small addition (pipe the
-gzip output to `s3cmd`/`rclone` instead of just the local file) rather than
-a rewrite.
-
-**Restore testing**: run `deploy/restore.sh <backup-file> [db-name]`
-against a throwaway database (never the live one — the script defaults to
-`ndyhub_restore_test` precisely so it can't collide) to verify a backup is
-actually restorable. Do this periodically, not just when something's
-already gone wrong — an untested backup is a hope, not a plan. Example:
+**Restore testing**: two paths now exist.
+- **Automated, weekly**: `deploy/restore-test.sh` runs every Sunday at
+  04:00 UTC (installed as a cron job by `server-setup.sh`), restores the
+  most recent local backup into a throwaway `ndyhub_restore_test` database,
+  sanity-checks that the `User` table actually came back populated (an
+  empty restore that didn't error is still a failure), then drops the
+  throwaway database. Any failure alerts the same way `backup.sh` does.
+  This is what actually closes "an untested backup is a hope, not a plan" —
+  it used to be true only if someone remembered to run it by hand.
+- **Manual, on-demand**: `deploy/restore.sh <backup-file> [db-name]` for a
+  real DR drill — same throwaway-database safety, but leaves the restored
+  database around afterward for a human to actually inspect:
 
 ```bash
 ssh root@<droplet-ip>
@@ -134,12 +156,14 @@ bash ~/ndy-hub/deploy/restore.sh ~/ndy-hub-backups/ndyhub-20260731-030000.sql.gz
 
 **Incident responsibilities**: until the team grows, whoever holds SSH
 access to the server is the on-call responder. DigitalOcean alert emails
-(CPU/memory/disk) and any future application-level alerting (Sentry or
-similar — not yet wired in) are the trigger; `docker compose logs` and this
-document are the starting point for triage.
+(CPU/memory/disk), the backup/restore-test failure emails above, and any
+future application-level alerting (Sentry or similar — not yet wired in)
+are the trigger; `docker compose logs` and this document are the starting
+point for triage.
 
 **What's deliberately not built yet**: application-level error tracking
 (e.g. Sentry) for catching failed payments and unexpected exceptions in
-real time, and off-server backup storage. Both are recommended next steps,
-not silently skipped — flagged here so the gap is visible rather than
+real time. Off-server backup storage is now wired and ready but stays
+inactive until real Spaces credentials are provided (see above) — not
+silently skipped, flagged here so the gap is visible rather than
 assumed-covered.

@@ -33,6 +33,13 @@ if ! command -v do-agent >/dev/null 2>&1; then
   curl -sSL https://repos.insights.digitalocean.com/install.sh | bash
 fi
 
+echo "== s3cmd (for off-server backup upload to DigitalOcean Spaces) =="
+# Installed unconditionally, harmlessly idle until SPACES_BUCKET is set in
+# .env.prod — see deploy/backup.sh's "OFF-SERVER UPLOAD" section.
+if ! command -v s3cmd >/dev/null 2>&1; then
+  apt-get install -y s3cmd
+fi
+
 echo "== Cloning repo =="
 if [ ! -d ~/ndy-hub/.git ]; then
   git clone "$REPO_URL" ~/ndy-hub
@@ -47,11 +54,15 @@ if [ ! -f .env.prod ]; then
   echo
 fi
 
-chmod +x deploy/backup.sh deploy/restore.sh
+chmod +x deploy/backup.sh deploy/restore.sh deploy/restore-test.sh
 
 echo "== Nightly backup cron job =="
 CRON_LINE="0 3 * * * /bin/bash $HOME/ndy-hub/deploy/backup.sh >> $HOME/ndy-hub-backups/backup.log 2>&1"
 ( crontab -l 2>/dev/null | grep -vF "ndy-hub/deploy/backup.sh" ; echo "$CRON_LINE" ) | crontab -
+
+echo "== Weekly restore-test cron job (Sundays 04:00 UTC, after the nightly backup) =="
+RESTORE_CRON_LINE="0 4 * * 0 /bin/bash $HOME/ndy-hub/deploy/restore-test.sh >> $HOME/ndy-hub-backups/restore-test.log 2>&1"
+( crontab -l 2>/dev/null | grep -vF "ndy-hub/deploy/restore-test.sh" ; echo "$RESTORE_CRON_LINE" ) | crontab -
 
 echo "== Done. Next steps: =="
 echo "1. Fill in ~/ndy-hub/.env.prod (secrets, IMAGE_API/IMAGE_WEB tags, WEB_APP_URL/API_URL with this server's IP)."
@@ -61,3 +72,8 @@ echo "4. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d"
 echo "5. docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T api npx prisma migrate deploy"
 echo "6. Nightly backups run automatically at 03:00 UTC, kept 14 days, in ~/ndy-hub-backups/."
 echo "7. Set alert policies in the DigitalOcean dashboard: Monitoring -> Alerts -> Create (CPU, memory, disk)."
+echo "8. Set INTERNAL_ALERT_SECRET in .env.prod (openssl rand -base64 32) so backup/restore-test failures actually alert admins."
+echo "9. Optional but recommended: set SPACES_BUCKET/SPACES_REGION/SPACES_ACCESS_KEY/SPACES_SECRET_KEY in .env.prod for off-server backup storage — see deploy/backup.sh's header."
+echo "10. Weekly automated restore tests run Sundays 04:00 UTC (deploy/restore-test.sh) — verifies the latest backup actually restores, not just that it was written."
+echo "11. Optional but recommended: create a free Sentry.io project (Node/NestJS for the API, Next.js for web) and set SENTRY_DSN/NEXT_PUBLIC_SENTRY_DSN (+ SENTRY_ORG/PROJECT/AUTH_TOKEN for source maps) in .env.prod — see apps/api/src/instrument.ts and apps/web/src/instrumentation.ts."
+echo "12. Optional but recommended: set up DigitalOcean Uptime checks (Monitoring -> Uptime -> Create Check) for ndyhub.com and api.ndyhub.com, alerting to your email — catches the site being down even if the server itself looks healthy."

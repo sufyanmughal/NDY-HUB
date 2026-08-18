@@ -16,6 +16,20 @@ RUN npm ci
 COPY apps/web apps/web
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# NEXT_PUBLIC_SENTRY_DSN/ENVIRONMENT get inlined into the client bundle at
+# build time (same as NEXT_PUBLIC_API_URL above) — genuinely inert if
+# unset, see src/instrumentation-client.ts. SENTRY_ORG/PROJECT/AUTH_TOKEN
+# are build-only (withSentryConfig's source-map upload step) and
+# deliberately never ENV'd — no reason for them to persist as environment
+# variables in the final image layers once the build step that needs them
+# is done.
+ARG NEXT_PUBLIC_SENTRY_DSN
+ARG NEXT_PUBLIC_SENTRY_ENVIRONMENT
+ARG SENTRY_ORG
+ARG SENTRY_PROJECT
+ARG SENTRY_AUTH_TOKEN
+ENV NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN}
+ENV NEXT_PUBLIC_SENTRY_ENVIRONMENT=${NEXT_PUBLIC_SENTRY_ENVIRONMENT}
 RUN npm run build --workspace apps/web
 
 FROM node:20-alpine AS runner

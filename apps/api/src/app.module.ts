@@ -25,6 +25,7 @@ import { WorkspaceModule } from './workspace/workspace.module';
 import { NotificationModule } from './notifications/notification.module';
 import { ActionEngineModule } from './action-engine/action-engine.module';
 import { NdyEconomyModule } from './ndy-economy/ndy-economy.module';
+import { InternalModule } from './internal/internal.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { NdyEconomyModule } from './ndy-economy/ndy-economy.module';
     NotificationModule,
     ActionEngineModule,
     NdyEconomyModule,
+    InternalModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
