@@ -1326,3 +1326,111 @@ export interface ActivityItem {
 export function getMyActivity(): Promise<ActivityItem[]> {
   return authedFetch("/activity/me");
 }
+
+// --- Business Center (Phase 4): workspace requests, team, invites ---
+
+export type BusinessWorkspaceRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER";
+
+export interface BusinessWorkspaceRequest {
+  id: string;
+  requestedByUserId: string;
+  requestedByNdyId: string;
+  businessName: string;
+  requestReason: string | null;
+  status: BusinessWorkspaceRequestStatus;
+  reviewedByNdyId: string | null;
+  reviewReason: string | null;
+  resolvedAt: string | null;
+  createdWorkspaceId: string | null;
+  createdAt: string;
+}
+
+export interface Workspace {
+  id: string;
+  type: "PERSONAL" | "BUSINESS";
+  name: string;
+  ownerUserId: string;
+  ndyBusinessId: string | null;
+  createdAt: string;
+}
+
+export interface WorkspaceMembershipRow {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  role: WorkspaceRole;
+  department: string | null;
+  createdAt: string;
+}
+
+export interface WorkspaceInvite {
+  id: string;
+  workspaceId: string;
+  invitedEmail: string;
+  invitedRole: WorkspaceRole;
+  invitedDepartment: string | null;
+  invitedByNdyId: string;
+  status: "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED" | "REVOKED";
+  expiresAt: string;
+  createdAt: string;
+}
+
+export function requestBusinessWorkspace(
+  businessName: string,
+  reason?: string,
+): Promise<BusinessWorkspaceRequest> {
+  return authedFetch("/business-workspaces/requests", {
+    method: "POST",
+    body: JSON.stringify({ businessName, reason }),
+  });
+}
+
+export function getMyBusinessWorkspaceRequests(): Promise<
+  BusinessWorkspaceRequest[]
+> {
+  return authedFetch("/business-workspaces/requests");
+}
+
+export function listBusinessWorkspaceMembers(
+  workspaceId: string,
+): Promise<WorkspaceMembershipRow[]> {
+  return authedFetch(`/business-workspaces/${workspaceId}/members`);
+}
+
+export function listWorkspaceInvites(
+  workspaceId: string,
+): Promise<WorkspaceInvite[]> {
+  return authedFetch(`/business-workspaces/${workspaceId}/invites`);
+}
+
+export function inviteToWorkspace(
+  workspaceId: string,
+  invitedEmail: string,
+  invitedRole: WorkspaceRole,
+  invitedDepartment?: string,
+): Promise<WorkspaceInvite> {
+  return authedFetch(`/business-workspaces/${workspaceId}/invites`, {
+    method: "POST",
+    body: JSON.stringify({ invitedEmail, invitedRole, invitedDepartment }),
+  });
+}
+
+export function revokeWorkspaceInvite(
+  workspaceId: string,
+  inviteId: string,
+): Promise<WorkspaceInvite> {
+  return authedFetch(
+    `/business-workspaces/${workspaceId}/invites/${inviteId}`,
+    { method: "DELETE" },
+  );
+}
+
+export function acceptWorkspaceInvite(
+  token: string,
+): Promise<WorkspaceMembershipRow> {
+  return authedFetch("/workspace-invites/accept", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}

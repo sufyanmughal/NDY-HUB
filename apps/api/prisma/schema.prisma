@@ -1091,8 +1091,16 @@ model Workspace {
   // at creation time, purely for display — never used as a lookup key.
   name        String
   ownerUserId String
+  // Set only for type: BUSINESS, once a BusinessWorkspaceRequest is
+  // approved — same "public-facing, permanent, six-char" shape as
+  // User.ndyId's core segment, formatted as "NDY-BIZ-XXXXXX" via the same
+  // ndy-id.util.ts helpers (extended for a Workspace-level id rather than
+  // a User-level one — a business is a tenant, not a personal identity).
+  // Null for PERSONAL workspaces, which never had a business id concept.
+  ndyBusinessId String?             @unique
   createdAt   DateTime              @default(now())
   memberships WorkspaceMembership[]
+  invites     WorkspaceInvite[]
 
   @@index([ownerUserId])
 }
@@ -1104,6 +1112,12 @@ model WorkspaceMembership {
   userId      String
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   role        WorkspaceRole @default(MEMBER)
+  // Free-text department label, per the client's explicit "include a
+  // simple department field now" answer (reversing this doc's own earlier
+  // "recommend deferring" note) — plain optional string, not its own
+  // model/enum, since there's no department-scoped permission or
+  // reporting feature yet for a richer model to serve.
+  department  String?
   createdAt   DateTime      @default(now())
 
   // A user can't join the same workspace twice — this is what makes
@@ -1111,6 +1125,71 @@ model WorkspaceMembership {
   // safe to call more than once for the same user without duplicating rows.
   @@unique([workspaceId, userId])
   @@index([userId])
+}
+
+enum BusinessWorkspaceRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Per the client's explicit "admin-approved — creation request goes
+// through the same propose/approve pattern as role changes" answer.
+// Structurally identical to RoleChangeRequest: propose (PENDING row),
+// separate resolution step, apply. Explicitly designed so approval can
+// later become automated/risk-based (via NDY Trust/business verification)
+// without a schema change — that's just a different `resolve()` caller,
+// not a different table shape.
+model BusinessWorkspaceRequest {
+  id                String                         @id @default(uuid())
+  requestedByUserId String
+  requestedByNdyId  String
+  businessName      String
+  requestReason     String?
+  status            BusinessWorkspaceRequestStatus @default(PENDING)
+
+  reviewedByUserId  String?
+  reviewedByNdyId   String?
+  reviewReason      String?
+  resolvedAt        DateTime?
+
+  // Set once APPROVED — the resulting Workspace's id, so the requester
+  // (and any UI polling this request) can find the workspace it created.
+  createdWorkspaceId String?
+
+  createdAt         DateTime                       @default(now())
+
+  @@index([status])
+}
+
+enum WorkspaceInviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REVOKED
+}
+
+// Same single-use/TTL token shape as every other invite/reset token on
+// User (see User.emailVerificationTokenHash) — token-based accept, no
+// dual-actor approval needed (inviting yourself makes no sense, so this
+// is simpler than BusinessWorkspaceRequest/RoleChangeRequest above).
+model WorkspaceInvite {
+  id              String                 @id @default(uuid())
+  workspaceId     String
+  workspace       Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedEmail    String
+  invitedRole     WorkspaceRole
+  invitedDepartment String?
+  invitedByUserId String
+  invitedByNdyId  String
+  status          WorkspaceInviteStatus  @default(PENDING)
+  tokenHash       String                 @unique
+  expiresAt       DateTime
+  resolvedAt      DateTime?
+  createdAt       DateTime               @default(now())
+
+  @@index([workspaceId, status])
 }
 
 // --- Central notification backbone (Phase 2) ---

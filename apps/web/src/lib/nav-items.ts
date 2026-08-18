@@ -10,6 +10,7 @@ import {
   Terminal,
   CircleDollarSign,
   HelpCircle,
+  Building2,
   type LucideIcon,
 } from "lucide-react";
 import { useMe } from "./use-me";
@@ -70,6 +71,13 @@ const BASE_NAV_ITEMS: NavItem[] = [
     sublabel: "Rewards, Tokens & Assets",
     icon: Landmark,
     iconColor: "#f6b503",
+  },
+  {
+    href: "/business",
+    label: "Business Center",
+    sublabel: "Teams & Workspaces",
+    icon: Building2,
+    iconColor: "#22c58b",
   },
   {
     href: "/founder",
