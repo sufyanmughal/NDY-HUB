@@ -45,6 +45,9 @@ CREATE TABLE "NdyEconomyEventLog" (
     CONSTRAINT "NdyEconomyEventLog_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateEnum
+CREATE TYPE "BridgeRequestStatus" AS ENUM ('PENDING', 'ELIGIBLE', 'INELIGIBLE', 'COOLING_OFF', 'APPROVED', 'EXECUTED', 'REJECTED');
+
 -- CreateTable
 CREATE TABLE "BridgeRequest" (
     "id" TEXT NOT NULL,
@@ -61,9 +64,6 @@ CREATE TABLE "BridgeRequest" (
 
     CONSTRAINT "BridgeRequest_pkey" PRIMARY KEY ("id")
 );
-
--- CreateEnum
-CREATE TYPE "BridgeRequestStatus" AS ENUM ('PENDING', 'ELIGIBLE', 'INELIGIBLE', 'COOLING_OFF', 'APPROVED', 'EXECUTED', 'REJECTED');
 
 -- CreateTable
 CREATE TABLE "ConversionPolicy" (
