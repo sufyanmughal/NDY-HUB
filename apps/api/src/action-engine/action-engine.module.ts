@@ -4,6 +4,7 @@ import { ActionEngineController } from './action-engine.controller';
 import { WorkspaceModule } from '../workspace/workspace.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { NdyspaceModule } from '../ndyspace/ndyspace.module';
+import { AuthModule } from '../auth/auth.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { ACTION_REGISTRY } from './action-registry';
 
@@ -12,10 +13,13 @@ import { ACTION_REGISTRY } from './action-registry';
  * execute() closures can actually resolve NdyspaceCalendarService /
  * NdyspaceContactsService / NdyspaceTasksService / NdyspaceNotesService —
  * ModuleRef only resolves providers visible to modules that import (or
- * are imported by) the module doing the resolving.
+ * are imported by) the module doing the resolving. Imports AuthModule for
+ * JwtAuthGuard on ActionEngineController — same requirement every other
+ * guarded controller in this codebase has (JwtAuthGuard needs JwtService,
+ * which only AuthModule's JwtModule import provides).
  */
 @Module({
-  imports: [WorkspaceModule, NotificationModule, NdyspaceModule],
+  imports: [WorkspaceModule, NotificationModule, NdyspaceModule, AuthModule],
   controllers: [ActionEngineController],
   providers: [ActionEngineService],
   exports: [ActionEngineService],
