@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { WorkspaceService } from './workspace.service';
 import { WorkspaceGuard } from './guards/workspace.guard';
 import { BusinessWorkspaceService } from './business-workspace.service';
@@ -25,9 +25,17 @@ import { NotificationModule } from '../notifications/notification.module';
  * don't inherit imports transitively) and NotificationModule so
  * WorkspaceInviteService can notify an inviter when their invite is
  * accepted.
+ *
+ * AuthModule is wrapped in forwardRef() because a real cycle exists:
+ * AuthModule -> IdentityModule -> WorkspaceModule (IdentityService calls
+ * WorkspaceService.getOrCreatePersonalWorkspace at signup, see Phase 1) ->
+ * AuthModule (this edge, added in Phase 4). Caught in production via a
+ * boot-time UndefinedModuleException — the same "only surfaces at real
+ * Nest boot, not tsc/eslint" class of bug as the Phase 3 DI crash, just a
+ * module-cycle variant instead of a missing-provider variant.
  */
 @Module({
-  imports: [AuthModule, NotificationModule],
+  imports: [forwardRef(() => AuthModule), NotificationModule],
   controllers: [
     BusinessWorkspaceController,
     WorkspaceTeamController,

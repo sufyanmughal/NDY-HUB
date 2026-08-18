@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
@@ -19,7 +19,11 @@ import { SmsService } from '../common/sms.service';
 
 @Module({
   imports: [
-    IdentityModule,
+    // forwardRef: IdentityModule -> WorkspaceModule -> AuthModule (this
+    // edge) is a real cycle since Phase 4 added WorkspaceModule's own
+    // AuthModule import — see workspace.module.ts's doc comment for the
+    // full chain.
+    forwardRef(() => IdentityModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
