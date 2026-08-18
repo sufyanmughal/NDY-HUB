@@ -178,6 +178,101 @@ export class FounderService {
     };
   }
 
+  /**
+   * The client's explicit "NDY Economy Control Center" requirement
+   * (spec §24), built from what's genuinely real and computable today.
+   * Deliberately does NOT invent numbers for systems that don't exist —
+   * CRYNDY treasury/liquidity pools, NDYX supply, and vesting have no
+   * real data source (no treasury-pool model, no NDYX ledger at all), so
+   * they're reported as `notYetTracked: true` rather than a fabricated
+   * zero or placeholder figure that could be mistaken for a real one.
+   * Bridge stats are genuinely real (BridgeRequest rows exist and are
+   * queried directly) even though nothing has ever reached EXECUTED —
+   * that's an honest "0 executed" from real data, not a placeholder.
+   */
+  async getEconomyOverview() {
+    const now = new Date();
+    const startOfToday = startOfDay(now);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [
+      ndybitsIssuedTotal,
+      ndybitsRedeemedTotal,
+      ndybitsFlaggedCount,
+      cryndySupplyByStatus,
+      bridgeRequestsByDirection,
+      bridgeVolumeToday,
+      bridgeVolumeThisMonth,
+      suspiciousBridgeRequests,
+    ] = await Promise.all([
+      this.prisma.ndybitsLedgerEntry.aggregate({
+        where: { amount: { gt: 0 } },
+        _sum: { amount: true },
+      }),
+      this.prisma.ndybitsLedgerEntry.count({
+        where: { redeemedAt: { not: null } },
+      }),
+      this.prisma.ndybitsLedgerEntry.count({
+        where: { riskFlag: { not: 'NONE' } },
+      }),
+      this.prisma.cryndyPurchase.groupBy({
+        by: ['status'],
+        _sum: { cryndyAmount: true, bonusAmount: true },
+        _count: true,
+      }),
+      this.prisma.bridgeRequest.groupBy({
+        by: ['direction', 'status'],
+        _count: true,
+      }),
+      this.prisma.bridgeRequest.count({
+        where: { createdAt: { gte: startOfToday } },
+      }),
+      this.prisma.bridgeRequest.count({
+        where: { createdAt: { gte: startOfMonth } },
+      }),
+      this.prisma.bridgeRequest.findMany({
+        where: { eligibilityNote: { not: null }, status: 'INELIGIBLE' },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          userId: true,
+          direction: true,
+          eligibilityNote: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    return {
+      ndybits: {
+        totalIssued: ndybitsIssuedTotal._sum.amount ?? 0,
+        totalRedeemedEntries: ndybitsRedeemedTotal,
+        flaggedEntries: ndybitsFlaggedCount,
+      },
+      cryndy: {
+        totalSupply: 21_000_000,
+        referenceValueEur: 2.5,
+        byStatus: cryndySupplyByStatus,
+        note: 'Treasury/liquidity/community pool breakdown is not tracked — no treasury-pool data model exists yet.',
+      },
+      ndyx: {
+        notYetTracked: true,
+        note: 'No NDYX data model exists — gated behind blockchain selection and legal/audit review, per architecture plan.',
+      },
+      bridges: {
+        byDirectionAndStatus: bridgeRequestsByDirection,
+        volumeToday: bridgeVolumeToday,
+        volumeThisMonth: bridgeVolumeThisMonth,
+        // "Suspicious" here means every INELIGIBLE request with a reason
+        // attached — real signal, but not yet risk-scored beyond that;
+        // a genuine fraud-scoring model is future work, not invented here.
+        recentIneligibleRequests: suspiciousBridgeRequests,
+      },
+      generatedAt: now,
+    };
+  }
+
   private async checkDatabaseHealth(): Promise<boolean> {
     try {
       await this.prisma.$queryRaw`SELECT 1`;

@@ -36,6 +36,12 @@ import { IdentityModule } from '../identity/identity.module';
     OAuthTokenService,
     OAuthAccessTokenGuard,
   ],
-  exports: [GrantService],
+  // OAuthClientService exported so NdyEconomyModule's client-credentials
+  // guard (event-intake endpoint) can reuse the same registered-client
+  // verification NDY HUB already trusts, rather than a second client
+  // registry — an ecosystem app reporting a verified economy event
+  // authenticates the same way it would for any other server-to-server
+  // NDY HUB call.
+  exports: [GrantService, OAuthClientService],
 })
 export class OAuthModule {}

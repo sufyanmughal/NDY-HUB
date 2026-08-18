@@ -228,6 +228,8 @@ model User {
 
   workspaceMemberships    WorkspaceMembership[]
   notifications           Notification[]
+  economyEventLogs        NdyEconomyEventLog[]
+  bridgeRequests          BridgeRequest[]
 
   @@index([ndyId])
 }
@@ -451,6 +453,13 @@ model CryndyPurchase {
   @@index([status])
 }
 
+enum NdybitsRiskFlag {
+  NONE
+  FLAGGED_VELOCITY
+  FLAGGED_DUPLICATE
+  FLAGGED_MANUAL_REVIEW
+}
+
 // Append-only NDYBITS movement log. Balance is derived by summing this
 // table rather than kept as a cached counter on User — see NdybitsService
 // for why (correctness over micro-optimizing a read that isn't hot yet).
@@ -468,9 +477,28 @@ model NdybitsLedgerEntry {
   // two ledger entries, even if whatever calls it retries.
   sourceEventId String? @unique
 
+  // Groups entries from the same reward campaign, e.g. "launch_referral_2026"
+  // — nullable since not every credit originates from a campaign (a manual
+  // admin adjustment, for instance).
+  campaignId String?
+  // Fraud/anti-abuse status per the client's explicit requirement that this
+  // exist "before the bridge becomes economically valuable" — set by
+  // RewardEngineService's velocity checks, never by the crediting call
+  // site directly. NONE for the overwhelming majority of entries.
+  riskFlag   NdybitsRiskFlag @default(NONE)
+  // Set once this specific entry's NDYBITS have been consumed by a
+  // NDYBITS -> CRYNDY bridge conversion (BridgeRequest below). Per the
+  // client's explicit requirement: converted NDYBITS are never deleted or
+  // left spendable — they stay visible in history, permanently marked
+  // "redeemed," and never counted again. NdybitsService's balance query
+  // must exclude redeemed entries once real bridge execution exists (not
+  // yet — see BridgeRequest's own "no execution path built" note).
+  redeemedAt DateTime?
+
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([campaignId])
 }
 
 // Milestone 4: tier names and real pricing are a business decision the
@@ -1237,4 +1265,131 @@ model ActionLogEntry {
 
   @@index([workspaceId, createdAt])
   @@index([requestedByUserId])
+}
+
+// --- NDY Economy (Phase 5/6) ---
+// Everything below is the client's full "EARN -> CONVERT -> USE -> BUILD
+// -> UPGRADE" architecture, built as real, working, but genuinely
+// unactivated infrastructure — matching the client's own explicit
+// instruction: "let's build the infrastructure first and activate the
+// financial functions only after tokenomics, security, treasury rules and
+// legal/compliance have been professionally reviewed." No real money
+// moves anywhere in this section. No blockchain, no smart contracts, no
+// NDYX data model (NDYX is gated behind a blockchain choice and legal
+// audit that hasn't happened — a placeholder ledger table for it would
+// misrepresent how far along it is).
+
+// The Reward Engine's authoritative catalog — the client's explicit
+// requirement that "apps send verified events, NDYHUB's Reward Engine
+// decides the reward amount, apps must never independently create
+// balances" made real. amount is never accepted from a caller; it's
+// always looked up here.
+model RewardRule {
+  id               String   @id @default(uuid())
+  eventKey         String   @unique // e.g. "QUIZ_COMPLETED", "DAILY_LOGIN", "REFERRAL_SIGNUP"
+  label            String
+  amount           Int      // server-side authoritative NDYBITS amount
+  maxPerUserPerDay Int?
+  // Off by default — real amounts are a business/economics decision the
+  // client still needs to confirm (flagged in the architecture audit),
+  // same "ship the mechanism, not the numbers" discipline as everywhere
+  // else in this section.
+  enabled          Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// One row per verified event report from an ecosystem app (NDYQUIZ,
+// NDJOYITSTEPS, etc.) — the audit trail behind RewardRule's decision,
+// per the client's explicit "NDYHUB records: user, application, event,
+// reward, timestamp" requirement. Distinct from NdybitsLedgerEntry: this
+// is "what event happened and what NDYHUB decided," the ledger entry (if
+// any) is "the resulting balance movement." A rejected/rate-limited event
+// still gets a row here (denied=true, no ledger entry), same "log
+// everything including rejections" discipline as ActionLogEntry.
+model NdyEconomyEventLog {
+  id            String   @id @default(uuid())
+  eventKey      String
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Which registered OAuthClient reported this event — apps report
+  // events, they never credit balances directly. Nullable only for
+  // internally-originated events (e.g. an admin manually triggering a
+  // reward rule for testing).
+  reportedByClientId String?
+  sourceEventId String   @unique // idempotency key, same contract as NdybitsLedgerEntry.sourceEventId
+  denied        Boolean  @default(false)
+  denyReason    String?
+  ledgerEntryId String?  @unique
+  createdAt     DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([eventKey])
+}
+
+// The Bridge Engine's request lifecycle — covers both NDYBITS->CRYNDY
+// (Bridge 1) and CRYNDY->NDYX (Bridge 2) with one shared shape, since the
+// client's own spec describes them as structurally identical pipelines at
+// different risk tiers. direction is a string, not an enum, deliberately
+// — a future third bridge or a renamed direction doesn't need a schema
+// migration.
+enum BridgeRequestStatus {
+  PENDING
+  ELIGIBLE
+  INELIGIBLE
+  COOLING_OFF
+  APPROVED
+  EXECUTED
+  REJECTED
+}
+
+model BridgeRequest {
+  id              String              @id @default(uuid())
+  userId          String
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  direction       String              // "NDYBITS_TO_CRYNDY" | "CRYNDY_TO_NDYX"
+  sourceAmount    Decimal             @db.Decimal(28, 8)
+  // Snapshot of ConversionPolicy.rate at request time — never recomputed
+  // retroactively, per the client's explicit "no permanent guaranteed
+  // rate" requirement (the policy can change; a quoted request shouldn't
+  // silently reprice underneath the user).
+  quotedRate      Decimal             @db.Decimal(18, 8)
+  status          BridgeRequestStatus @default(PENDING)
+  // Why ineligible, if applicable — surfaced back to the user rather than
+  // a bare rejection.
+  eligibilityNote String?
+  coolingOffUntil DateTime?
+  // Unique human-facing reference, e.g. "NBR-2026-8F72KD", per the
+  // client's explicit "every conversion gets a unique Bridge Transaction
+  // ID" requirement. Distinct from id (uuid) the same way
+  // CryndyPurchase.reference is distinct from its own id.
+  bridgeTransactionRef String            @unique
+  createdAt       DateTime            @default(now())
+  resolvedAt      DateTime?
+
+  @@index([userId, status])
+  @@index([direction])
+}
+
+// A live-editable policy row, not a hardcoded constant — the client's
+// explicit "NDY Conversion Policy Engine" requirement: reference rates
+// (10 NDYBITS:1 CRYNDY, 100 CRYNDY:1 NDYX) exist here as real, changeable
+// data, never baked into application code. One row per direction.
+model ConversionPolicy {
+  id              String   @id @default(uuid())
+  direction       String   @unique // "NDYBITS_TO_CRYNDY" | "CRYNDY_TO_NDYX"
+  rate            Decimal  @db.Decimal(18, 8) // units of source per 1 unit of target
+  minBridgeAmount Decimal? @db.Decimal(28, 8) // e.g. minimum 10 CRYNDY per Bridge 2 request, prevents micro-transaction spam
+  dailyCapPerUser Decimal? @db.Decimal(28, 8)
+  // The treasury/reserve balance this policy is allowed to draw against —
+  // the client's explicit "check available conversion pool before any
+  // conversion" requirement, made real even though nothing here ever
+  // reaches EXECUTED yet.
+  reserveBalance  Decimal  @default(0) @db.Decimal(28, 8)
+  // Off by default — this is the literal "architecture-ready, not
+  // activated" switch. Nothing in this codebase ever sets this true;
+  // flipping it is a deliberate, reviewed, post-legal-review operational
+  // decision, not a deploy.
+  enabled         Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
 }

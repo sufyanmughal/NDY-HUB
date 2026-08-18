@@ -21,4 +21,10 @@ export class FounderController {
   getFinancials() {
     return this.founder.getFinancialSummary();
   }
+
+  @Get('economy-overview')
+  @RequirePermission(Permission.VIEW_FINANCIALS)
+  getEconomyOverview() {
+    return this.founder.getEconomyOverview();
+  }
 }

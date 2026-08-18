@@ -9,6 +9,13 @@ export const OIDC_SCOPES: Record<string, string> = {
   email: 'Your email address',
   membership: 'Your current membership tier and status',
   cryndy: 'Your available CRYNDY balance',
+  // Not an OIDC consent scope in the usual sense (no user ever sees or
+  // approves this on a consent screen) — it's a server-to-server
+  // capability grant for the NDY Economy event-intake endpoint, reusing
+  // OAuthClient.allowedScopes' existing validated-scope-list mechanism
+  // rather than a second scope vocabulary. See EconomyClientGuard.
+  'ndybits:report-event':
+    'Report verified ecosystem events for NDYBITS reward crediting',
 };
 
 export const ALL_SCOPES = Object.keys(OIDC_SCOPES);
