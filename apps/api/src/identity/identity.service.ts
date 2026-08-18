@@ -11,6 +11,7 @@ import {
   parseNdyId,
 } from '../common/ndy-id.util';
 import { Role } from '@prisma/client';
+import { WorkspaceService } from '../workspace/workspace.service';
 
 const MAX_NDY_ID_ATTEMPTS = 5;
 
@@ -38,7 +39,10 @@ export type PassportProfileFields = {
 
 @Injectable()
 export class IdentityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly workspaceService: WorkspaceService,
+  ) {}
 
   /**
    * Creates a user with a freshly generated, guaranteed-unique NDY ID.
@@ -66,7 +70,7 @@ export class IdentityService {
       // rather than accepted as a caller-supplied param.
       const ndyId = formatNdyId(coreId, ndyIdTypeForRole(Role.USER));
       try {
-        return await this.prisma.user.create({
+        const created = await this.prisma.user.create({
           data: {
             ndyCoreId: coreId,
             ndyId,
@@ -90,6 +94,21 @@ export class IdentityService {
             phoneIsPublic: params.phoneIsPublic,
           },
         });
+
+        // Every user gets a personal workspace — invisible infrastructure
+        // (Phase 1 of the workspace/tenancy plan), not a user-facing
+        // feature yet. Deliberately non-fatal: a hiccup here should never
+        // block signup itself. getOrCreatePersonalWorkspace is safe to
+        // call again later (idempotent) if this ever needs a retry — see
+        // apps/api/scripts/backfill-personal-workspaces.ts for the
+        // equivalent one-time pass over pre-existing accounts.
+        try {
+          await this.workspaceService.getOrCreatePersonalWorkspace(created.id);
+        } catch {
+          // Swallowed intentionally — see comment above.
+        }
+
+        return created;
       } catch (err: unknown) {
         if (
           (isUniqueConstraintError(err, 'ndyCoreId') ||

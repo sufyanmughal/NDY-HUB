@@ -47,7 +47,10 @@ import { SmsService } from '../common/sms.service';
   // JwtModule (for JwtService) and JwtAuthGuard itself need to be visible to
   // any other module that guards a route with @UseGuards(JwtAuthGuard) —
   // without this, Nest can resolve JwtAuthGuard's class but not its
-  // JwtService constructor dependency, and refuses to boot.
-  exports: [JwtModule, JwtAuthGuard, SecurityEventService],
+  // JwtService constructor dependency, and refuses to boot. MailService is
+  // exported so NotificationModule (Phase 2) can reuse the same Resend
+  // wrapper rather than a second instance — it's stateless, so this is
+  // just visibility, not shared state.
+  exports: [JwtModule, JwtAuthGuard, SecurityEventService, MailService],
 })
 export class AuthModule {}

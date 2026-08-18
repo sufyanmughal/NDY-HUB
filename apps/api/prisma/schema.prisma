@@ -183,6 +183,15 @@ model User {
   ndyappsConnected  Boolean           @default(false)
   ndyappsConnectedAt DateTime?
 
+  // The workspace this user lands in by default (their own personal
+  // workspace for every existing user today — see WorkspaceService.
+  // getOrCreatePersonalWorkspace). Nullable only because it's backfilled
+  // after the fact for pre-existing rows; every user has exactly one by
+  // the time the backfill migration finishes. Not a relation to keep this
+  // model's own onDelete semantics untouched — Workspace deletion logic
+  // lives in WorkspaceService, not a cascading FK here.
+  defaultWorkspaceId String?
+
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
@@ -216,6 +225,9 @@ model User {
   notes                   Note[]
   bookmarks               Bookmark[]
   ndyspaceNotifications   NdyspaceNotification[]
+
+  workspaceMemberships    WorkspaceMembership[]
+  notifications           Notification[]
 
   @@index([ndyId])
 }
@@ -1015,4 +1027,214 @@ model NdyspaceNotification {
   createdAt DateTime                 @default(now())
 
   @@index([userId, isRead, createdAt])
+}
+
+// --- Workspace / tenancy foundation ---
+// The precondition almost everything else silently assumes: NDY Business
+// Center (team membership + roles), the Action Engine (its own
+// ActionRequest contract already carries a workspaceId), and any future
+// Circle/shared-content linkage all need a real notion of "which tenant
+// is this happening inside." Introduced now, invisibly — every existing
+// user gets exactly one PERSONAL workspace of size 1 in the backfill
+// migration, so nothing about today's product changes. See
+// WorkspaceService.getOrCreatePersonalWorkspace for the runtime
+// equivalent used by any newly-created user going forward.
+enum WorkspaceType {
+  PERSONAL
+  BUSINESS
+}
+
+// Deliberately a separate axis from the global Role enum on User — a
+// platform SUPER_ADMIN is not automatically a workspace OWNER, and vice
+// versa. WorkspaceGuard checks this; PermissionGuard checks Role. Kept to
+// three values for v1 (see docs/action-engine-design.md's sibling plan
+// doc) — a fuller "multiple roles worn simultaneously" matrix is a later,
+// separately-scoped decision, not assumed here.
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Workspace {
+  id          String                @id @default(uuid())
+  type        WorkspaceType
+  // For PERSONAL workspaces: denormalized from the owner's fullName/ndyId
+  // at creation time, purely for display — never used as a lookup key.
+  name        String
+  ownerUserId String
+  createdAt   DateTime              @default(now())
+  memberships WorkspaceMembership[]
+
+  @@index([ownerUserId])
+}
+
+model WorkspaceMembership {
+  id          String        @id @default(uuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+
+  // A user can't join the same workspace twice — this is what makes
+  // WorkspaceService.getOrCreatePersonalWorkspace's upsert-style create
+  // safe to call more than once for the same user without duplicating rows.
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+// --- Central notification backbone (Phase 2) ---
+// NdyspaceNotification (above) is explicitly scoped to NDYSPACE only, per
+// its own schema comment — reusing it for security/economy/action-approval
+// events would be scope creep on a model deliberately kept narrow. This is
+// its sibling for everything else: a general, typed, cross-cutting
+// notification with a real delivery channel, so future features (the
+// Action Engine's approval alerts, NDYBITS reward credits, security
+// alerts) all write through one mechanism instead of each inventing an
+// ad hoc notification path. NdyspaceNotification stays exactly as-is —
+// not migrated or merged here, that's a separate future cleanup if ever
+// warranted, not a Phase 2 requirement.
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+}
+
+enum NotificationCategory {
+  SECURITY
+  ECONOMY
+  ACTION_APPROVAL
+  NDYSPACE
+  SYSTEM
+}
+
+model Notification {
+  id          String               @id @default(uuid())
+  userId      String
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Null for personal/global notifications; set once workspace-scoped
+  // events exist (Phase 4+) so a notification can be attributed to the
+  // business workspace it happened in, not just the user.
+  workspaceId String?
+  category    NotificationCategory
+  channel     NotificationChannel
+  title       String
+  body        String
+  linkUrl     String?
+  isRead      Boolean              @default(false)
+  // Same idempotency pattern as NdybitsLedgerEntry.sourceEventId — set by
+  // callers that key off a real external/internal event (a reward credit,
+  // an approval request) so the same event can never post two
+  // notifications even if the caller retries.
+  sourceEventId String?            @unique
+  createdAt   DateTime             @default(now())
+
+  @@index([userId, isRead, createdAt])
+}
+
+// --- Action Engine (Phase 3) ---
+// Built exactly per docs/action-engine-design.md, already reviewed with
+// the client. The trust-zone split: the Fabric/AI layer (not built yet)
+// is allowed to be wrong; this is the only component that actually
+// mutates data, and it reaches its own conclusion about validity rather
+// than trusting whatever proposed the action. v1 registers a handful of
+// real, already-built actions as proof of the pattern — see
+// ActionEngineService for the registry and execution flow.
+enum ActionRiskTier {
+  LOW      // reversible, no external visibility
+  MEDIUM   // visible to others or moderately hard to reverse
+  HIGH     // hard to reverse or touches sensitive data
+  CRITICAL // financial or identity-security actions
+}
+
+// A real table, not just a code convention — lets the Approval Center and
+// audit UI enumerate "every action that exists" without hardcoding a list
+// in five places. Registering an action here is a deliberate, reviewed
+// step, same discipline as oauth/scopes.ts's "add scopes as real clients
+// need them, not speculatively."
+model ActionDefinition {
+  id               String         @id @default(uuid())
+  actionKey        String         @unique // e.g. "calendar.event.create"
+  label            String
+  domain           String         // "calendar" | "contacts" | "tasks" | "ndyspace" | ...
+  riskTier         ActionRiskTier
+  requiredScopes   String[]       // reuses oauth/scopes.ts's vocabulary
+  reversible       Boolean        @default(false)
+  reverseActionKey String?
+  // Kill switch — disable an action ecosystem-wide without a deploy.
+  enabled          Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+
+  @@index([domain])
+}
+
+enum ActionApprovalStatus {
+  PENDING
+  APPROVED
+  DENIED
+  EXPIRED
+}
+
+// The same shape as RoleChangeRequest, generalized: propose (Action
+// Engine creates a PENDING row here) -> separate resolution step ->
+// apply. LOW-risk actions never get a row here at all — they execute
+// immediately once authorized+validated.
+model ActionApproval {
+  id                 String               @id @default(uuid())
+  actionLogId        String               @unique
+  actionLog          ActionLogEntry       @relation(fields: [actionLogId], references: [id], onDelete: Cascade)
+  riskTier           ActionRiskTier
+  status             ActionApprovalStatus @default(PENDING)
+  // true for CRITICAL — approval must include a fresh passkey/2FA check,
+  // not just an active session. Not enforced by this table itself; the
+  // approval-resolution endpoint is what actually requires it (v1 has no
+  // CRITICAL actions registered yet, so nothing exercises this path today
+  // — the field exists so v2+ needs no schema change to use it).
+  requiresStrongAuth Boolean              @default(false)
+  // PENDING approvals expire — an unconfirmed request shouldn't sit
+  // executable forever.
+  expiresAt          DateTime
+  resolvedByUserId   String?
+  resolvedAt         DateTime?
+  createdAt          DateTime             @default(now())
+
+  @@index([status])
+}
+
+enum ActionExecutionStatus {
+  REJECTED
+  PENDING_APPROVAL
+  EXECUTED
+  DENIED
+}
+
+// ActionLogEntry is AuditLogEntry's sibling for this pipeline, not a
+// replacement — same denormalized-actor-snapshot shape (survives account
+// changes), logs every request at every stage including rejections, since
+// a denied action is itself a security signal worth keeping.
+model ActionLogEntry {
+  id                String                 @id @default(uuid())
+  actionKey         String
+  workspaceId       String
+  requestedByUserId String
+  requestedByNdyId  String
+  // Who/what originated this request — never omitted. The Action Engine
+  // treats every origin identically once past Authorize; the AI gets no
+  // special trust. Stored as Json rather than a typed column since the
+  // "detail" sub-field is free text that varies by origin type.
+  origin            Json
+  params             Json
+  status            ActionExecutionStatus
+  riskTier          ActionRiskTier
+  reason            String?                // populated on REJECTED/DENIED
+  resultSummary     Json?                  // populated on EXECUTED — a small summary, not the full domain object
+  idempotencyKey    String                 @unique
+  createdAt         DateTime               @default(now())
+
+  approval          ActionApproval?
+
+  @@index([workspaceId, createdAt])
+  @@index([requestedByUserId])
 }

@@ -53,5 +53,18 @@ import { NdyspaceOverviewController } from './ndyspace-overview.controller';
     NdyspaceBookmarksService,
     NdyspaceNotificationsService,
   ],
+  // Exported so ActionEngineModule (Phase 3) can resolve these via
+  // ModuleRef — the Action Engine wraps these exact services rather than
+  // reimplementing calendar/contact/task/note creation, per
+  // docs/action-engine-design.md's "wraps existing domain services, does
+  // not reimplement them" rule. Only the four the registry actually calls
+  // are exported, not every NDYSPACE service — no reason to widen this
+  // module's public surface further than something outside it needs today.
+  exports: [
+    NdyspaceCalendarService,
+    NdyspaceContactsService,
+    NdyspaceTasksService,
+    NdyspaceNotesService,
+  ],
 })
 export class NdyspaceModule {}
