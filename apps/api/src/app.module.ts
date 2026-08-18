@@ -21,6 +21,9 @@ import { FounderModule } from './founder/founder.module';
 import { EcosystemModule } from './ecosystem/ecosystem.module';
 import { ActivityModule } from './activity/activity.module';
 import { NdyspaceModule } from './ndyspace/ndyspace.module';
+import { WorkspaceModule } from './workspace/workspace.module';
+import { NotificationModule } from './notifications/notification.module';
+import { ActionEngineModule } from './action-engine/action-engine.module';
 
 @Module({
   imports: [
@@ -48,6 +51,9 @@ import { NdyspaceModule } from './ndyspace/ndyspace.module';
     EcosystemModule,
     ActivityModule,
     NdyspaceModule,
+    WorkspaceModule,
+    NotificationModule,
+    ActionEngineModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
