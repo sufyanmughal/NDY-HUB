@@ -13,6 +13,7 @@ import {
   type AuditLogEntry,
   type AdminOAuthClient,
   type AdminSupportTicket,
+  type OAuthClientType,
 } from "@/lib/api";
 import { useMe } from "@/lib/use-me";
 import { roleHasPermission, roleHasAnyPermission } from "@/lib/permissions";
@@ -158,13 +159,14 @@ function OAuthClientsSection() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [name, setName] = useState("");
+  const [clientType, setClientType] = useState<OAuthClientType>("CONFIDENTIAL");
   const [redirectUrisText, setRedirectUrisText] = useState("");
   const [selectedScopes, setSelectedScopes] = useState<string[]>(["openid"]);
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [revealedSecret, setRevealedSecret] = useState<{
     clientId: string;
-    clientSecret: string;
+    clientSecret: string | null;
   } | null>(null);
 
   const refresh = useCallback(() => {
@@ -214,12 +216,14 @@ function OAuthClientsSection() {
         name,
         redirectUris,
         allowedScopes: selectedScopes,
+        clientType,
       });
       setRevealedSecret({
         clientId: created.clientId,
         clientSecret: created.clientSecret,
       });
       setName("");
+      setClientType("CONFIDENTIAL");
       setRedirectUrisText("");
       setSelectedScopes(["openid"]);
       setFormOpen(false);
@@ -236,11 +240,13 @@ function OAuthClientsSection() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-medium text-foreground-muted">
-            Connected Websites (OAuth Clients)
+            Connected Apps &amp; Websites (OAuth Clients)
           </h2>
           <p className="mt-1 text-xs text-foreground-muted">
-            NDJOYIT sites registered to sign users in through NDY HUB via
-            OAuth/OIDC.
+            NDJOYIT sites and apps registered to sign users in through NDY
+            HUB via OAuth/OIDC. Native/mobile apps (Flutter, Android, iOS)
+            should register as Public — they never get a secret and
+            authenticate via PKCE instead.
           </p>
         </div>
         <button
@@ -259,15 +265,18 @@ function OAuthClientsSection() {
       {revealedSecret && (
         <div className="mt-4 rounded-md border border-good/40 bg-good/10 p-3 text-sm">
           <p className="font-medium text-good">
-            Client registered — copy the secret now, it won&apos;t be shown
-            again.
+            {revealedSecret.clientSecret
+              ? "Client registered — copy the secret now, it won't be shown again."
+              : "Client registered as Public — no secret was issued (PKCE-only, expected for native/mobile apps)."}
           </p>
           <p className="mt-2 font-mono text-xs">
             client_id: {revealedSecret.clientId}
           </p>
-          <p className="mt-1 break-all font-mono text-xs">
-            client_secret: {revealedSecret.clientSecret}
-          </p>
+          {revealedSecret.clientSecret && (
+            <p className="mt-1 break-all font-mono text-xs">
+              client_secret: {revealedSecret.clientSecret}
+            </p>
+          )}
           <button
             onClick={() => setRevealedSecret(null)}
             className="mt-2 rounded-md border border-border px-2 py-1 text-xs hover:bg-surface-2"
@@ -284,7 +293,7 @@ function OAuthClientsSection() {
         >
           <div>
             <label className="block text-xs uppercase tracking-wide text-foreground-muted">
-              Site name
+              Site / app name
             </label>
             <input
               value={name}
@@ -297,6 +306,36 @@ function OAuthClientsSection() {
           </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+              Client type
+            </label>
+            <div className="mt-1 flex gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  checked={clientType === "CONFIDENTIAL"}
+                  onChange={() => setClientType("CONFIDENTIAL")}
+                />
+                Confidential — a real backend (website, server)
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  checked={clientType === "PUBLIC"}
+                  onChange={() => setClientType("PUBLIC")}
+                />
+                Public — a native/mobile app (Flutter, Android, iOS)
+              </label>
+            </div>
+            {clientType === "PUBLIC" && (
+              <p className="mt-1 text-xs text-foreground-muted">
+                No client_secret will be issued. The app must send
+                code_challenge (PKCE, S256) on every /oauth/authorize
+                request.
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-foreground-muted">
               Redirect URIs (one per line)
             </label>
             <textarea
@@ -304,7 +343,11 @@ function OAuthClientsSection() {
               onChange={(e) => setRedirectUrisText(e.target.value)}
               required
               rows={3}
-              placeholder="https://ndyquiz.com/auth/callback"
+              placeholder={
+                clientType === "PUBLIC"
+                  ? "ndjoyit://oauth-callback\nor an Android App Link: https://ndjoyit.com/oauth-callback"
+                  : "https://ndyquiz.com/auth/callback"
+              }
               className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             />
           </div>
@@ -367,6 +410,11 @@ function OAuthClientsSection() {
                     }`}
                   >
                     {client.isActive ? "Active" : "Deactivated"}
+                  </span>
+                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">
+                    {client.clientType === "PUBLIC"
+                      ? "Public (PKCE)"
+                      : "Confidential"}
                   </span>
                 </div>
                 <p className="mt-1 font-mono text-xs text-foreground-muted">

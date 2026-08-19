@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
+import { OAuthClientType } from '@prisma/client';
 import { OAuthClientService } from './oauth-client.service';
 import { AuthorizationCodeService } from './authorization-code.service';
 import { GrantService } from './grant.service';
@@ -68,6 +69,17 @@ export class AuthorizeController {
     if (!client.redirectUris.includes(redirectUri)) {
       throw new BadRequestException(
         'redirect_uri is not registered for this client.',
+      );
+    }
+    // PUBLIC clients (native/mobile apps, see OAuthClientType) have no
+    // client_secret — PKCE is the only thing that authenticates their
+    // token exchange, so it can't be skipped the way it can for a
+    // CONFIDENTIAL client. Failing here (before the consent round-trip)
+    // gives the app developer a clear error immediately rather than a
+    // confusing failure only at the token endpoint.
+    if (client.clientType === OAuthClientType.PUBLIC && !codeChallenge) {
+      throw new BadRequestException(
+        'code_challenge is required for public clients (PKCE, RFC 8252).',
       );
     }
 

@@ -5,6 +5,7 @@ import {
   Post,
   UnauthorizedException,
 } from '@nestjs/common';
+import { OAuthClientType } from '@prisma/client';
 import { OAuthClientService } from './oauth-client.service';
 import {
   AuthorizationCodeService,
@@ -44,7 +45,7 @@ export class TokenController {
 
   private async handleAuthorizationCodeGrant(
     dto: TokenDto,
-    client: { id: string; clientId: string },
+    client: { id: string; clientId: string; clientType: OAuthClientType },
   ) {
     if (!dto.code || !dto.redirect_uri) {
       throw new BadRequestException(
@@ -56,6 +57,20 @@ export class TokenController {
       client.id,
       dto.redirect_uri,
     );
+
+    // PUBLIC clients have no client_secret at all (see
+    // OAuthClientService.verifySecret) — PKCE is the *only* thing proving
+    // this token request came from whoever obtained the code, so it can't
+    // be optional for them the way it is for CONFIDENTIAL clients (who
+    // already authenticated with a real secret above, in token()).
+    if (
+      client.clientType === OAuthClientType.PUBLIC &&
+      !authCode.codeChallenge
+    ) {
+      throw new BadRequestException(
+        'PKCE (code_challenge) is required for public clients.',
+      );
+    }
 
     if (authCode.codeChallenge) {
       if (!dto.code_verifier) {

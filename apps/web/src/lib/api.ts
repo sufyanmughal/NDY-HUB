@@ -1113,9 +1113,16 @@ export function getAdminAuditLog(): Promise<{
 // --- Admin: OAuth client management (registering NDJOYIT sites as SSO
 // relying parties) ---
 
+// PUBLIC = a native/mobile app (Flutter, Android, iOS) — never gets a
+// client_secret (baking one into an APK isn't a secret), authenticates its
+// token exchange via PKCE alone instead. CONFIDENTIAL = a real backend
+// that can keep a secret genuinely secret — existing behavior, unchanged.
+export type OAuthClientType = "CONFIDENTIAL" | "PUBLIC";
+
 export interface AdminOAuthClient {
   id: string;
   clientId: string;
+  clientType: OAuthClientType;
   name: string;
   redirectUris: string[];
   allowedScopes: string[];
@@ -1135,12 +1142,14 @@ export function listAdminOAuthClients(): Promise<AdminOAuthClient[]> {
 }
 
 /** The response includes clientSecret in plaintext — the one and only time
- * it's ever visible. The caller must show it once and never fetch it again. */
+ * it's ever visible. The caller must show it once and never fetch it again.
+ * clientSecret is null for PUBLIC clients — they never get one. */
 export function createAdminOAuthClient(params: {
   name: string;
   redirectUris: string[];
   allowedScopes: string[];
-}): Promise<AdminOAuthClient & { clientSecret: string }> {
+  clientType?: OAuthClientType;
+}): Promise<AdminOAuthClient & { clientSecret: string | null }> {
   return authedFetch("/admin/oauth-clients", {
     method: "POST",
     body: JSON.stringify(params),

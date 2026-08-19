@@ -11,8 +11,15 @@ export class TokenDto {
   @IsString()
   client_id!: string;
 
+  // Optional at the DTO level — required for CONFIDENTIAL clients, absent
+  // for PUBLIC ones (native/mobile apps never have a secret to send, see
+  // OAuthClientType). TokenController enforces which is actually required
+  // once it knows the client's type, same "controller checks what
+  // grant_type/client_type actually require" discipline as every other
+  // conditional field here.
+  @IsOptional()
   @IsString()
-  client_secret!: string;
+  client_secret?: string;
 
   @IsOptional()
   @IsString()

@@ -633,14 +633,30 @@ model RoleChangeRequest {
 // that makes "one login for the ecosystem" true past NDY HUB's own
 // dashboard — see NDYAPPS-INTEGRATION.md for the mobile-app equivalent.
 
+// CONFIDENTIAL: a real backend (NDJOYIT, a server-side integration) that
+// can keep clientSecretHash's plaintext counterpart genuinely secret.
+// PUBLIC: a native/mobile app (Flutter, Android, iOS) or any client whose
+// binary end users can decompile — a "secret" baked into an APK isn't one.
+// Per RFC 8252 (OAuth 2.0 for Native Apps) and OAuth 2.1, PUBLIC clients
+// never receive a client_secret at all and MUST use PKCE instead — see
+// TokenController's grant handling and AuthorizeController's PKCE
+// enforcement for where this distinction is actually applied.
+enum OAuthClientType {
+  CONFIDENTIAL
+  PUBLIC
+}
+
 // Admin-managed (see AdminOAuthClientsController) — one row per connected
-// website. clientSecretHash follows the same pattern as refresh tokens
-// throughout this schema: only a hash is ever stored, the plaintext secret
-// is shown to the admin exactly once, at creation.
+// website or app. clientSecretHash follows the same pattern as refresh
+// tokens throughout this schema: only a hash is ever stored, the plaintext
+// secret is shown to the admin exactly once, at creation. Null for PUBLIC
+// clients — they never get a secret to begin with, not just one that's
+// hidden after creation.
 model OAuthClient {
-  id               String   @id @default(uuid())
-  clientId         String   @unique
-  clientSecretHash String
+  id               String          @id @default(uuid())
+  clientId         String          @unique
+  clientSecretHash String?
+  clientType       OAuthClientType @default(CONFIDENTIAL)
   name             String   // shown on the consent screen, e.g. "NDJOYIT Services"
   redirectUris     String[] // exact-match whitelist — no partial/prefix matching
   allowedScopes    String[] // subset of the supported scope list this client may ever request

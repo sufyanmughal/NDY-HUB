@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { customAlphabet } from 'nanoid';
+import { OAuthClientType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ALL_SCOPES } from './scopes';
 
@@ -28,6 +29,7 @@ export class OAuthClientService {
     name: string;
     redirectUris: string[];
     allowedScopes: string[];
+    clientType?: OAuthClientType;
   }) {
     const invalidScopes = params.allowedScopes.filter(
       (s) => !ALL_SCOPES.includes(s),
@@ -41,21 +43,32 @@ export class OAuthClientService {
       throw new BadRequestException('At least one redirect URI is required.');
     }
 
+    const clientType = params.clientType ?? OAuthClientType.CONFIDENTIAL;
     const clientId = generateClientId();
-    // The plaintext secret is returned exactly once, here. Only its hash is
-    // ever stored — same pattern as refresh tokens elsewhere in this schema.
-    const clientSecret = randomBytes(32).toString('base64url');
+
+    // PUBLIC clients (native/mobile apps — see OAuthClientType's schema
+    // doc comment) never receive a secret at all: baking one into an APK
+    // isn't a secret, and PKCE is what actually protects the exchange for
+    // them. Only CONFIDENTIAL clients get one, same as before this change.
+    const clientSecret =
+      clientType === OAuthClientType.CONFIDENTIAL
+        ? randomBytes(32).toString('base64url')
+        : null;
 
     const client = await this.prisma.oAuthClient.create({
       data: {
         clientId,
-        clientSecretHash: hashSecret(clientSecret),
+        clientSecretHash: clientSecret ? hashSecret(clientSecret) : null,
+        clientType,
         name: params.name,
         redirectUris: params.redirectUris,
         allowedScopes: params.allowedScopes,
       },
     });
 
+    // clientSecret is null for PUBLIC clients — the admin panel should
+    // show "no secret — this is a public client, PKCE only" rather than a
+    // blank/missing value.
     return { ...serializeClient(client), clientSecret };
   }
 
@@ -89,10 +102,19 @@ export class OAuthClientService {
     };
   }
 
+  /**
+   * PUBLIC clients have no secret to verify — presenting one at all (even
+   * a garbage value) is a no-op success, since TokenController's PKCE
+   * check is what actually authenticates the request for them. Only
+   * CONFIDENTIAL clients (clientSecretHash set) go through the real
+   * comparison.
+   */
   verifySecret(
-    client: { clientSecretHash: string },
-    providedSecret: string,
+    client: { clientType: OAuthClientType; clientSecretHash: string | null },
+    providedSecret: string | undefined,
   ): boolean {
+    if (client.clientType === OAuthClientType.PUBLIC) return true;
+    if (!client.clientSecretHash || !providedSecret) return false;
     return client.clientSecretHash === hashSecret(providedSecret);
   }
 }
@@ -104,6 +126,7 @@ export function hashSecret(secret: string): string {
 function serializeClient(client: {
   id: string;
   clientId: string;
+  clientType: OAuthClientType;
   name: string;
   redirectUris: string[];
   allowedScopes: string[];
@@ -113,6 +136,7 @@ function serializeClient(client: {
   return {
     id: client.id,
     clientId: client.clientId,
+    clientType: client.clientType,
     name: client.name,
     redirectUris: client.redirectUris,
     allowedScopes: client.allowedScopes,
