@@ -26,6 +26,7 @@ import { NotificationModule } from './notifications/notification.module';
 import { ActionEngineModule } from './action-engine/action-engine.module';
 import { NdyEconomyModule } from './ndy-economy/ndy-economy.module';
 import { InternalModule } from './internal/internal.module';
+import { IdentityVerificationModule } from './identity-verification/identity-verification.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { InternalModule } from './internal/internal.module';
     ActionEngineModule,
     NdyEconomyModule,
     InternalModule,
+    IdentityVerificationModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -1434,3 +1434,61 @@ export function acceptWorkspaceInvite(
     body: JSON.stringify({ token }),
   });
 }
+
+// --- Identity Verification (Phase 7): LEVEL_3 manual review request ---
+
+export type IdentityVerificationRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface IdentityVerificationRequest {
+  id: string;
+  userId: string;
+  evidenceNote: string | null;
+  status: IdentityVerificationRequestStatus;
+  reviewedByNdyId: string | null;
+  reviewReason: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+export function requestIdentityVerification(
+  evidenceNote?: string,
+): Promise<IdentityVerificationRequest> {
+  return authedFetch("/identity-verification/requests", {
+    method: "POST",
+    body: JSON.stringify({ evidenceNote }),
+  });
+}
+
+export function getMyIdentityVerificationRequests(): Promise<
+  IdentityVerificationRequest[]
+> {
+  return authedFetch("/identity-verification/requests/mine");
+}
+
+// Admin review queue — requires REVIEW_IDENTITY_VERIFICATION.
+export function listIdentityVerificationRequests(
+  status?: IdentityVerificationRequestStatus,
+): Promise<IdentityVerificationRequest[]> {
+  const query = status ? `?status=${status}` : "";
+  return authedFetch(`/identity-verification/requests${query}`);
+}
+
+export function approveIdentityVerificationRequest(
+  id: string,
+  reason?: string,
+): Promise<IdentityVerificationRequest> {
+  return authedFetch(`/identity-verification/requests/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function rejectIdentityVerificationRequest(
+  id: string,
+  reason?: string,
+): Promise<IdentityVerificationRequest> {
+  return authedFetch(`/identity-verification/requests/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}

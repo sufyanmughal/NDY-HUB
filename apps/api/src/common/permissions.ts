@@ -15,6 +15,12 @@ export enum Permission {
   VIEW_AUDIT_LOG = 'VIEW_AUDIT_LOG',
   VIEW_FOUNDER_OVERVIEW = 'VIEW_FOUNDER_OVERVIEW',
   VIEW_FINANCIALS = 'VIEW_FINANCIALS',
+  // LEVEL_3 (identity document) manual review — the client's explicit
+  // answer #10: "new dedicated reviewer permission," not folded into the
+  // existing MANAGE_USERS (which already means something narrower —
+  // search/suspend). Deliberately its own permission so a future distinct
+  // reviewer role can be introduced without touching MANAGE_USERS' scope.
+  REVIEW_IDENTITY_VERIFICATION = 'REVIEW_IDENTITY_VERIFICATION',
 }
 
 /**
@@ -35,6 +41,11 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.MANAGE_OAUTH_CLIENTS,
     Permission.MANAGE_SUPPORT_TICKETS,
     Permission.VIEW_AUDIT_LOG,
+    // Default holder until a distinct reviewer role is worth carving out
+    // — matches this codebase's existing "ship the simple default, revisit
+    // if real usage demands more" pattern for every other minimal-viable
+    // role decision.
+    Permission.REVIEW_IDENTITY_VERIFICATION,
   ],
   DEVELOPER: [Permission.MANAGE_OAUTH_CLIENTS],
   FINANCE: [Permission.VIEW_FINANCIALS],

@@ -18,6 +18,7 @@ import { useMe } from "@/lib/use-me";
 import { roleHasPermission, roleHasAnyPermission } from "@/lib/permissions";
 import { UserManagementPanel } from "@/components/user-management-panel";
 import { RoleChangeRequestPanel } from "@/components/role-change-request-panel";
+import { IdentityVerificationReviewPanel } from "@/components/identity-verification-review-panel";
 
 /**
  * With 9 roles each granting different, non-overlapping admin capabilities
@@ -52,12 +53,17 @@ export default function AdminPage() {
     me.role,
     "MANAGE_SUPPORT_TICKETS",
   );
+  const canReviewIdentityVerification = roleHasPermission(
+    me.role,
+    "REVIEW_IDENTITY_VERIFICATION",
+  );
   const hasAnyAdminAccess = roleHasAnyPermission(me.role, [
     "MANAGE_USERS",
     "MANAGE_ROLES",
     "VIEW_AUDIT_LOG",
     "MANAGE_OAUTH_CLIENTS",
     "MANAGE_SUPPORT_TICKETS",
+    "REVIEW_IDENTITY_VERIFICATION",
   ]);
 
   if (!hasAnyAdminAccess) {
@@ -95,6 +101,7 @@ export default function AdminPage() {
       {canViewAuditLog && <AuditLogSection />}
       {canManageOAuthClients && <OAuthClientsSection />}
       {canManageSupportTickets && <SupportTicketsSection />}
+      {canReviewIdentityVerification && <IdentityVerificationReviewPanel />}
     </div>
   );
 }

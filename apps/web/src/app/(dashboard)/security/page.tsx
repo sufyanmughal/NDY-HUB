@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useMe } from "@/lib/use-me";
 import {
   getMySessions,
   revokeSessionById,
@@ -9,10 +10,13 @@ import {
   getConnectedSites,
   revokeConnectedSite,
   getMySecurityEvents,
+  requestIdentityVerification,
+  getMyIdentityVerificationRequests,
   type SecuritySession,
   type ConnectedSite,
   type SecurityEvent,
   type SecurityEventType,
+  type IdentityVerificationRequest,
 } from "@/lib/api";
 
 const SECURITY_EVENT_LABELS: Record<SecurityEventType, string> = {
@@ -33,9 +37,15 @@ const SECURITY_EVENT_LABELS: Record<SecurityEventType, string> = {
 
 export default function SecurityPage() {
   const { auth, logout } = useAuth();
+  const me = useMe();
   const [sessions, setSessions] = useState<SecuritySession[] | null>(null);
   const [sites, setSites] = useState<ConnectedSite[] | null>(null);
   const [events, setEvents] = useState<SecurityEvent[] | null>(null);
+  const [idvRequests, setIdvRequests] = useState<
+    IdentityVerificationRequest[] | null
+  >(null);
+  const [idvNote, setIdvNote] = useState("");
+  const [idvSubmitting, setIdvSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [siteBusyId, setSiteBusyId] = useState<string | null>(null);
@@ -61,11 +71,34 @@ export default function SecurityPage() {
       .catch((err) => setError((err as Error).message));
   }, [auth]);
 
+  const refreshIdv = useCallback(() => {
+    if (auth.status !== "authenticated") return;
+    getMyIdentityVerificationRequests()
+      .then(setIdvRequests)
+      .catch((err) => setError((err as Error).message));
+  }, [auth]);
+
   useEffect(() => {
     refresh();
     refreshSites();
     refreshEvents();
-  }, [refresh, refreshSites, refreshEvents]);
+    refreshIdv();
+  }, [refresh, refreshSites, refreshEvents, refreshIdv]);
+
+  async function handleRequestIdv(e: React.FormEvent) {
+    e.preventDefault();
+    setIdvSubmitting(true);
+    setError(null);
+    try {
+      await requestIdentityVerification(idvNote || undefined);
+      setIdvNote("");
+      refreshIdv();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIdvSubmitting(false);
+    }
+  }
 
   if (auth.status !== "authenticated") return null;
   async function handleRevoke(sessionId: string) {
@@ -233,6 +266,79 @@ export default function SecurityPage() {
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-border bg-surface p-5">
+        <h2 className="text-sm font-medium text-foreground-muted">
+          Identity Verification (LEVEL_3)
+        </h2>
+        {me?.verificationLevel === "LEVEL_3" ? (
+          <p className="mt-3 text-sm text-good">
+            Your identity is verified.
+          </p>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-foreground-muted">
+              Request a manual identity review. NDY HUB does not accept
+              document uploads here — describe how you&apos;ve already shared
+              proof of identity (e.g. a support ticket) and a reviewer will
+              follow up.
+            </p>
+            {idvRequests?.some((r) => r.status === "PENDING") ? (
+              <p className="mt-3 text-sm text-warn">
+                Your request is pending review.
+              </p>
+            ) : (
+              <form onSubmit={handleRequestIdv} className="mt-4 space-y-3">
+                <textarea
+                  value={idvNote}
+                  onChange={(e) => setIdvNote(e.target.value)}
+                  placeholder="Optional note — e.g. how/where you already sent proof of identity"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  rows={2}
+                  maxLength={1000}
+                />
+                <button
+                  type="submit"
+                  disabled={idvSubmitting}
+                  className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Request Verification
+                </button>
+              </form>
+            )}
+            {idvRequests && idvRequests.length > 0 && (
+              <ul className="mt-4 space-y-2">
+                {idvRequests.map((r) => (
+                  <li
+                    key={r.id}
+                    className="rounded-md border border-border p-3 text-sm"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span>{new Date(r.createdAt).toLocaleString()}</span>
+                      <span
+                        className={
+                          r.status === "APPROVED"
+                            ? "text-good"
+                            : r.status === "REJECTED"
+                              ? "text-critical"
+                              : "text-warn"
+                        }
+                      >
+                        {r.status.charAt(0) + r.status.slice(1).toLowerCase()}
+                      </span>
+                    </div>
+                    {r.reviewReason && (
+                      <p className="mt-1 text-xs text-foreground-muted">
+                        &ldquo;{r.reviewReason}&rdquo;
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </div>
 

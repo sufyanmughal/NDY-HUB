@@ -230,6 +230,8 @@ model User {
   notifications           Notification[]
   economyEventLogs        NdyEconomyEventLog[]
   bridgeRequests          BridgeRequest[]
+  passportClaims          PassportClaim[]
+  identityVerificationRequests IdentityVerificationRequest[]
 
   @@index([ndyId])
 }
@@ -1471,4 +1473,73 @@ model ConversionPolicy {
   // decision, not a deploy.
   enabled         Boolean  @default(false)
   updatedAt       DateTime @updatedAt
+}
+
+// --- Passport structured claims (Phase 7) ---
+// Passport fields (bio, country, website, etc.) are already flat typed
+// columns on User, not a JSON blob — the real gap this phase closes is
+// provenance: nothing distinguishes "NDY HUB self-asserted" from
+// "third-party-verified" per claim, and VerificationLevel is a single
+// scalar on User, not per-claim. This table sits alongside the existing
+// flat User fields (additive, no migration of existing Passport data) —
+// new claims opt into it, starting with formalizing identityVerifiedAt
+// into a real LEVEL_3 claim row via IdentityVerificationRequest below.
+enum ClaimProvenance {
+  SELF_ASSERTED
+  NDY_VERIFIED
+  THIRD_PARTY_CREDENTIAL
+}
+
+model PassportClaim {
+  id         String           @id @default(uuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  claimKey   String           // e.g. "phone_verified", "identity_document"
+  provenance ClaimProvenance
+  // Null for SELF_ASSERTED/NDY_VERIFIED; populated for
+  // THIRD_PARTY_CREDENTIAL, e.g. "EU-DIW" — no such issuer integration
+  // exists yet, this column just avoids a future migration when one does.
+  issuer     String?
+  verifiedAt DateTime?
+  // Credential-specific data, kept opaque here on purpose — this table's
+  // job is provenance tracking, not modeling every future credential
+  // schema (OpenID4VCI or similar, not built).
+  metadata   Json?
+  createdAt  DateTime         @default(now())
+
+  @@unique([userId, claimKey])
+}
+
+enum IdentityVerificationRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// The LEVEL_3 (identity document) manual review flow — per the client's
+// explicit answer: NDY HUB owns the request/status/approval/audit trail,
+// but deliberately does NOT store the ID/passport document itself. No
+// document-upload field exists here on purpose; evidenceNote is a plain
+// text pointer to wherever the real evidence was actually handled
+// (a support ticket, an email thread) — never the document bytes. Kept
+// architecture-ready per the client's explicit instruction: a future
+// dedicated secure KYC/document-handling layer can attach to this same
+// request row (e.g. via a new evidenceRef pointing at that system) without
+// a schema rewrite here.
+model IdentityVerificationRequest {
+  id             String                             @id @default(uuid())
+  userId         String
+  user           User                               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  evidenceNote   String?
+  status         IdentityVerificationRequestStatus   @default(PENDING)
+
+  reviewedByUserId String?
+  reviewedByNdyId  String?
+  reviewReason     String?
+  resolvedAt       DateTime?
+
+  createdAt      DateTime                           @default(now())
+
+  @@index([status])
+  @@index([userId])
 }
