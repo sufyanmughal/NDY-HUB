@@ -556,6 +556,13 @@ authenticate against the same identity without each maintaining their own
 password store. Authorization Code Flow with PKCE (S256 only — `plain` is
 rejected).
 
+**Integrating a specific client?** This section is the raw endpoint
+reference — for a guided, step-by-step walkthrough see
+`docs/WEBSITE-INTEGRATION.md` (a website calling the API directly) or
+`docs/MOBILE-INTEGRATION.md` (a Flutter/native app, registered as a
+**Public** OAuth client — no `client_secret`, PKCE-only, see that doc's §1
+for why).
+
 **Discovery**: `GET /.well-known/openid-configuration` and
 `GET /.well-known/jwks.json` — standard OIDC discovery documents, so any
 off-the-shelf OIDC client library can integrate without NDY HUB-specific
@@ -612,10 +619,11 @@ part of SSO.
 The frontend navigates the browser to `redirectUrl`. If `approve: false`,
 the redirect carries `error=access_denied` instead of a code.
 
-### 4. `POST /oauth/token` (server-to-server, client-authenticated)
+### 4. `POST /oauth/token` (client-authenticated)
 
-The relying party's **backend**, never the browser, calls this directly
-with its `client_id`/`client_secret`.
+**Confidential clients** (websites, server backends): the relying party's
+**backend**, never the browser, calls this directly with its
+`client_id`/`client_secret`.
 
 ```json
 {
@@ -631,8 +639,15 @@ or
 { "grant_type": "refresh_token", "refresh_token": "...", "client_id": "...", "client_secret": "..." }
 ```
 
+**Public clients** (native/mobile apps registered with `clientType:
+PUBLIC` — see `docs/MOBILE-INTEGRATION.md`): identical shape, but
+`client_secret` is omitted entirely — none is ever issued to a Public
+client. `code_verifier` (PKCE) is mandatory instead, both here and at
+`/oauth/authorize` in step 1; a Public client's authorize request without
+a `code_challenge` is rejected outright.
+
 Standard OIDC token response shape (`access_token`, `id_token`,
-`refresh_token`, `expires_in`, `token_type`).
+`refresh_token`, `expires_in`, `token_type`) regardless of client type.
 
 ### 5. `GET /oauth/userinfo`
 
