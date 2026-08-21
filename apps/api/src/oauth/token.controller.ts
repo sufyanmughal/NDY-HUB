@@ -106,10 +106,8 @@ export class TokenController {
         'refresh_token is required for this grant_type.',
       );
     }
-    const { userId, ndyId, scope } = await this.tokens.rotateRefreshToken(
-      dto.refresh_token,
-      client.id,
-    );
+    const { userId, ndyId, scope, familyId } =
+      await this.tokens.rotateRefreshToken(dto.refresh_token, client.id);
     const user = await this.identity.findById(userId);
 
     return this.tokens.issueTokenSet({
@@ -119,6 +117,11 @@ export class TokenController {
       clientId: client.clientId,
       scope,
       claims: scopesGrantClaims(scope, user),
+      // Carries the same family forward — see rotateRefreshToken's doc
+      // comment. Without this, reuse detection would never trigger: every
+      // rotation would silently start a fresh, unrelated family instead
+      // of extending the chain it's actually part of.
+      familyId,
     });
   }
 }

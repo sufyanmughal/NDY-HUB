@@ -16,6 +16,26 @@ export const OIDC_SCOPES: Record<string, string> = {
   // rather than a second scope vocabulary. See EconomyClientGuard.
   'ndybits:report-event':
     'Report verified ecosystem events for NDYBITS reward crediting',
+  // Phase B (identity-architecture-hardening-plan.md) — same
+  // server-to-server capability-grant shape as ndybits:report-event
+  // above, for the general Ecosystem Event Contract's intake endpoint.
+  // See EcosystemEventClientGuard.
+  'ecosystem:report-event':
+    'Report ecosystem-relevant events (identity/profile/membership/activity changes)',
+
+  // Phase C (identity-architecture-hardening-plan.md) — granular
+  // resource:action scopes, additive alongside the coarse ones above
+  // (profile/membership/cryndy stay valid indefinitely; nothing below
+  // replaces them). No :write scopes yet — every current OAuth-issued
+  // flow is read-only from a relying party's perspective; a :write scope
+  // implies a real mutation endpoint behind it, and none exists yet for
+  // any of these. Add one alongside whatever endpoint actually needs it,
+  // not speculatively.
+  'profile:read': 'Read your Passport/profile fields',
+  'membership:read': 'Read your current membership tier and status',
+  'wallet:read': 'Read your NDYBITS and CRYNDY balances',
+  'activity:read': 'Read your ecosystem activity feed',
+  'connections:read': 'See which other NDY products/apps you have connected',
 };
 
 export const ALL_SCOPES = Object.keys(OIDC_SCOPES);

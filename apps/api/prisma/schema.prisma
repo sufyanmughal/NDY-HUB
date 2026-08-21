@@ -232,6 +232,7 @@ model User {
   bridgeRequests          BridgeRequest[]
   passportClaims          PassportClaim[]
   identityVerificationRequests IdentityVerificationRequest[]
+  ecosystemEvents         EcosystemEvent[]
 
   @@index([ndyId])
 }
@@ -730,12 +731,21 @@ model OAuthRefreshToken {
   clientId  String
   client    OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
   scope     String
+  // Shared by every token descended from one original grant — set once at
+  // issue time, carried forward unchanged across every rotation. This is
+  // what makes reuse detection possible: presenting an already-revoked
+  // token is the standard signal a refresh token was stolen, and the
+  // correct response is killing the whole family (every token sharing
+  // this id), not just the one presented. See
+  // OAuthTokenService.rotateRefreshToken.
+  familyId  String
   createdAt DateTime    @default(now())
   expiresAt DateTime
   revokedAt DateTime?
 
   @@index([userId])
   @@index([clientId])
+  @@index([familyId])
 }
 
 model Session {
@@ -768,6 +778,10 @@ enum SecurityEventType {
   EMAIL_CHANGED
   OAUTH_APP_CONNECTED
   OAUTH_APP_REVOKED
+  // An already-rotated (revoked) OAuth refresh token was presented again —
+  // the standard signal a refresh token was stolen and an attacker is
+  // racing the legitimate client. See OAuthTokenService.rotateRefreshToken.
+  OAUTH_TOKEN_REUSE_DETECTED
 }
 
 // A user-facing "what happened on my account" timeline — distinct from
@@ -1558,4 +1572,45 @@ model IdentityVerificationRequest {
 
   @@index([status])
   @@index([userId])
+}
+
+// --- Ecosystem Event Contract v1 ---
+// Phase B of identity-architecture-hardening-plan.md, per the client's
+// explicit request for a reusable event architecture ("identity.updated",
+// "booking.created", "quiz.completed", etc.) so future NDY products don't
+// each need a bespoke sync mechanism. This is the general log every
+// ecosystem-relevant event reports through — NdyEconomyEventLog (above)
+// stays exactly as it is, purpose-built for reward-specific fields
+// (denied/denyReason/ledgerEntryId/riskFlag) that don't belong here.
+// RewardEngineService remains the authority on what triggers a NDYBITS
+// credit; this table is the shared front door both it and future
+// non-reward consumers write through.
+//
+// Deliberately NOT a data warehouse for every product's internal records
+// — per the client's own scoping principle, NDYSTAYS keeps owning
+// booking/property data, NDYQUIZ keeps owning game state, etc. This logs
+// the *signal* ("a booking was created"), not the product's full record.
+model EcosystemEvent {
+  id                 String   @id @default(uuid())
+  // Namespaced, dot-separated — "quiz.completed", "booking.created",
+  // "identity.updated". Validated against a registered catalog at report
+  // time (see EcosystemEventService), same "add real ones as clients need
+  // them, not speculatively" discipline as oauth/scopes.ts.
+  eventType          String
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Which registered OAuthClient reported this — nullable only for
+  // internally-originated events (e.g. NDYHUB's own identity.updated).
+  reportedByClientId String?
+  // Event-specific payload, kept opaque here on purpose — same reasoning
+  // as PassportClaim.metadata: this table's job is being a reliable,
+  // queryable log, not modeling every future event's exact shape.
+  payload            Json?
+  // Idempotency — same contract as every other *EventId field in this
+  // schema (NdybitsLedgerEntry.sourceEventId, NdyEconomyEventLog.sourceEventId).
+  sourceEventId      String   @unique
+  createdAt          DateTime @default(now())
+
+  @@index([userId, eventType, createdAt])
+  @@index([eventType])
 }

@@ -27,6 +27,7 @@ import { ActionEngineModule } from './action-engine/action-engine.module';
 import { NdyEconomyModule } from './ndy-economy/ndy-economy.module';
 import { InternalModule } from './internal/internal.module';
 import { IdentityVerificationModule } from './identity-verification/identity-verification.module';
+import { EcosystemEventModule } from './ecosystem-event/ecosystem-event.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { IdentityVerificationModule } from './identity-verification/identity-ver
     NdyEconomyModule,
     InternalModule,
     IdentityVerificationModule,
+    EcosystemEventModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

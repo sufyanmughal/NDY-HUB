@@ -13,13 +13,19 @@ import { DiscoveryController } from './discovery.controller';
 import { GrantsController } from './grants.controller';
 import { AuthModule } from '../auth/auth.module';
 import { IdentityModule } from '../identity/identity.module';
+import { NotificationModule } from '../notifications/notification.module';
 
 @Module({
-  // AuthModule: JwtAuthGuard (consent/status/grants endpoints), and the
-  // shared JwtModule (OAuthTokenService signs with the same JwtService).
-  // PermissionGuard resolves via the global PrismaModule. IdentityModule:
-  // user lookups the token/userinfo endpoints both need.
-  imports: [AuthModule, IdentityModule],
+  // AuthModule: JwtAuthGuard (consent/status/grants endpoints), the
+  // shared JwtModule (OAuthTokenService signs with the same JwtService),
+  // and SecurityEventService (refresh-token reuse detection, Phase A of
+  // identity-architecture-hardening-plan.md). PermissionGuard resolves via
+  // the global PrismaModule. IdentityModule: user lookups the
+  // token/userinfo endpoints both need. NotificationModule: alerting the
+  // user by email when reuse is detected — no cycle risk, NotificationModule
+  // only imports AuthModule itself (see workspace.module.ts's doc comment
+  // for the cycle this project has hit twice before; checked here first).
+  imports: [AuthModule, IdentityModule, NotificationModule],
   controllers: [
     OAuthClientAdminController,
     AuthorizeController,
