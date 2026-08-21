@@ -338,7 +338,9 @@ export class AuthController {
   @Throttle(BRUTE_FORCE_GUARD)
   @Post('2fa/send-sms')
   async sendSms2faChallenge(@Body() dto: SendSmsChallengeDto) {
-    const userId = await this.totp.resolveUserIdForChallenge(dto.challengeToken);
+    const userId = await this.totp.resolveUserIdForChallenge(
+      dto.challengeToken,
+    );
     return this.sms2fa.sendChallengeCode(userId);
   }
 
@@ -483,5 +485,18 @@ function normalizeProvider(raw: string): SocialProvider {
 }
 
 function sessionMeta(req: Request): SessionMeta {
-  return { ip: req.ip, userAgent: req.headers['user-agent'] };
+  // x-device-id: the client-generated, locally-persisted value described
+  // in Device's schema doc comment — a header (not a body field) so it
+  // applies uniformly across every session-issuing endpoint here without
+  // touching each one's own DTO individually. Absent on older clients
+  // that haven't adopted this yet; deviceId stays undefined, matching
+  // SessionMeta's own optional-field contract.
+  const deviceIdHeader = req.headers['x-device-id'];
+  return {
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+    deviceId: Array.isArray(deviceIdHeader)
+      ? deviceIdHeader[0]
+      : deviceIdHeader,
+  };
 }

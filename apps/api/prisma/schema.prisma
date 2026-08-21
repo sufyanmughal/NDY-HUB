@@ -233,6 +233,7 @@ model User {
   passportClaims          PassportClaim[]
   identityVerificationRequests IdentityVerificationRequest[]
   ecosystemEvents         EcosystemEvent[]
+  devices                 Device[]
 
   @@index([ndyId])
 }
@@ -739,6 +740,13 @@ model OAuthRefreshToken {
   // this id), not just the one presented. See
   // OAuthTokenService.rotateRefreshToken.
   familyId  String
+  // Nullable, same reasoning as Session.deviceId — populated when the
+  // authorizing request carried x-device-id. This is the field that makes
+  // "Sign Out All Devices" reach every connected NDY product's tokens,
+  // not just the NDY HUB dashboard's own Session rows — see Device's
+  // schema doc comment.
+  deviceId  String?
+  device    Device?     @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   createdAt DateTime    @default(now())
   expiresAt DateTime
   revokedAt DateTime?
@@ -746,6 +754,56 @@ model OAuthRefreshToken {
   @@index([userId])
   @@index([clientId])
   @@index([familyId])
+  @@index([deviceId])
+}
+
+// --- Central device management (Phase D, identity-architecture-
+// hardening-plan.md) ---
+// Per the client's explicit sign-off: "Sign Out All Devices must work
+// ecosystem-wide" — revoking a Device here has to kill both the NDY HUB
+// dashboard Session(s) AND every OAuthRefreshToken (every connected NDY
+// product) tied to it, not just one or the other. This is the shared
+// identity a device keeps across logins; Session/OAuthRefreshToken rows
+// come and go per login/rotation, but the Device row they're tagged with
+// is stable — that's what makes "this device" a real, revokable concept
+// instead of just a per-session guess from user-agent/IP.
+//
+// deviceId is client-generated and persisted locally (a random value the
+// app/browser creates once and sends on every login/token request via
+// the x-device-id header — see auth.controller.ts's sessionMeta() and
+// oauth/token.controller.ts) — NDY HUB never invents one. Sessions/tokens
+// from a request with no deviceId simply aren't attached to any Device
+// (deviceId nullable on both), which is expected for older app builds
+// that haven't adopted this yet — nothing breaks, they just don't show
+// up in the cross-product device list until they do.
+model Device {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // The client-generated value itself — unique per user, not globally
+  // (two different users' apps could theoretically generate the same
+  // random value; vanishingly unlikely, but scoping the uniqueness
+  // constraint to the user is the correct, defensive choice regardless).
+  deviceId     String
+  // Human-readable, e.g. "Sufyan's iPhone" — derived from user-agent at
+  // first-seen time if the client didn't supply one explicitly; editable
+  // later is a natural follow-on, not required for this phase.
+  label        String
+  // Off by default in this phase (client's explicit "keep it passive for
+  // now" instruction) — nothing sets this true yet. Exists so a future
+  // active-alerting phase (his own explicit "design so we can add
+  // new-device alerts and confirm/deny later" requirement) is a behavior
+  // change behind this flag, not a schema change.
+  alertsEnabled Boolean  @default(false)
+  firstSeenAt  DateTime  @default(now())
+  lastSeenAt   DateTime  @default(now())
+  revokedAt    DateTime?
+
+  sessions      Session[]
+  refreshTokens OAuthRefreshToken[]
+
+  @@unique([userId, deviceId])
+  @@index([userId])
 }
 
 model Session {
@@ -757,11 +815,16 @@ model Session {
   refreshTokenHash String    @unique
   userAgent        String?
   ip               String?
+  // Nullable — see Device's own doc comment for why (older clients that
+  // haven't started sending x-device-id yet).
+  deviceId         String?
+  device           Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   createdAt        DateTime  @default(now())
   expiresAt        DateTime
   revokedAt        DateTime?
 
   @@index([userId])
+  @@index([deviceId])
 }
 
 enum SecurityEventType {
@@ -782,6 +845,9 @@ enum SecurityEventType {
   // the standard signal a refresh token was stolen and an attacker is
   // racing the legitimate client. See OAuthTokenService.rotateRefreshToken.
   OAUTH_TOKEN_REUSE_DETECTED
+  // A device was revoked (individually, or as part of "Sign Out All
+  // Devices") — the resulting ecosystem-wide session/token kill, logged.
+  DEVICE_REVOKED
 }
 
 // A user-facing "what happened on my account" timeline — distinct from

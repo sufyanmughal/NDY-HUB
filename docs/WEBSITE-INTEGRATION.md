@@ -237,6 +237,28 @@ saveTokens(session.accessToken, session.refreshToken); // always save BOTH — t
 instant a new pair is issued. Always overwrite your stored refresh token
 with the new one from the response, never keep reusing the original.
 
+**Device identification (optional, recommended)**: NDY HUB supports
+central, ecosystem-wide device management — a user can see and revoke
+every device connected across every NDY product from one place
+(`ndyhub.com/security`). To participate, generate a random ID once,
+persist it (a long-lived cookie or `localStorage`), and send it as an
+`x-device-id` header on every `/auth/register`, `/auth/login`, and
+`/auth/refresh` call:
+
+```js
+const res = await fetch("https://api.ndyhub.com/auth/login", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-device-id": getOrCreateDeviceId(), // your own helper, stored client-side
+  },
+  body: JSON.stringify({ email, password }),
+});
+```
+
+This is optional — a site that never sends it still authenticates
+normally, it just won't appear in the user's cross-product device list.
+
 ---
 
 ## 9. Logout

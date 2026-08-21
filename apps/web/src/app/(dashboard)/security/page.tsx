@@ -7,12 +7,15 @@ import {
   getMySessions,
   revokeSessionById,
   revokeAllSessions,
+  getMyDevices,
+  revokeDeviceById,
   getConnectedSites,
   revokeConnectedSite,
   getMySecurityEvents,
   requestIdentityVerification,
   getMyIdentityVerificationRequests,
   type SecuritySession,
+  type SecurityDevice,
   type ConnectedSite,
   type SecurityEvent,
   type SecurityEventType,
@@ -33,12 +36,15 @@ const SECURITY_EVENT_LABELS: Record<SecurityEventType, string> = {
   EMAIL_CHANGED: "Email address changed",
   OAUTH_APP_CONNECTED: "Connected a new app",
   OAUTH_APP_REVOKED: "Revoked access to an app",
+  OAUTH_TOKEN_REUSE_DETECTED: "Suspicious activity — a connected app's login was reused",
+  DEVICE_REVOKED: "Signed out a device",
 };
 
 export default function SecurityPage() {
   const { auth, logout } = useAuth();
   const me = useMe();
   const [sessions, setSessions] = useState<SecuritySession[] | null>(null);
+  const [devices, setDevices] = useState<SecurityDevice[] | null>(null);
   const [sites, setSites] = useState<ConnectedSite[] | null>(null);
   const [events, setEvents] = useState<SecurityEvent[] | null>(null);
   const [idvRequests, setIdvRequests] = useState<
@@ -48,12 +54,20 @@ export default function SecurityPage() {
   const [idvSubmitting, setIdvSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [deviceBusyId, setDeviceBusyId] = useState<string | null>(null);
   const [siteBusyId, setSiteBusyId] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     if (auth.status !== "authenticated") return;
     getMySessions()
       .then(setSessions)
+      .catch((err) => setError((err as Error).message));
+  }, [auth]);
+
+  const refreshDevices = useCallback(() => {
+    if (auth.status !== "authenticated") return;
+    getMyDevices()
+      .then(setDevices)
       .catch((err) => setError((err as Error).message));
   }, [auth]);
 
@@ -80,10 +94,11 @@ export default function SecurityPage() {
 
   useEffect(() => {
     refresh();
+    refreshDevices();
     refreshSites();
     refreshEvents();
     refreshIdv();
-  }, [refresh, refreshSites, refreshEvents, refreshIdv]);
+  }, [refresh, refreshDevices, refreshSites, refreshEvents, refreshIdv]);
 
   async function handleRequestIdv(e: React.FormEvent) {
     e.preventDefault();
@@ -111,6 +126,23 @@ export default function SecurityPage() {
       setError((err as Error).message);
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function handleRevokeDevice(deviceId: string) {
+    setDeviceBusyId(deviceId);
+    setError(null);
+    try {
+      await revokeDeviceById(deviceId);
+      // A revoked device may include the one making this call — refresh
+      // sessions too, since its Session row (if any) just got killed
+      // alongside it, same ecosystem-wide propagation the backend does.
+      refreshDevices();
+      refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDeviceBusyId(null);
     }
   }
 
@@ -202,6 +234,45 @@ export default function SecurityPage() {
                     {busyId === session.id ? "…" : "Revoke"}
                   </button>
                 )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-border bg-surface p-5">
+        <h2 className="text-sm font-medium text-foreground-muted">
+          Devices
+        </h2>
+        <p className="mt-1 text-xs text-foreground-muted">
+          Revoking a device signs it out everywhere — this NDY HUB session
+          and every connected NDY app it&apos;s used, not just here.
+        </p>
+        {devices && devices.length === 0 ? (
+          <p className="mt-3 text-sm text-foreground-muted">
+            No devices recognized yet — signing in from an app that sends a
+            device identifier will show up here.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-border">
+            {devices?.map((device) => (
+              <li
+                key={device.id}
+                className="flex items-center justify-between py-3 text-sm"
+              >
+                <div>
+                  <div className="font-medium">{device.label}</div>
+                  <div className="text-xs text-foreground-muted">
+                    Last active {new Date(device.lastSeenAt).toLocaleString()}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleRevokeDevice(device.id)}
+                  disabled={deviceBusyId === device.id}
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-2 disabled:opacity-50"
+                >
+                  {deviceBusyId === device.id ? "…" : "Revoke"}
+                </button>
               </li>
             ))}
           </ul>

@@ -1,14 +1,22 @@
 import { Module } from '@nestjs/common';
 import { SecurityService } from './security.service';
-import { SecurityController } from './security.controller';
+import {
+  SecurityController,
+  SecurityDevicesController,
+} from './security.controller';
 import { SecurityEventsController } from './security-events.controller';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  // AuthModule: JwtAuthGuard on both controllers, SecurityEventService for
-  // SecurityEventsController.
+  // AuthModule: JwtAuthGuard on every controller here, SecurityEventService
+  // for SecurityEventsController, and DeviceService (Phase D) for
+  // SecurityService's device list/revoke methods.
   imports: [AuthModule],
-  controllers: [SecurityController, SecurityEventsController],
+  controllers: [
+    SecurityController,
+    SecurityDevicesController,
+    SecurityEventsController,
+  ],
   providers: [SecurityService],
 })
 export class SecurityModule {}

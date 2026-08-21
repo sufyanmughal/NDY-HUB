@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { SessionService } from './session.service';
 import { SecurityEventService } from './security-event.service';
+import { DeviceService } from './device.service';
 import { TotpService } from './totp.service';
 import { Sms2faService } from './sms-2fa.service';
 import { PasskeyService } from './passkey.service';
@@ -37,6 +38,7 @@ import { SmsService } from '../common/sms.service';
     AuthService,
     SessionService,
     SecurityEventService,
+    DeviceService,
     TotpService,
     Sms2faService,
     PasskeyService,
@@ -54,7 +56,19 @@ import { SmsService } from '../common/sms.service';
   // JwtService constructor dependency, and refuses to boot. MailService is
   // exported so NotificationModule (Phase 2) can reuse the same Resend
   // wrapper rather than a second instance — it's stateless, so this is
-  // just visibility, not shared state.
-  exports: [JwtModule, JwtAuthGuard, SecurityEventService, MailService],
+  // just visibility, not shared state. DeviceService lives here (not
+  // SecurityModule, where its endpoints actually are) specifically to
+  // avoid a cycle: SessionService (this module) needs to call it on every
+  // login, and SecurityModule already imports AuthModule — putting
+  // DeviceService in SecurityModule instead would require AuthModule to
+  // import SecurityModule right back, the same class of cycle this
+  // project has hit twice before (see workspace.module.ts's doc comment).
+  exports: [
+    JwtModule,
+    JwtAuthGuard,
+    SecurityEventService,
+    MailService,
+    DeviceService,
+  ],
 })
 export class AuthModule {}

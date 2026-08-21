@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Headers,
   Post,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -29,7 +30,13 @@ export class TokenController {
   ) {}
 
   @Post('token')
-  async token(@Body() dto: TokenDto) {
+  async token(
+    @Body() dto: TokenDto,
+    // Same client-generated device identifier as auth.controller.ts's
+    // sessionMeta() — see Device's schema doc comment. A header here too,
+    // for the same "applies uniformly without touching the DTO" reason.
+    @Headers('x-device-id') deviceId?: string,
+  ) {
     const client = await this.clients
       .findByClientId(dto.client_id)
       .catch(() => null);
@@ -38,14 +45,15 @@ export class TokenController {
     }
 
     if (dto.grant_type === 'authorization_code') {
-      return this.handleAuthorizationCodeGrant(dto, client);
+      return this.handleAuthorizationCodeGrant(dto, client, deviceId);
     }
-    return this.handleRefreshTokenGrant(dto, client);
+    return this.handleRefreshTokenGrant(dto, client, deviceId);
   }
 
   private async handleAuthorizationCodeGrant(
     dto: TokenDto,
     client: { id: string; clientId: string; clientType: OAuthClientType },
+    deviceId?: string,
   ) {
     if (!dto.code || !dto.redirect_uri) {
       throw new BadRequestException(
@@ -94,12 +102,14 @@ export class TokenController {
       clientId: client.clientId,
       scope: authCode.scope,
       claims: scopesGrantClaims(authCode.scope, user),
+      deviceId,
     });
   }
 
   private async handleRefreshTokenGrant(
     dto: TokenDto,
     client: { id: string; clientId: string },
+    deviceId?: string,
   ) {
     if (!dto.refresh_token) {
       throw new BadRequestException(
@@ -122,6 +132,13 @@ export class TokenController {
       // rotation would silently start a fresh, unrelated family instead
       // of extending the chain it's actually part of.
       familyId,
+      // Not necessarily the same deviceId the original grant carried
+      // (whoever sends the header this time might omit it, or the token
+      // could be rotated from a background job on the same device) —
+      // deliberately re-resolved on each rotation rather than pinned to
+      // whatever the very first grant saw, same "always trust the current
+      // request's own signal" reasoning as SessionService.rotateSession.
+      deviceId,
     });
   }
 }

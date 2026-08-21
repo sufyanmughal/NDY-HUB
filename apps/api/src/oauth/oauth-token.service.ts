@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { parseScope } from './scopes';
 import { OidcKeysService } from './oidc-keys.service';
 import { SecurityEventService } from '../auth/security-event.service';
+import { DeviceService } from '../auth/device.service';
 import { NotificationService } from '../notifications/notification.service';
 
 const ACCESS_TOKEN_TTL = '1h';
@@ -49,6 +50,7 @@ export class OAuthTokenService {
     private readonly keys: OidcKeysService,
     private readonly securityEvents: SecurityEventService,
     private readonly notifications: NotificationService,
+    private readonly devices: DeviceService,
   ) {}
 
   /**
@@ -77,6 +79,9 @@ export class OAuthTokenService {
     // still recognize it as part of the same chain. Omitted on a fresh
     // login (authorization_code grant), which starts a brand new family.
     familyId?: string;
+    // Client-generated device identifier — see Device's schema doc
+    // comment. Optional: absent from clients that haven't adopted it yet.
+    deviceId?: string;
   }): Promise<OAuthTokenSet> {
     const issuer = this.config.getOrThrow<string>('WEB_APP_URL');
 
@@ -107,6 +112,10 @@ export class OAuthTokenService {
       },
     );
 
+    const deviceId = await this.devices.resolveDevice(params.userId, {
+      deviceId: params.deviceId,
+    });
+
     const refreshToken = randomBytes(48).toString('base64url');
     await this.prisma.oAuthRefreshToken.create({
       data: {
@@ -115,6 +124,7 @@ export class OAuthTokenService {
         clientId: params.clientDbId,
         scope: params.scope,
         familyId: params.familyId ?? randomUUID(),
+        deviceId,
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
       },
     });

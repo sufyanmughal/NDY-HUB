@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { DeviceService } from './device.service';
 
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -9,6 +10,11 @@ const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 export interface SessionMeta {
   userAgent?: string;
   ip?: string;
+  // Client-generated, locally-persisted value sent via the x-device-id
+  // header — see auth.controller.ts's sessionMeta() and Device's schema
+  // doc comment. Optional: older clients that haven't adopted this yet
+  // just don't get their Session tagged with a Device.
+  deviceId?: string;
 }
 
 export interface IssuedSession {
@@ -28,6 +34,7 @@ export class SessionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly devices: DeviceService,
   ) {}
 
   async issueSession(
@@ -36,6 +43,10 @@ export class SessionService {
     meta: SessionMeta,
   ): Promise<IssuedSession> {
     const refreshToken = randomBytes(48).toString('base64url');
+    const deviceId = await this.devices.resolveDevice(userId, {
+      deviceId: meta.deviceId,
+      userAgent: meta.userAgent,
+    });
     // Created before the JWT is signed so the access token can carry the
     // session's own id (sid) — that's what lets the Security page say
     // "this is the device you're looking at right now" instead of just
@@ -46,6 +57,7 @@ export class SessionService {
         refreshTokenHash: hashToken(refreshToken),
         userAgent: meta.userAgent,
         ip: meta.ip,
+        deviceId,
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
       },
     });

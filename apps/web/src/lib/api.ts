@@ -18,6 +18,30 @@ const PROXIED_API_PATH = "/api";
 
 export type LoginRequestStatus = "PENDING" | "APPROVED" | "DENIED" | "EXPIRED";
 
+// Phase D (identity-architecture-hardening-plan.md) — a random value
+// generated once and persisted in localStorage, sent as x-device-id on
+// every request so NDY HUB can recognize "this browser" as a stable
+// Device across logins, the same way the Flutter integration guide asks
+// every app to do (see docs/MOBILE-INTEGRATION.md). Guarded for
+// server-side execution (no localStorage there) since this module is
+// imported from both client and server code paths in this app.
+const DEVICE_ID_STORAGE_KEY = "ndyhub_device_id";
+
+function getOrCreateDeviceId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const existing = window.localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    if (existing) return existing;
+    const generated = crypto.randomUUID();
+    window.localStorage.setItem(DEVICE_ID_STORAGE_KEY, generated);
+    return generated;
+  } catch {
+    // Private browsing / storage disabled — degrade gracefully, same
+    // contract as every other optional deviceId path server-side.
+    return null;
+  }
+}
+
 export interface LoginRequest {
   token: string;
   method: "QR" | "DEEP_LINK";
@@ -45,13 +69,18 @@ export class ApiError extends Error {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const deviceId = getOrCreateDeviceId();
   const res = await fetch(`${PROXIED_API_PATH}${path}`, {
     ...init,
     // Sends the httpOnly session cookies on every call, same-origin or
     // not — without this, fetch() drops cookies by default and every
     // authenticated request would silently look logged-out.
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...(deviceId ? { "x-device-id": deviceId } : {}),
+      ...init?.headers,
+    },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -428,6 +457,27 @@ export function revokeAllSessions(): Promise<{ revokedCount: number }> {
   );
 }
 
+// --- Device management (Phase D of the identity architecture hardening
+// plan) — cross-product, not just this browser's own Session the way
+// SecuritySession above is. Revoking a device kills its Sessions AND
+// every connected NDY product's OAuth tokens tied to it.
+export interface SecurityDevice {
+  id: string;
+  label: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
+
+export function getMyDevices(): Promise<SecurityDevice[]> {
+  return authedFetch<SecurityDevice[]>("/security/devices");
+}
+
+export function revokeDeviceById(deviceId: string): Promise<void> {
+  return authedFetch<void>(`/security/devices/${deviceId}`, {
+    method: "DELETE",
+  });
+}
+
 export type SecurityEventType =
   | "LOGIN_SUCCESS"
   | "NEW_DEVICE"
@@ -441,7 +491,9 @@ export type SecurityEventType =
   | "RECOVERY_CODE_USED"
   | "EMAIL_CHANGED"
   | "OAUTH_APP_CONNECTED"
-  | "OAUTH_APP_REVOKED";
+  | "OAUTH_APP_REVOKED"
+  | "OAUTH_TOKEN_REUSE_DETECTED"
+  | "DEVICE_REVOKED";
 
 export interface SecurityEvent {
   id: string;

@@ -17,10 +17,13 @@ Full API reference (every endpoint, every field): **https://ndyhub.com/docs**
 **Send us:**
 1. Your app's name (shown on the login screen users see).
 2. The **redirect URI** your app will use to receive the login result —
-   either a custom URL scheme (`ndjoyit://oauth-callback`) or, if you'd
-   rather avoid custom-scheme collisions with other apps on the same
-   device, an Android App Link / iOS Universal Link
-   (`https://ndjoyit.com/oauth-callback`).
+   **preferred: an HTTPS Android App Link / iOS Universal Link**
+   (`https://ndjoyit.com/oauth-callback`). A custom URL scheme
+   (`ndjoyit://oauth-callback`) is accepted as a fallback if verified App
+   Links aren't set up yet, but App Links are the production standard:
+   they can't collide with another app's scheme on the same device, and
+   they don't route through an interstitial "open in app?" prompt on
+   either platform the way a custom scheme sometimes does.
 3. Which scopes you need: `openid` (always required), plus any of
    `profile`, `email`, `membership`, `cryndy`.
 
@@ -137,9 +140,12 @@ In `ios/Runner/Info.plist`, add a `CFBundleURLTypes` entry:
 </array>
 ```
 
-If you registered an Android App Link / Universal Link instead of a custom
-scheme, follow `flutter_appauth`'s README for the associated-domains setup
-— it's a standard deep-link registration, nothing NDY HUB-specific.
+**If you're using the preferred App Link/Universal Link setup** instead of
+a custom scheme, follow `flutter_appauth`'s README for the
+associated-domains setup — it's a standard deep-link registration, nothing
+NDY HUB-specific (Android: a `assetlinks.json` file hosted at your
+domain's `/.well-known/`; iOS: an `apple-app-site-association` file, same
+location).
 
 ---
 
@@ -171,6 +177,45 @@ scheme, follow `flutter_appauth`'s README for the associated-domains setup
 - **ID token**: a standard OIDC JWT — decode it client-side (e.g. with
   `dart_jsonwebtoken`) if you just need the NDY ID/name/email claims
   without an extra network round trip.
+
+---
+
+## 4a. Device identification (for "Sign Out All Devices")
+
+NDY HUB now supports central, ecosystem-wide device management — a user
+can see every device connected across every NDY product in one place
+(`ndyhub.com/security`) and sign one out, which immediately revokes that
+device's access to your app too, not just NDY HUB's own dashboard.
+
+To participate, generate a random device identifier **once**, persist it
+locally, and send it as an `x-device-id` header on every `/oauth/token`
+call (both the initial exchange and every later refresh):
+
+```dart
+import 'package:uuid/uuid.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+const _storage = FlutterSecureStorage();
+
+Future<String> getOrCreateDeviceId() async {
+  final existing = await _storage.read(key: 'ndyhub_device_id');
+  if (existing != null) return existing;
+  final generated = const Uuid().v4();
+  await _storage.write(key: 'ndyhub_device_id', value: generated);
+  return generated;
+}
+```
+
+`flutter_appauth`'s `AuthorizationTokenRequest` accepts additional
+parameters — pass `additionalParameters: {'x-device-id': deviceId}` (check
+the current `flutter_appauth` API for the exact field name/version; if
+it's not exposed as a request parameter in your version, send it as a
+literal HTTP header on the token exchange instead, since `/oauth/token` is
+a plain HTTPS POST underneath).
+
+This is optional, not required for login to work — an app that never
+sends `x-device-id` still authenticates normally, it just won't appear in
+the user's cross-product device list.
 
 ---
 
