@@ -1313,6 +1313,11 @@ enum NotificationCategory {
   ACTION_APPROVAL
   NDYSPACE
   SYSTEM
+  // Cross-product notifications from NDYMAIL (standalone product, own DB,
+  // calls in over POST /internal/notify) — new mail arrived, mailbox
+  // reauth required, etc. Added alongside that endpoint; see
+  // InternalModule's NotifyController for the caller side.
+  NDYMAIL
 }
 
 model Notification {
