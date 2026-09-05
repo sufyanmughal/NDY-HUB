@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { EcosystemEventService } from './ecosystem-event.service';
 import { EcosystemEventClientGuard } from './guards/ecosystem-event-client.guard';
@@ -34,6 +42,28 @@ export class EcosystemEventsController {
       sourceEventId: dto.sourceEventId,
       payload: dto.payload,
       reportedByClientId: req.ecosystemEventClient?.clientId,
+    });
+  }
+
+  /**
+   * Server-to-server feed for consumers that process the whole event
+   * log rather than one user's activity — NDYCORE's ingestion layer is
+   * the first caller. Deliberately a separate scope
+   * (ecosystem:read-events) from report-event: a client that's allowed
+   * to log events isn't automatically allowed to read every user's
+   * event history back out.
+   */
+  @Get()
+  @RequireEcosystemEventScope('ecosystem:read-events')
+  list(
+    @Query('cursor') cursor?: string,
+    @Query('take') take?: string,
+    @Query('eventType') eventType?: string,
+  ) {
+    return this.ecosystemEvents.listSince({
+      cursor,
+      take: take ? Number(take) : undefined,
+      eventType,
     });
   }
 }

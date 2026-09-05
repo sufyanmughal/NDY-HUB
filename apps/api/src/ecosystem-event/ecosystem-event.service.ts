@@ -100,4 +100,28 @@ export class EcosystemEventService {
       take,
     });
   }
+
+  /**
+   * Server-to-server cursor pagination over the full event log — for
+   * NDYCORE's ingestion layer, not a single user's "mine" slice. Cursors
+   * on `id` (uuid, not time) because createdAt has no uniqueness
+   * guarantee under concurrent writes; ordered ascending by createdAt
+   * then id so a consumer polling this on an interval always advances
+   * forward without gaps or duplicates, same reasoning as any
+   * keyset-pagination-over-a-log design.
+   */
+  async listSince(params: { cursor?: string; take?: number; eventType?: string }) {
+    const take = Math.min(params.take ?? 100, 500);
+    const events = await this.prisma.ecosystemEvent.findMany({
+      where: params.eventType ? { eventType: params.eventType } : undefined,
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take,
+      ...(params.cursor
+        ? { cursor: { id: params.cursor }, skip: 1 }
+        : {}),
+    });
+    const nextCursor =
+      events.length === take ? events[events.length - 1].id : null;
+    return { events, nextCursor };
+  }
 }

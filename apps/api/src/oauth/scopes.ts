@@ -22,6 +22,12 @@ export const OIDC_SCOPES: Record<string, string> = {
   // See EcosystemEventClientGuard.
   'ecosystem:report-event':
     'Report ecosystem-relevant events (identity/profile/membership/activity changes)',
+  // NDYCORE's ingestion layer — a server-to-server capability grant to
+  // page through the full Ecosystem Event Contract log (not one user's
+  // "mine" slice), same shape as ecosystem:report-event above. See
+  // EcosystemEventClientGuard and the cursor-paginated list() endpoint.
+  'ecosystem:read-events':
+    'Read the ecosystem event log for intelligence/automation processing (NDYCORE)',
 
   // Phase C (identity-architecture-hardening-plan.md) — granular
   // resource:action scopes, additive alongside the coarse ones above
