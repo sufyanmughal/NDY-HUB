@@ -32,6 +32,28 @@ enum LoginRequestMethod {
   DEEP_LINK
 }
 
+// Distinct from LoginRequestStatus even though the values match exactly —
+// kept separate on purpose so DeviceApprovalRequest's lifecycle can evolve
+// independently (e.g. a future "AUTO_APPROVED for trusted IP range" status)
+// without touching the unrelated QR-login flow's enum.
+enum DeviceApprovalStatus {
+  PENDING
+  APPROVED
+  DENIED
+  EXPIRED
+}
+
+// What triggered this approval request — today only NEW_DEVICE (the one
+// signal DeviceService.resolveDevice already detects, per its own doc
+// comment on the discarded create-vs-update result). RISKY_ACTION reserved
+// for the client's stated long-term vision (NDY Signature requests, NDYPay
+// approvals, sensitive NDYHUB actions) — not wired to anything yet, added
+// now so this enum doesn't need a migration the moment that phase starts.
+enum DeviceApprovalReason {
+  NEW_DEVICE
+  RISKY_ACTION
+}
+
 // Milestone 6 (admin): a single role rather than the full multi-role matrix
 // the proposal eventually wants (Verified User + Member + CRYNDY Holder +
 // Business Verified, worn simultaneously) — that needs a join table and
@@ -58,17 +80,30 @@ enum Role {
 
 model User {
   id                String            @id @default(uuid())
-  // The permanent, never-regenerated identity — six characters, generated
-  // once at signup. This is the real lookup/join key everywhere internally
-  // (never ndyId below), so a role change can never break a URL, OAuth
-  // claim, or anything else built from a user's public ID. See
-  // common/ndy-id.util.ts.
+  // The permanent, never-regenerated identity segment — six characters for
+  // ordinary members (random, via nanoid — see common/ndy-id.util.ts's
+  // anti-enumeration comment), or a manually-assigned, zero-padded
+  // sequential "genesis number" (e.g. "000001") for the small set of named
+  // founding/leadership NDY ID classes (see ndyIdType below). This is the
+  // real lookup/join key everywhere internally (never ndyId below), so a
+  // role or title change can never break a URL, OAuth claim, or anything
+  // else built from a user's public ID.
   ndyCoreId         String            @unique
-  // Denormalized display string, e.g. "NDY-FND-4F82XK" — rebuilt from
-  // ndyCoreId + the current role (via ndyIdTypeForRole) every time role
-  // changes, so every *read* just returns a ready-to-display value instead
-  // of recomputing the type on every request. Never used as a lookup key —
-  // see ndyCoreId above for why.
+  // Explicit override for the ID's class segment (CEO/FND/EXE/PRT/INV/DEV),
+  // per the client's "one permanent NDY ID, class never changes even as
+  // professional role/title evolves" spec. Null for everyone else, in which
+  // case the class is derived from Role at read time via ndyIdTypeForRole
+  // (MBR for USER and all internal staff roles, FND for FOUNDER) exactly as
+  // before — this column only exists to let a fixed handful of
+  // founding/leadership people carry a class that isn't just a mechanical
+  // function of their Role enum value (e.g. an EXE or DEV person may also
+  // be a FOUNDER-permissioned Role without becoming ID class FND).
+  ndyIdType         String?
+  // Denormalized display string, e.g. "NDY-FND-4F82XK" or "NDY-CEO-000001"
+  // — rebuilt from ndyCoreId + (ndyIdType override, else the current role
+  // via ndyIdTypeForRole) every time either changes, so every *read* just
+  // returns a ready-to-display value instead of recomputing the type on
+  // every request. Never used as a lookup key — see ndyCoreId above for why.
   ndyId             String            @unique
   email             String            @unique
   passwordHash      String?           // null for users who only ever sign in via Google/Apple/NDYAPPS
@@ -196,6 +231,7 @@ model User {
   updatedAt         DateTime          @updatedAt
 
   loginRequests      LoginRequest[]
+  deviceApprovalRequests DeviceApprovalRequest[]
   sessions            Session[]
   cryndyPurchases     CryndyPurchase[]
   ndybitsLedgerEntries NdybitsLedgerEntry[]
@@ -290,10 +326,21 @@ enum AuthProvider {
 // back — counter must be persisted and checked on every subsequent login
 // to detect a cloned authenticator (a real device's counter only ever
 // increases; a clone replaying an old assertion reports a stale one).
+//
+// rpId: WebAuthn credentials are cryptographically bound to a single
+// origin by the spec itself — a passkey made for ndyhub.com cannot be
+// used to sign into ndymail.com, the same way a GitHub passkey can't log
+// into GitLab. Every NDJOYIT product that wants its own passkey/Face ID/
+// Touch ID login (not just NDYHUB) needs its own rpId-scoped row for the
+// same account, so login lookups only ever match credentials meant for
+// the site the user is actually on. Existing rows all get backfilled to
+// NDYHUB's own hostname (see the migration) since every Passkey created
+// before this column existed was, by construction, an NDYHUB one.
 model Passkey {
   id           String    @id @default(uuid())
   userId       String
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rpId         String
   credentialId String    @unique
   publicKey    Bytes
   counter      Int       @default(0)
@@ -303,6 +350,7 @@ model Passkey {
   lastUsedAt   DateTime?
 
   @@index([userId])
+  @@index([rpId])
 }
 
 // The WebAuthn ceremony is two round trips (options, then a signed
@@ -321,6 +369,14 @@ model WebauthnChallenge {
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      WebauthnChallengeType
+  // Which relying-party origin this ceremony is for — carried from the
+  // options call through to the verify call so verifyRegistrationResponse/
+  // verifyAuthenticationResponse's expectedOrigin/expectedRPID always
+  // match what generateRegistrationOptions/generateAuthenticationOptions
+  // actually used, even when multiple products (NDYHUB, NDYMAIL, future
+  // others) each run their own ceremonies concurrently. See Passkey.rpId's
+  // doc comment for why this exists at all.
+  rpId      String
   expiresAt DateTime
   createdAt DateTime @default(now())
 }
@@ -403,6 +459,55 @@ model LoginRequest {
 
   @@index([token])
   @@index([status])
+}
+
+// NDYAPPS Trusted Device / Approval Channel — the client's explicit
+// message-22 architecture ask: NDYHUB detects a new/risky device, pushes
+// an approval request to NDYAPPS, the user confirms via biometric AND a
+// number-matching code (anti-MITM, same UX pattern as Microsoft/Google
+// Authenticator push approval) rather than a bare tap-to-approve button.
+//
+// Deliberately its own model, not a repurposed LoginRequest: LoginRequest
+// is "log the *initiating* device into NDYHUB itself" (QR/deep-link web
+// login); this is "approve an action FROM an already-known device," where
+// the approving side is always NDYAPPS on a device that's already
+// authenticated as this user. Different actors, different guard, and
+// conflating them would make LoginRequest's own single-use/exchange
+// semantics (sessionIssuedAt etc.) ambiguous for a flow that never issues
+// a session at all.
+model DeviceApprovalRequest {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // The device whose new/risky activity triggered this — nullable only
+  // because DeviceService.resolveDevice itself tolerates a missing
+  // deviceId (older clients); an approval request with no device to name
+  // still needs to exist so the user isn't silently left unprotected.
+  deviceId String?
+  device   Device? @relation(fields: [deviceId], references: [id])
+
+  reason DeviceApprovalReason
+  status DeviceApprovalStatus @default(PENDING)
+
+  // 3-digit, human-comparable — matches the "NDYMAIL shows 482, NDYAPPS
+  // asks does NDYMAIL show 482" number-matching pattern the client
+  // described explicitly. Not a secret in the cryptographic sense (it's
+  // shown on the initiating screen to anyone looking at it) — its job is
+  // detecting a mismatched/attacker-controlled session, not preventing
+  // guessing, so 3 digits (1000 possibilities) is the right size: long
+  // enough that a MITM showing the wrong code is obvious, short enough
+  // that a human actually compares it instead of blindly tapping through.
+  matchCode String
+
+  requestingContext String? // e.g. "NDYMAIL login from a new device" — shown on NDYAPPS
+
+  expiresAt  DateTime
+  approvedAt DateTime?
+  deniedAt   DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, status])
 }
 
 // Milestone 5 (CRYNDY + NDYBITS): a purchase moving through the presale
@@ -801,6 +906,7 @@ model Device {
 
   sessions      Session[]
   refreshTokens OAuthRefreshToken[]
+  approvalRequests DeviceApprovalRequest[]
 
   @@unique([userId, deviceId])
   @@index([userId])
@@ -1313,6 +1419,11 @@ enum NotificationCategory {
   ACTION_APPROVAL
   NDYSPACE
   SYSTEM
+  // Cross-product notifications from NDYMAIL (standalone product, own DB,
+  // calls in over POST /internal/notify) — new mail arrived, mailbox
+  // reauth required, etc. Added alongside that endpoint; see
+  // InternalModule's NotifyController for the caller side.
+  NDYMAIL
 }
 
 model Notification {

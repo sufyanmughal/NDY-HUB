@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SecurityEventService } from './security-event.service';
+import { DeviceApprovalService } from './device-approval.service';
 
 export interface DeviceContext {
   /** The client-generated, locally-persisted value sent via the
@@ -33,6 +34,7 @@ export class DeviceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly securityEvents: SecurityEventService,
+    private readonly deviceApproval: DeviceApprovalService,
   ) {}
 
   /**
@@ -63,6 +65,15 @@ export class DeviceService {
 
     const label = deriveLabel(context.userAgent);
 
+    // Detecting new-vs-existing has to happen before the upsert runs —
+    // this is the exact "was this a create or an update" signal this
+    // method's own doc comment describes as the hook point for active
+    // alerting, previously discarded because nothing consumed it yet.
+    const existing = await this.prisma.device.findUnique({
+      where: { userId_deviceId: { userId, deviceId: context.deviceId } },
+      select: { id: true },
+    });
+
     const device = await this.prisma.device.upsert({
       where: { userId_deviceId: { userId, deviceId: context.deviceId } },
       create: { userId, deviceId: context.deviceId, label },
@@ -79,6 +90,37 @@ export class DeviceService {
         where: { id: device.id },
         data: { revokedAt: null },
       });
+    }
+
+    // Fires the NDYAPPS Trusted Device approval flow — see
+    // DeviceApprovalService's own doc comment. `existing === null` is the
+    // actual "genuinely new device" signal this method's own doc comment
+    // reserved for exactly this purpose — not device.revokedAt or any
+    // other proxy.
+    //
+    // Gated on alertsEnabled, which today is unconditionally false for
+    // any freshly-created Device row (see the schema's own default and
+    // doc comment — nothing in this codebase sets it true yet). That
+    // makes this branch a real no-op for every user right now, by design:
+    // it stays that way until a later phase adds a real way to opt a user
+    // into active alerting, at which point this wiring needs no further
+    // change — only something upstream flipping the flag. Kept as an
+    // explicit read (not assumed always-false) so this code is correct
+    // the moment that later phase ships, not silently stale.
+    //
+    // Never awaited into the caller's critical path — a failure here must
+    // not block the login itself, same "best-effort, non-fatal" pattern
+    // EcosystemEventService already uses for its Reward Engine forward.
+    if (existing === null && device.alertsEnabled) {
+      this.deviceApproval
+        .createForNewDevice({
+          userId,
+          deviceId: device.id,
+          requestingContext: `New sign-in from ${label}`,
+        })
+        .catch(() => {
+          // Non-fatal by design — see this block's doc comment above.
+        });
     }
 
     return device.id;

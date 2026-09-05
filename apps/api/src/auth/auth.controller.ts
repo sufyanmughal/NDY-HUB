@@ -34,6 +34,8 @@ import { SocialAuthService, type SocialProvider } from './social-auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { CreateLoginRequestDto } from './dto/create-login-request.dto';
+import { ApproveDeviceRequestDto } from './dto/approve-device-request.dto';
+import { DeviceApprovalService } from './device-approval.service';
 import { RefreshDto } from './dto/refresh.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -81,6 +83,7 @@ export class AuthController {
     private readonly sms2fa: Sms2faService,
     private readonly passkeys: PasskeyService,
     private readonly social: SocialAuthService,
+    private readonly deviceApproval: DeviceApprovalService,
   ) {}
 
   @Throttle(BRUTE_FORCE_GUARD)
@@ -156,6 +159,42 @@ export class AuthController {
     // Called by the desktop browser once it sees the request go APPROVED —
     // trades the one-time approval for a real access/refresh session pair.
     return this.auth.exchangeLoginRequest(token, sessionMeta(req));
+  }
+
+  // NDYAPPS Trusted Device / Approval Channel — see
+  // DeviceApprovalService's own doc comment for why this is a separate
+  // flow from login-request above (approving an action FROM an
+  // already-known device, not logging the initiating device in).
+  @Get('device-approval/:id')
+  getDeviceApprovalStatus(@Param('id') id: string) {
+    // The initiating side (e.g. NDYMAIL) polls this to know when NDYAPPS
+    // has responded, and to render matchCode for the user to visually
+    // compare against what NDYAPPS shows — same "poll as a fallback"
+    // shape as login-request's own status endpoint, no WebSocket push for
+    // this flow yet.
+    return this.deviceApproval.getStatus(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('device-approval/:id/approve')
+  approveDeviceRequest(
+    @Param('id') id: string,
+    @Body() dto: ApproveDeviceRequestDto,
+    @CurrentUser() user: { sub: string },
+  ) {
+    // Requires a valid NDYAPPS access token, same as login-request's
+    // approve — this can only ever be called from a device already
+    // authenticated as this user.
+    return this.deviceApproval.approve(id, user.sub, dto.matchCode);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('device-approval/:id/deny')
+  denyDeviceRequest(
+    @Param('id') id: string,
+    @CurrentUser() user: { sub: string },
+  ) {
+    return this.deviceApproval.deny(id, user.sub);
   }
 
   @UseGuards(JwtAuthGuard)
