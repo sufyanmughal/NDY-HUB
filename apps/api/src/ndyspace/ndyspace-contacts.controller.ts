@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -30,6 +31,18 @@ export class NdyspaceContactsController {
   @Get()
   list(@CurrentUser() user: AuthenticatedRequestUser) {
     return this.contacts.list(user.sub);
+  }
+
+  // Must be declared before @Get(':id') — otherwise Nest's route matching
+  // would treat "search" as an :id value and this route would never be
+  // reached. Used by NDYMAIL's compose recipient picker — see
+  // NdyspaceContactsService.search's doc comment.
+  @Get('search')
+  search(
+    @Query('q') q: string | undefined,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.contacts.search(user.sub, q ?? '');
   }
 
   @Get(':id')
