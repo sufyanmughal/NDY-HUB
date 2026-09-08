@@ -5,8 +5,12 @@ import { IsIn, IsOptional, IsString } from 'class-validator';
 // controller so the error message can say exactly what's missing rather
 // than a generic validation failure.
 export class TokenDto {
-  @IsIn(['authorization_code', 'refresh_token'])
-  grant_type!: 'authorization_code' | 'refresh_token';
+  // 'password' (Resource Owner Password Credentials) is a deliberate,
+  // narrow exception — see TokenController.handlePasswordGrant's doc
+  // comment for why it exists and PASSWORD_GRANT_ALLOWED_CLIENT_IDS for
+  // the allow-list restricting which registered clients may use it.
+  @IsIn(['authorization_code', 'refresh_token', 'password'])
+  grant_type!: 'authorization_code' | 'refresh_token' | 'password';
 
   @IsString()
   client_id!: string;
@@ -39,4 +43,22 @@ export class TokenDto {
   @IsOptional()
   @IsString()
   code_verifier?: string;
+
+  // Only for grant_type: 'password'.
+  @IsOptional()
+  @IsString()
+  username?: string;
+
+  @IsOptional()
+  @IsString()
+  password?: string;
+
+  // Space-delimited, only meaningful for grant_type: 'password' (every
+  // other grant derives its scope from the authorization_code/refresh
+  // token itself, not from a caller-supplied field) — filtered against the
+  // client's registered allowedScopes in TokenController, never trusted
+  // as-is.
+  @IsOptional()
+  @IsString()
+  scope?: string;
 }

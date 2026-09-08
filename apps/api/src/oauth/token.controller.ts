@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Headers,
   Post,
   UnauthorizedException,
@@ -15,6 +16,26 @@ import {
 import { OAuthTokenService, scopesGrantClaims } from './oauth-token.service';
 import { TokenDto } from './dto/token.dto';
 import { IdentityService } from '../identity/identity.service';
+import { AuthService } from '../auth/auth.service';
+
+// Resource Owner Password Credentials (RFC 6749 §4.3) is deprecated by
+// OAuth 2.1 and normally shouldn't exist on a real OIDC provider — it
+// means the relying party's own UI collects the user's NDYHUB password
+// directly, instead of the user typing it only on ndyhub.com. NDYMAIL's
+// login page does this deliberately, by explicit product decision (2026-08-29,
+// approved after the security tradeoff was explained), because its login
+// screen needs to render its own email/password fields rather than
+// redirect to NDYHUB's page. Restricted to an explicit allow-list, not
+// opened to every CONFIDENTIAL client, so this stays a one-off exception
+// rather than quietly becoming the default way any future NDJOYIT
+// product integrates. Adding another client_id here is itself a decision
+// worth flagging, not a routine config change.
+const PASSWORD_GRANT_ALLOWED_CLIENT_IDS = new Set(
+  (process.env.OAUTH_PASSWORD_GRANT_CLIENT_IDS ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean),
+);
 
 // Server-to-server only — the relying party's backend calls this directly,
 // never the browser. Every response shape below matches the standard OIDC
@@ -27,6 +48,7 @@ export class TokenController {
     private readonly codes: AuthorizationCodeService,
     private readonly tokens: OAuthTokenService,
     private readonly identity: IdentityService,
+    private readonly auth: AuthService,
   ) {}
 
   @Post('token')
@@ -47,7 +69,61 @@ export class TokenController {
     if (dto.grant_type === 'authorization_code') {
       return this.handleAuthorizationCodeGrant(dto, client, deviceId);
     }
+    if (dto.grant_type === 'password') {
+      return this.handlePasswordGrant(dto, client, deviceId);
+    }
     return this.handleRefreshTokenGrant(dto, client, deviceId);
+  }
+
+  // See PASSWORD_GRANT_ALLOWED_CLIENT_IDS's doc comment above — this whole
+  // grant type is a deliberate, narrow exception, not the normal path.
+  private async handlePasswordGrant(
+    dto: TokenDto,
+    client: { id: string; clientId: string },
+    deviceId?: string,
+  ) {
+    if (!PASSWORD_GRANT_ALLOWED_CLIENT_IDS.has(client.clientId)) {
+      throw new ForbiddenException(
+        'This client is not authorized to use the password grant.',
+      );
+    }
+    if (!dto.username || !dto.password) {
+      throw new BadRequestException(
+        'username and password are required for this grant_type.',
+      );
+    }
+    const { id: userId } = await this.auth.validateCredentialsForPasswordGrant(
+      dto.username,
+      dto.password,
+    );
+    const user = await this.identity.findById(userId);
+    const registeredClient = await this.clients.findByClientId(
+      client.clientId,
+    );
+    // openid is always implicit — same default every other grant type gets
+    // via the consent screen's scope list; password grant has no consent
+    // screen to derive it from, so it's fixed here to whatever the client
+    // asks for, filtered to what NDYMAIL's registered allowedScopes
+    // actually permits, same enforcement every other grant is subject to.
+    const requestedScopes = (dto.scope ?? 'openid profile email')
+      .split(' ')
+      .filter(Boolean);
+    const grantedScopes = requestedScopes.filter((s) =>
+      registeredClient.allowedScopes.includes(s),
+    );
+    const scope = grantedScopes.includes('openid')
+      ? grantedScopes.join(' ')
+      : ['openid', ...grantedScopes].join(' ');
+
+    return this.tokens.issueTokenSet({
+      userId: user.id,
+      ndyId: user.ndyId,
+      clientDbId: client.id,
+      clientId: client.clientId,
+      scope,
+      claims: scopesGrantClaims(scope, user),
+      deviceId,
+    });
   }
 
   private async handleAuthorizationCodeGrant(
