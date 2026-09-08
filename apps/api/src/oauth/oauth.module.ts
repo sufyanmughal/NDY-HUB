@@ -11,6 +11,7 @@ import { TokenController } from './token.controller';
 import { UserInfoController } from './userinfo.controller';
 import { DiscoveryController } from './discovery.controller';
 import { GrantsController } from './grants.controller';
+import { CrossProductPasskeyController } from './cross-product-passkey.controller';
 import { AuthModule } from '../auth/auth.module';
 import { IdentityModule } from '../identity/identity.module';
 import { NotificationModule } from '../notifications/notification.module';
@@ -33,6 +34,7 @@ import { NotificationModule } from '../notifications/notification.module';
     UserInfoController,
     DiscoveryController,
     GrantsController,
+    CrossProductPasskeyController,
   ],
   providers: [
     OAuthClientService,

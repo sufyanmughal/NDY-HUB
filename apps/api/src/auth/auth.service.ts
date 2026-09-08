@@ -208,6 +208,49 @@ export class AuthService {
     return session;
   }
 
+  /**
+   * Validates email+password (and blocks on suspended/unverified/2FA-
+   * enabled accounts) without issuing an NDYHUB dashboard session —
+   * for OAuth's password grant (TokenController), where the caller wants
+   * an OAuth token set for a specific relying party, not a live NDYHUB
+   * browser session. Deliberately does NOT reuse login() as-is: that
+   * method's whole job past the credential check is issuing exactly the
+   * session artifact this caller doesn't want (and shouldn't be able to
+   * silently rack up unrevokable phantom sessions in, since NDYMAIL's UI
+   * has no session list for them). 2FA-enabled accounts are rejected
+   * outright here rather than routed into a challenge — the OAuth token
+   * endpoint's response shape has no room for a challengeToken round trip,
+   * and silently skipping 2FA for password-grant logins would be a much
+   * worse hole than the grant itself.
+   */
+  async validateCredentialsForPasswordGrant(
+    email: string,
+    password: string,
+  ): Promise<{ id: string; ndyId: string }> {
+    const user = await this.identity.findByEmail(email);
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Incorrect email or password.');
+    }
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Incorrect email or password.');
+    }
+    if (user.suspended) {
+      throw new UnauthorizedException('This account has been suspended.');
+    }
+    if (!user.emailVerifiedAt) {
+      throw new UnauthorizedException(
+        'Please verify your email before signing in.',
+      );
+    }
+    if (enabledTwoFactorMethods(user).length > 0) {
+      throw new UnauthorizedException(
+        'This account has two-factor authentication enabled — sign in at ndyhub.com to use it.',
+      );
+    }
+    return { id: user.id, ndyId: user.ndyId };
+  }
+
   async refresh(
     refreshToken: string,
     meta: SessionMeta,
