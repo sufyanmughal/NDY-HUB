@@ -46,4 +46,18 @@ RUN for item in /tmp/api_node_modules/*/ /tmp/api_node_modules/.[!.]*/; do \
 
 RUN mkdir -p /app/uploads
 EXPOSE 3000
-CMD ["node", "dist/main"]
+# Real bug found 2026-09-08: nest build's actual output path for this
+# project has been observed landing at BOTH dist/main.js (local dev
+# machines) and dist/src/main.js (this Dockerfile's own containerized
+# build) for the exact same source tree and locked @nestjs/cli version —
+# root cause not fully pinned down (suspected: something about
+# TypeScript's rootDir inference differing between environments when no
+# rootDir is set explicitly in tsconfig.json), but confirmed via a real
+# crash-looping production container: "Error: Cannot find module
+# '/app/dist/main'" when dist/src/main.js was where main.js actually was.
+# This made the previous hardcoded `CMD ["node", "dist/main"]` a real,
+# silent single point of failure the moment the build environment's
+# output shape drifted — this entrypoint script checks both real,
+# observed locations rather than assuming one.
+RUN printf '#!/bin/sh\nif [ -f dist/main.js ]; then exec node dist/main.js; elif [ -f dist/src/main.js ]; then exec node dist/src/main.js; else echo "FATAL: main.js not found in dist/ or dist/src/" >&2; exit 1; fi\n' > /app/start.sh && chmod +x /app/start.sh
+CMD ["/app/start.sh"]
