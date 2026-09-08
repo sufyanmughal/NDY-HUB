@@ -61,6 +61,17 @@ services:
       APPLE_PRIVATE_KEY: ${APPLE_PRIVATE_KEY:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      # See token.controller.ts's PASSWORD_GRANT_ALLOWED_CLIENT_IDS —
+      # comma-separated client_ids permitted to use the OAuth password
+      # grant. Setting this in .env.prod alone does nothing; docker
+      # compose only passes through env vars explicitly listed here.
+      OAUTH_PASSWORD_GRANT_CLIENT_IDS: ${OAUTH_PASSWORD_GRANT_CLIENT_IDS:-}
+      # See cross-product-passkey.controller.ts's
+      # CROSS_PRODUCT_PASSKEY_CLIENTS — comma-separated client_id:rpKey
+      # pairs (e.g. "abc123:ndymail") permitted to run cross-product
+      # Face ID/Touch ID/Passkey ceremonies. Same passthrough requirement
+      # as OAUTH_PASSWORD_GRANT_CLIENT_IDS above.
+      OAUTH_PASSKEY_CLIENT_MAP: ${OAUTH_PASSKEY_CLIENT_MAP:-}
     volumes:
       - ndy_hub_api_uploads:/app/uploads
     expose:
