@@ -28,6 +28,10 @@ import { NdyEconomyModule } from './ndy-economy/ndy-economy.module';
 import { InternalModule } from './internal/internal.module';
 import { IdentityVerificationModule } from './identity-verification/identity-verification.module';
 import { EcosystemEventModule } from './ecosystem-event/ecosystem-event.module';
+import { TrustModule } from './trust/trust.module';
+import { NdyqrModule } from './ndyqr/ndyqr.module';
+import { SignatureModule } from './signature/signature.module';
+import { ContextBrokerModule } from './context-broker/context-broker.module';
 
 @Module({
   imports: [
@@ -62,6 +66,10 @@ import { EcosystemEventModule } from './ecosystem-event/ecosystem-event.module';
     InternalModule,
     IdentityVerificationModule,
     EcosystemEventModule,
+    TrustModule,
+    NdyqrModule,
+    SignatureModule,
+    ContextBrokerModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

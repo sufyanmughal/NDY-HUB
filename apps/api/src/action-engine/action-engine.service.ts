@@ -17,6 +17,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkspaceService } from '../workspace/workspace.service';
 import { NotificationService } from '../notifications/notification.service';
+import { ContextBrokerService } from '../context-broker/context-broker.service';
 import { ACTION_REGISTRY, findActionDefinition } from './action-registry';
 
 const APPROVAL_TTL_HOURS = 48;
@@ -71,6 +72,7 @@ export class ActionEngineService {
     private readonly moduleRef: ModuleRef,
     private readonly workspaceService: WorkspaceService,
     private readonly notifications: NotificationService,
+    private readonly contextBroker: ContextBrokerService,
   ) {}
 
   async submit(input: ActionRequestInput): Promise<ActionResult> {
@@ -121,6 +123,24 @@ export class ActionEngineService {
       );
     }
     void membership;
+
+    // CONTEXT BROKER — an AI/agent-originated request gets ONE extra check on
+    // top of everything above: the user must have granted THIS agent the
+    // consent scope this action needs (see ContextBrokerService). Additive by
+    // design — a non-agent origin skips it entirely and the rest of the
+    // pipeline is unchanged, so an AI still goes through membership,
+    // validation, risk tier and audit exactly like a human. A refusal is
+    // audited through the same reject() path as any other Authorize failure.
+    if (input.origin.type === 'agent') {
+      const consent = await this.contextBroker.assertConsent(
+        input.requestedByUserId,
+        input.origin.detail,
+        definition.requiredScopes,
+      );
+      if (!consent.allowed) {
+        return this.reject(input, definition.riskTier, consent.reason);
+      }
+    }
 
     // VALIDATE — the exact same class-validator DTO the corresponding
     // controller uses, run here instead of (or in addition to) there.

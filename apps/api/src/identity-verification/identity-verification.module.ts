@@ -3,6 +3,7 @@ import { IdentityVerificationService } from './identity-verification.service';
 import { IdentityVerificationController } from './identity-verification.controller';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationModule } from '../notifications/notification.module';
+import { TrustModule } from '../trust/trust.module';
 
 /**
  * Phase 7's LEVEL_3 review flow — deliberately its own module rather than
@@ -12,9 +13,12 @@ import { NotificationModule } from '../notifications/notification.module';
  * module to that cycle when this one doesn't need to be in it at all).
  * Imports AuthModule for JwtAuthGuard/PermissionGuard and NotificationModule
  * so IdentityVerificationService can notify the requester on decision.
+ * TrustModule (exports TrustService) so approving a LEVEL_3 request can
+ * recompute the requester's Trust Tier in the same flow — see Phase 8's
+ * TrustService.recompute() doc comment for why this is the trigger point.
  */
 @Module({
-  imports: [AuthModule, NotificationModule],
+  imports: [AuthModule, NotificationModule, TrustModule],
   controllers: [IdentityVerificationController],
   providers: [IdentityVerificationService],
 })

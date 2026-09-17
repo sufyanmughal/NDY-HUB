@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   NotificationCategory,
   NotificationChannel,
@@ -37,6 +38,7 @@ export class WorkspaceInviteService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly notifications: NotificationService,
+    private readonly config: ConfigService,
   ) {}
 
   async invite(
@@ -74,17 +76,30 @@ export class WorkspaceInviteService {
       },
     });
 
+    // The link, not the bare token, is what makes this invite actionable —
+    // the accept page reads ?token= and the invitee is (or signs in there as)
+    // the invited account, so a human never has to copy a token by hand.
+    const acceptUrl = `${this.config.getOrThrow<string>(
+      'WEB_APP_URL',
+    )}/workspace-invites/accept?token=${rawToken}`;
+
     await this.mail.send({
       to: invitedEmail,
       subject: `You've been invited to join ${workspace.name} on NDY HUB`,
       html: `<p>${escapeHtml(actor.ndyId)} invited you to join <strong>${escapeHtml(
         workspace.name,
-      )}</strong> on NDY HUB as ${escapeHtml(invitedRole)}.</p><p>This invite expires in 7 days.</p><p>Token: ${escapeHtml(
-        rawToken,
-      )}</p>`,
+      )}</strong> on NDY HUB as ${escapeHtml(invitedRole)}.</p><p><a href="${escapeHtml(
+        acceptUrl,
+      )}">Accept the invite</a></p><p>This invite expires in 7 days.</p>`,
     });
 
-    return invite;
+    // acceptUrl rides alongside the row the same "shown once, copy it now"
+    // way OAuthClientService.create returns a client secret: this is the only
+    // moment the raw token exists outside the invitee's inbox (the database
+    // stores only its hash). It's what lets an inviter still share the link
+    // out-of-band — without it, an invite is undeliverable whenever no mail
+    // provider is configured, since MailService no-ops without RESEND_API_KEY.
+    return { ...invite, acceptUrl };
   }
 
   async accept(userId: string, rawToken: string) {
@@ -144,6 +159,35 @@ export class WorkspaceInviteService {
     });
 
     return membership;
+  }
+
+  /**
+   * Read-only preview for the accept page — the "you've been invited to
+   * <workspace>" screen an invitee sees before committing. Deliberately does
+   * not mutate the invite (unlike accept(), which flips it to EXPIRED when
+   * it finds one past its date): loading a page isn't a decision, and a
+   * preview that expires an invite would be a surprising side effect.
+   *
+   * Returns invitedEmail so the page can tell an invitee who is signed in as
+   * a *different* account which address the invite was actually for, instead
+   * of leaving them with accept()'s bare 403.
+   */
+  async preview(rawToken: string) {
+    const invite = await this.prisma.workspaceInvite.findUnique({
+      where: { tokenHash: hashToken(rawToken) },
+      include: { workspace: true },
+    });
+    if (!invite) throw new NotFoundException('Invalid invite token.');
+
+    return {
+      workspaceName: invite.workspace.name,
+      invitedEmail: invite.invitedEmail,
+      invitedRole: invite.invitedRole,
+      invitedDepartment: invite.invitedDepartment,
+      invitedByNdyId: invite.invitedByNdyId,
+      status: invite.status,
+      expiresAt: invite.expiresAt,
+    };
   }
 
   async revoke(actor: WorkspaceActor, inviteId: string) {

@@ -270,6 +270,9 @@ model User {
   identityVerificationRequests IdentityVerificationRequest[]
   ecosystemEvents         EcosystemEvent[]
   devices                 Device[]
+  ndyQrCodes              NdyQrCode[]
+  aiAgentConsents         AiAgentConsent[]
+  trustProfile            TrustProfile?
 
   @@index([ndyId])
 }
@@ -751,6 +754,13 @@ model RoleChangeRequest {
 enum OAuthClientType {
   CONFIDENTIAL
   PUBLIC
+  // An AI agent/assistant acting on a user's behalf. Functionally an OAuth
+  // client (same grants/tokens/scopes), but requests it originates are also
+  // gated by the Context Broker's per-user AI consent (see AiAgentConsent and
+  // ContextBrokerService) — an AI gets no special trust, it gets an extra
+  // check. See docs/phase8-signature-trust-design.md and the Context Broker
+  // design notes.
+  AI_AGENT
 }
 
 // Admin-managed (see AdminOAuthClientsController) — one row per connected
@@ -1424,6 +1434,11 @@ enum NotificationCategory {
   // reauth required, etc. Added alongside that endpoint; see
   // InternalModule's NotifyController for the caller side.
   NDYMAIL
+  // NDY Signature (Phase 8) — "you have a document to sign", "your document
+  // was signed/declined". A distinct category (rather than reusing
+  // ACTION_APPROVAL) because signing is not an Action Engine action — see
+  // docs/phase8-signature-trust-design.md §2.
+  SIGNATURE
 }
 
 model Notification {
@@ -1717,6 +1732,39 @@ model PassportClaim {
   @@unique([userId, claimKey])
 }
 
+// Phase 8 (docs/phase8-signature-trust-design.md §3) — NDY Trust.
+//
+// `tier` derives cleanly from VerificationLevel + PassportClaim (both already
+// real). `score` is a finer-grained 0–100 signal whose formula was confirmed
+// with the client before building it (the design doc's §5.4 left it open
+// specifically so a wrong formula wouldn't ship silently). The weights live in
+// TrustService.SCORE_WEIGHTS — one place — so adjusting them is a code change
+// with no schema impact.
+//
+// Derived/cached, not the source of truth — User.verificationLevel and
+// PassportClaim rows remain authoritative; this is a materialized view,
+// recomputed by TrustService whenever a relevant fact changes (same
+// "cache a derived value, never trust it blindly alone" reasoning as
+// every other computed-and-cached field in this schema).
+enum TrustTier {
+  UNVERIFIED // LEVEL_0/1 — no meaningful claims yet
+  BASIC // LEVEL_2 — email + phone verified
+  VERIFIED // LEVEL_3 — + identity document (IdentityVerificationRequest)
+  TRUSTED // VERIFIED + at least one additional trust-relevant PassportClaim
+}
+
+model TrustProfile {
+  id         String    @id @default(uuid())
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tier       TrustTier @default(UNVERIFIED)
+  // 0–100. Always fits alongside `tier` — the tier is the coarse public badge,
+  // the score is the finer-grained number (visibility on public surfaces is
+  // still a client decision; today it is exposed only on GET /trust/me).
+  score      Int       @default(0)
+  computedAt DateTime  @default(now())
+}
+
 enum IdentityVerificationRequestStatus {
   PENDING
   APPROVED
@@ -1790,4 +1838,231 @@ model EcosystemEvent {
 
   @@index([userId, eventType, createdAt])
   @@index([eventType])
+}
+
+// --- NDYQR™ — central dynamic QR service -------------------------------------
+// One QR everywhere in the NDJOYIT ecosystem. A member (or business) creates
+// a code once; the short link it encodes (`/q/:slug`) is stable, but the
+// destination behind it is mutable, so a printed or displayed QR never has to
+// be replaced when its target changes. Every NDY product should call this
+// service rather than rendering its own QR system (see docs/ndyqr.md).
+//
+// Types mirror the products the client listed (NDYSTAYS, NDYCONNECT, ...) plus
+// LINK (any URL) and PASSPORT (an NDY Passport profile). The enum is
+// descriptive metadata for filtering/analytics — it does not change how the
+// redirect works today (destination is always an absolute URL), so adding a
+// future product is a one-line enum addition, not a redesign.
+enum NdyQrType {
+  LINK
+  PASSPORT
+  NDYSTAYS
+  NDYCONNECT
+  NDYQUIZ
+  NDYVIXIT
+  NDYXTRA
+  NDYPAY
+  LOGIN
+}
+
+model NdyQrCode {
+  id    String    @id @default(uuid())
+  // The public short code that is actually encoded into the QR image — kept
+  // separate from `id` so it's short, non-guessable, and independent of the
+  // internal key (same reasoning as User.ndyId vs User.id).
+  slug  String    @unique
+  // Exactly ONE of ownerId / oauthClientId is always set (enforced by a CHECK
+  // constraint in the migration): a code belongs either to a member, or to a
+  // registered OAuthClient that created it on its own behalf with no user
+  // session (scope ndyqr:create).
+  ownerId       String?
+  owner         User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  oauthClientId String?
+
+  label       String
+  type        NdyQrType @default(LINK)
+  // The whole point of a *dynamic* QR: this is mutable. Changing it never
+  // changes `slug`, so an already-printed code keeps working.
+  destination String
+  // Optional campaign/tag for grouping scans in analytics (client's
+  // "campaign management" ask) — free-form for now.
+  campaign    String?
+  isActive    Boolean   @default(true)
+  // Deactivating via isActive is the normal path; expiresAt is for codes that
+  // should stop working at a known time (e.g. an event). Resolving checks both.
+  expiresAt   DateTime?
+
+  // Branding (client's "consistent NDY visual identity" ask). All nullable —
+  // null means "use the NDY default" (the magenta→violet→blue gradient + the
+  // official centered ND logo), so the standard is the default, not something
+  // every code has to opt into. brandStyle is a reserved key for future
+  // named presets ("ndy-gradient", "ndy-mono"); the two explicit colors let a
+  // product tint a code while keeping the standard shape/logo/error-correction.
+  brandStyle String  @default("ndy-gradient")
+  colorFrom  String?
+  colorTo    String?
+  logoUrl    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  scans NdyQrScan[]
+
+  @@index([ownerId, createdAt])
+  @@index([oauthClientId, createdAt])
+  @@index([slug])
+}
+
+// One row per resolved scan. Append-only; the redirect path writes here
+// fire-and-forget so a slow analytics write never delays a user's redirect.
+model NdyQrScan {
+  id       String    @id @default(uuid())
+  qrCodeId String
+  qrCode   NdyQrCode @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+
+  scannedAt  DateTime @default(now())
+  ip         String?
+  userAgent  String?
+  referer    String?
+  // "City, Region, Country" from the shared GeoIpService (best-effort, never
+  // blocks the redirect — see NdyqrService.recordScan).
+  location   String?
+  // Derived from the user agent (mobile/tablet/desktop/unknown) — cheap, and
+  // the split the client's analytics ask most obviously wants.
+  deviceType String?
+
+  @@index([qrCodeId, scannedAt])
+}
+
+// --- NDY Signature (Phase 8, second half) -----------------------------------
+// A way for an NDY-identified user to sign a document/statement, producing a
+// durable, independently-verifiable artifact — not an internal audit row. A
+// Signature must be checkable by a third party (the public
+// GET /signature/verify/:signatureId route) without trusting NDY HUB's own
+// database, which is why this is its own domain rather than an Action Engine
+// action (see docs/phase8-signature-trust-design.md §2).
+//
+// Actor attribution uses the same denormalized-snapshot pattern as
+// AuditLogEntry / ActionLogEntry (signerUserId + signerNdyId) so a completed
+// signature's record can't drift if the user row later changes.
+//
+// Deliberately NO User relations here: creator/signer ids are stored as plain
+// columns (snapshots), not live FKs. That keeps a signature verifiable even
+// if it was created by an account that is later deleted, and mirrors the
+// design doc's explicit choice — a signature outlives the system that made it.
+
+enum SignatureRequestStatus {
+  PENDING
+  SIGNED
+  DECLINED
+  EXPIRED
+  REVOKED
+}
+
+// A document/statement awaiting one or more signatures. contentHash lets the
+// signed artifact be verified byte-for-byte later without NDY HUB storing the
+// document itself (mirrors IdentityVerificationRequest's "store a
+// reference/hash, never the sensitive artifact" choice).
+model SignatureRequest {
+  id              String                  @id @default(uuid())
+  title           String
+  // sha256 of the document/statement content.
+  contentHash     String
+  // Pointer to where the actual document lives (a DriveFile id, an external
+  // URL) — never the raw bytes here.
+  contentRef      String?
+  createdByUserId String
+  createdByNdyId  String
+  status          SignatureRequestStatus  @default(PENDING)
+  expiresAt       DateTime?
+  createdAt       DateTime                @default(now())
+
+  signers    SignatureRequestSigner[]
+  signatures Signature[]
+
+  @@index([createdByUserId, createdAt])
+  @@index([status])
+}
+
+// One row per required signer — supports multi-party signing without a schema
+// change. The slot is separate from the completed Signature so re-issuing a
+// signer row never mutates an already-recorded signature.
+model SignatureRequestSigner {
+  id                 String           @id @default(uuid())
+  signatureRequestId String
+  signatureRequest   SignatureRequest @relation(fields: [signatureRequestId], references: [id], onDelete: Cascade)
+  // Null until resolved, when the signer was invited by email rather than
+  // chosen from existing users; bound to a real user at sign time by matching
+  // the authenticated account's email.
+  userId             String?
+  invitedEmail       String?
+  // Same single-use-token shape as WorkspaceInvite — only the hash is stored.
+  tokenHash          String           @unique
+  signedAt           DateTime?
+  declinedAt         DateTime?
+  expiresAt          DateTime
+
+  @@index([signatureRequestId])
+}
+
+// The actual, immutable signature event.
+model Signature {
+  id                 String           @id @default(uuid())
+  signatureRequestId String
+  signatureRequest   SignatureRequest @relation(fields: [signatureRequestId], references: [id], onDelete: Cascade)
+  signerUserId       String
+  // Denormalized snapshot, same reasoning as AuditLogEntry.
+  signerNdyId        String
+  // Copied from SignatureRequest at sign time — proves what was actually
+  // signed, even if the request row is later altered.
+  contentHash        String
+  ip                 String?
+  userAgent          String?
+  signedAt           DateTime         @default(now())
+
+  @@index([signatureRequestId])
+  @@index([signerUserId])
+}
+
+// --- Context Broker — AI external-service permission layer ------------------
+// A gate between an AI/agent-driven action and the products it touches: an AI
+// acting on a user's behalf can only reach the specific scopes the user has
+// explicitly granted, auditable the same way a human's OAuth grant is. This is
+// what makes "let an AI draft a calendar event" safe, rather than "hand the AI
+// a raw API key".
+//
+// Deliberately reuses what already exists rather than inventing a second auth
+// system: the agent IS an OAuthClient (clientType AI_AGENT; the same grants/
+// tokens/scope machinery), and enforcement rides the Action Engine's existing
+// Authorize step. This table is the one genuinely new piece — the per-user,
+// per-agent consent record that step reads.
+//
+// NOTE: the scope vocabulary below is a curated placeholder pending a real
+// first consumer (see ContextBrokerService). It is extended as genuine
+// agent-callable actions are registered, not guessed broadly up front — the
+// same "don't build ahead of a real caller" discipline as oauth/scopes.ts.
+
+enum AiAgentConsentScope {
+  CALENDAR
+  CONTACTS
+  TASKS
+  NOTES
+  ECONOMY_READ
+}
+
+model AiAgentConsent {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // The OAuthClient.clientId (the public client id) of the AI agent this grant
+  // is for — the same identifier the agent already authenticates with.
+  oauthClientId String
+  scopes        AiAgentConsentScope[]
+  grantedAt     DateTime @default(now())
+  // Soft revoke: a revoked grant is kept as evidence rather than deleted, the
+  // same "keep a record that a permission existed" reasoning as AuditLogEntry.
+  revokedAt     DateTime?
+
+  @@unique([userId, oauthClientId])
+  @@index([userId])
+  @@index([oauthClientId])
 }

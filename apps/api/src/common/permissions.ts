@@ -21,6 +21,12 @@ export enum Permission {
   // search/suspend). Deliberately its own permission so a future distinct
   // reviewer role can be introduced without touching MANAGE_USERS' scope.
   REVIEW_IDENTITY_VERIFICATION = 'REVIEW_IDENTITY_VERIFICATION',
+  // NDYQR™ — platform-wide visibility over every dynamic QR code in the
+  // ecosystem (the "central" management view). Deliberately separate from
+  // MANAGE_USERS: an operator may need to see/curate codes without having
+  // user-management rights. Everyone can still create their own codes — this
+  // only gates the cross-account listing.
+  MANAGE_QR_CODES = 'MANAGE_QR_CODES',
 }
 
 /**
@@ -46,6 +52,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // if real usage demands more" pattern for every other minimal-viable
     // role decision.
     Permission.REVIEW_IDENTITY_VERIFICATION,
+    Permission.MANAGE_QR_CODES,
   ],
   DEVELOPER: [Permission.MANAGE_OAUTH_CLIENTS],
   FINANCE: [Permission.VIEW_FINANCIALS],

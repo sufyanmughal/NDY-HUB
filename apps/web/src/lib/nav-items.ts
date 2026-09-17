@@ -11,6 +11,9 @@ import {
   CircleDollarSign,
   HelpCircle,
   Building2,
+  QrCode,
+  FileSignature,
+  Bot,
   type LucideIcon,
 } from "lucide-react";
 import { useMe } from "./use-me";
@@ -64,6 +67,27 @@ const BASE_NAV_ITEMS: NavItem[] = [
     sublabel: "Digital Identity",
     icon: ShieldCheck,
     iconColor: "#4f7cff",
+  },
+  {
+    href: "/qr-codes",
+    label: "NDYQR™",
+    sublabel: "Dynamic QR Codes",
+    icon: QrCode,
+    iconColor: "#e600f0",
+  },
+  {
+    href: "/signatures",
+    label: "NDY Signature",
+    sublabel: "Sign & Verify",
+    icon: FileSignature,
+    iconColor: "#22c58b",
+  },
+  {
+    href: "/ai-agents",
+    label: "AI Agents",
+    sublabel: "Consent & Access",
+    icon: Bot,
+    iconColor: "#22d3ee",
   },
   {
     href: "/economy",

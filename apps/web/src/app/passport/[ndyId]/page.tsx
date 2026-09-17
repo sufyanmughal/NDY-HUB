@@ -106,6 +106,7 @@ export default function PublicPassportPage({
         phone: passport.phone,
         membershipTierLabel: null,
         qrDataUrl,
+        foundingIdentity: passport.foundingIdentity,
       }
     : null;
 

@@ -80,6 +80,48 @@ export class OAuthClientService {
     return serializeClient(client);
   }
 
+  /** Editing a live client's name/redirectUris/allowedScopes — deliberately
+   * excludes clientId, clientType, and the secret itself: those are
+   * identity-defining for anything that already has this client's
+   * credentials baked into its config (like NDYMAIL's own env vars), so
+   * changing them here would silently break every existing integration
+   * rather than just adjust what the client's allowed to do. Rotating a
+   * secret or changing client type is a "create a new client, retire the
+   * old one" operation, not an edit. */
+  async update(
+    id: string,
+    params: { name?: string; redirectUris?: string[]; allowedScopes?: string[] },
+  ) {
+    const existing = await this.prisma.oAuthClient.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('No OAuth client with that id.');
+    }
+
+    if (params.allowedScopes) {
+      const invalidScopes = params.allowedScopes.filter(
+        (s) => !ALL_SCOPES.includes(s),
+      );
+      if (invalidScopes.length > 0) {
+        throw new BadRequestException(
+          `Unknown scope(s): ${invalidScopes.join(', ')}`,
+        );
+      }
+    }
+    if (params.redirectUris && params.redirectUris.length === 0) {
+      throw new BadRequestException('At least one redirect URI is required.');
+    }
+
+    const client = await this.prisma.oAuthClient.update({
+      where: { id },
+      data: {
+        ...(params.name !== undefined && { name: params.name }),
+        ...(params.redirectUris !== undefined && { redirectUris: params.redirectUris }),
+        ...(params.allowedScopes !== undefined && { allowedScopes: params.allowedScopes }),
+      },
+    });
+    return serializeClient(client);
+  }
+
   async findByClientId(clientId: string) {
     const client = await this.prisma.oAuthClient.findUnique({
       where: { clientId },

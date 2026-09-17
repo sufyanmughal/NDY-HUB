@@ -7,6 +7,7 @@ import {
   getOAuthScopeCatalog,
   listAdminOAuthClients,
   createAdminOAuthClient,
+  updateAdminOAuthClient,
   setAdminOAuthClientActive,
   adminListSupportTickets,
   adminReplySupportTicket,
@@ -169,6 +170,18 @@ function OAuthClientsSection() {
     clientSecret: string | null;
   } | null>(null);
 
+  // Editing an existing client — a separate id/form-state pair from the
+  // create form above rather than reusing it, since edit only touches
+  // name/redirectUris/allowedScopes (never clientType or secret — see
+  // updateAdminOAuthClient's doc comment) and starts pre-filled from the
+  // client being edited, not blank.
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editRedirectUrisText, setEditRedirectUrisText] = useState("");
+  const [editSelectedScopes, setEditSelectedScopes] = useState<string[]>([]);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   const refresh = useCallback(() => {
     listAdminOAuthClients()
       .then(setClients)
@@ -232,6 +245,48 @@ function OAuthClientsSection() {
       setCreateError((err as Error).message);
     } finally {
       setCreateBusy(false);
+    }
+  }
+
+  function openEdit(client: AdminOAuthClient) {
+    // Closing the create form when opening edit (and vice versa, see
+    // toggleEditScope below) — one inline form open at a time keeps the
+    // list from getting cluttered with multiple open forms.
+    setFormOpen(false);
+    setEditingClientId(client.id);
+    setEditName(client.name);
+    setEditRedirectUrisText(client.redirectUris.join("\n"));
+    setEditSelectedScopes(client.allowedScopes);
+    setEditError(null);
+  }
+
+  function toggleEditScope(scope: string) {
+    setEditSelectedScopes((prev) =>
+      prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope],
+    );
+  }
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingClientId) return;
+    const redirectUris = editRedirectUrisText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      await updateAdminOAuthClient(editingClientId, {
+        name: editName,
+        redirectUris,
+        allowedScopes: editSelectedScopes,
+      });
+      setEditingClientId(null);
+      refresh();
+    } catch (err) {
+      setEditError((err as Error).message);
+    } finally {
+      setEditBusy(false);
     }
   }
 
@@ -397,9 +452,9 @@ function OAuthClientsSection() {
           {clients.map((client) => (
             <li
               key={client.id}
-              className="flex items-center justify-between py-3 text-sm"
+              className="flex items-start justify-between gap-4 py-3 text-sm"
             >
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{client.name}</span>
                   <span
@@ -424,14 +479,109 @@ function OAuthClientsSection() {
                   {client.allowedScopes.join(", ")} ·{" "}
                   {client.redirectUris.length} redirect URI(s)
                 </p>
+
+                {editingClientId === client.id && (
+                  <form
+                    onSubmit={handleUpdate}
+                    className="mt-3 space-y-3 rounded-md border border-border bg-background p-4"
+                  >
+                    <div>
+                      <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                        Site / app name
+                      </label>
+                      <input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        required
+                        maxLength={100}
+                        className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                        Redirect URIs (one per line)
+                      </label>
+                      <textarea
+                        value={editRedirectUrisText}
+                        onChange={(e) => setEditRedirectUrisText(e.target.value)}
+                        required
+                        rows={3}
+                        className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+                        Allowed scopes
+                      </label>
+                      <p className="mt-0.5 text-xs text-foreground-muted">
+                        Check to allow, uncheck to remove — an unchecked
+                        scope can no longer be requested by this client on
+                        its next connection, but doesn&apos;t revoke
+                        access already granted to existing users under it.
+                      </p>
+                      <div className="mt-1 space-y-1">
+                        {Object.entries(
+                          scopeCatalog ?? { openid: "Confirm who you are (required)" },
+                        ).map(([scope, description]) => (
+                          <label
+                            key={scope}
+                            className="flex items-center gap-2 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={editSelectedScopes.includes(scope)}
+                              onChange={() => toggleEditScope(scope)}
+                              disabled={scope === "openid"}
+                            />
+                            <span className="font-mono text-xs">{scope}</span>
+                            <span className="text-xs text-foreground-muted">
+                              — {description}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    {editError && (
+                      <p className="text-sm text-critical">{editError}</p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={editBusy}
+                        className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {editBusy ? "Saving…" : "Save changes"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingClientId(null)}
+                        className="rounded-md border border-border px-4 py-2 text-sm hover:bg-surface-2"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
-              <button
-                onClick={() => handleToggleActive(client)}
-                disabled={busyClientId === client.id}
-                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-2 disabled:opacity-50"
-              >
-                {client.isActive ? "Deactivate" : "Activate"}
-              </button>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  onClick={() =>
+                    editingClientId === client.id
+                      ? setEditingClientId(null)
+                      : openEdit(client)
+                  }
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-2"
+                >
+                  {editingClientId === client.id ? "Close" : "Edit"}
+                </button>
+                <button
+                  onClick={() => handleToggleActive(client)}
+                  disabled={busyClientId === client.id}
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface-2 disabled:opacity-50"
+                >
+                  {client.isActive ? "Deactivate" : "Activate"}
+                </button>
+              </div>
             </li>
           ))}
         </ul>

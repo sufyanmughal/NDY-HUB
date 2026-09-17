@@ -98,4 +98,12 @@ export class WorkspaceInviteAcceptController {
   ) {
     return this.invites.accept(user.sub, dto.token);
   }
+
+  /** Read-only — lets the accept page show what's being joined before the
+   * invitee commits. Same guard as accept(): the invitee has to be signed in
+   * to preview, since the preview discloses the invited email address. */
+  @Get(':token')
+  preview(@Param('token') token: string) {
+    return this.invites.preview(token);
+  }
 }

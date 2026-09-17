@@ -15,6 +15,7 @@ import { LoginRequestGateway } from './login-request.gateway';
 import { DeviceApprovalService } from './device-approval.service';
 import { IdentityModule } from '../identity/identity.module';
 import { NotificationModule } from '../notifications/notification.module';
+import { TrustModule } from '../trust/trust.module';
 import { GeoIpService } from '../common/geo-ip.service';
 import { PhotoStorageService } from '../common/photo-storage.service';
 import { MailService } from '../common/mail.service';
@@ -37,6 +38,13 @@ import { SmsService } from '../common/sms.service';
     // (see project's own DI-boot-crash history), so both edges are
     // wrapped defensively rather than assuming one side suffices.
     forwardRef(() => NotificationModule),
+    // forwardRef: TrustModule already imports AuthModule (for
+    // JwtAuthGuard, see trust.module.ts). This edge (AuthModule ->
+    // TrustModule, so Sms2faService can recompute a user's Trust Tier the
+    // moment phone verification completes) completes that cycle. Wrapped
+    // on both sides, same defensive reasoning as the NotificationModule
+    // edge directly above.
+    forwardRef(() => TrustModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

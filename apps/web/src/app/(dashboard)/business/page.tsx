@@ -194,6 +194,13 @@ function TeamPanel({ workspaceId }: { workspaceId: string }) {
   const [department, setDepartment] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The one-time accept link for the invite just created — see
+  // inviteToWorkspace's doc comment. Replaced on the next invite.
+  const [createdInvite, setCreatedInvite] = useState<{
+    email: string;
+    acceptUrl: string;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(() => {
     listBusinessWorkspaceMembers(workspaceId)
@@ -214,12 +221,17 @@ function TeamPanel({ workspaceId }: { workspaceId: string }) {
     setBusy(true);
     setError(null);
     try {
-      await inviteToWorkspace(
+      const invite = await inviteToWorkspace(
         workspaceId,
         email.trim(),
         role,
         department || undefined,
       );
+      setCreatedInvite({
+        email: invite.invitedEmail,
+        acceptUrl: invite.acceptUrl,
+      });
+      setCopied(false);
       setEmail("");
       setDepartment("");
       refresh();
@@ -312,6 +324,35 @@ function TeamPanel({ workspaceId }: { workspaceId: string }) {
           Invite
         </button>
       </form>
+
+      {createdInvite && (
+        <div className="mt-3 rounded-md border border-border bg-background p-3 text-sm">
+          <p className="font-medium">
+            Invite created for {createdInvite.email}
+          </p>
+          <p className="mt-1 text-xs text-foreground-muted">
+            This link is shown once — pass it on if the invitation email
+            doesn&apos;t arrive.
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="flex-1 truncate rounded border border-border bg-surface px-2 py-1 text-[11px]">
+              {createdInvite.acceptUrl}
+            </code>
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(createdInvite.acceptUrl)
+                  .then(() => setCopied(true))
+                  .catch(() => setCopied(false));
+              }}
+              className="shrink-0 rounded-md border border-border px-3 py-1 text-xs font-medium hover:bg-surface"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <p className="mt-3 rounded-md border border-critical/30 bg-critical/10 px-3 py-2 text-sm text-critical">

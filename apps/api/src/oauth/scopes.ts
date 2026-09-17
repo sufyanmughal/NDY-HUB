@@ -42,6 +42,13 @@ export const OIDC_SCOPES: Record<string, string> = {
   'wallet:read': 'Read your NDYBITS and CRYNDY balances',
   'activity:read': 'Read your ecosystem activity feed',
   'connections:read': 'See which other NDY products/apps you have connected',
+
+  // NDYQR — server-to-server capability grant letting another NDY product's
+  // backend create codes on its OWN behalf (no logged-in user), so NDYQR stays
+  // the single QR implementation in the ecosystem rather than each product
+  // growing its own. Same server-to-server shape as ndybits:report-event above;
+  // see NdyQrClientGuard and docs/ndyqr.md §7b.
+  'ndyqr:create': 'Create NDYQR codes on behalf of this product',
 };
 
 export const ALL_SCOPES = Object.keys(OIDC_SCOPES);

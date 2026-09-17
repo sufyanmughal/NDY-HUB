@@ -7,7 +7,7 @@ import {
 import { Role, RoleChangeRequestStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AdminActor } from './admin.service';
-import { formatNdyId, ndyIdTypeForRole } from '../common/ndy-id.util';
+import { formatNdyId, ndyIdTypeForUser } from '../common/ndy-id.util';
 
 const FOUNDER_ONLY_ASSIGNABLE: readonly Role[] = [
   Role.FOUNDER,
@@ -95,9 +95,16 @@ export class RoleChangeRequestService {
     // permanent identity) is never touched by a role change, per the
     // client's explicit requirement. ndyId is rebuilt from it so every
     // subsequent read gets the new type without a separate migration step.
+    // ndyIdTypeForUser (not the raw role-only ndyIdTypeForRole) is
+    // deliberate: a founding/leadership user with an explicit ndyIdType
+    // override (CEO/EXE/PRT/INV/DEV) must keep that permanent ID class even
+    // as their Role changes — otherwise an ordinary role change would
+    // silently downgrade e.g. NDY-FND-000002 back to a role-derived MBR/FND
+    // segment, breaking the spec's "identity is permanent, roles evolve"
+    // guarantee.
     const newNdyId = formatNdyId(
       target.ndyCoreId,
-      ndyIdTypeForRole(request.requestedRole),
+      ndyIdTypeForUser({ ndyIdType: target.ndyIdType, role: request.requestedRole }),
     );
 
     const [, updatedRequest] = await this.prisma.$transaction([

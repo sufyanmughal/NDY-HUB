@@ -27,6 +27,12 @@ export interface PassportCardData {
    * "NDY HUB" as its second line instead of a tier name. */
   membershipTierLabel: string | null | undefined;
   qrDataUrl: string | null;
+  /** Founding/leadership identity badge — present only for the small,
+   * manually-assigned set of NDY ID classes (CEO/EXE/PRT/INV/DEV). Title/
+   * subtitle come from the "professional_title" PassportClaim (dynamic,
+   * evolves over time), separate from the permanent ndyId class itself —
+   * see common/ndy-id.util.ts. undefined/null for every ordinary user. */
+  foundingIdentity?: { class: string; title: string | null; subtitle: string | null } | null;
 }
 
 export type PassportCardDesignId = "passport" | "business" | "minimal";

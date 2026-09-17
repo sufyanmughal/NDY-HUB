@@ -1,0 +1,20 @@
+-- Re-add NDYMAIL to NotificationCategory.
+--
+-- 20260828000000_remove_ndymail rebuilt this enum without NDYMAIL, treating
+-- it as a "NDYMAIL-only value" that belonged to the code moved out to the
+-- standalone product. That was over-reach: NDYMAIL is not only a set of
+-- tables, it is also a live *cross-product notification category*.
+--
+-- The standalone NDYMAIL relays notifications into NDYHUB's shared
+-- Notification Center over POST /internal/notify with category: "NDYMAIL"
+-- (see ndymail/app/api/src/notifications/notification.service.ts). Because
+-- schema.prisma still declares NDYMAIL, NotifyController's @IsEnum
+-- validation accepts it and the insert then fails at the Postgres enum —
+-- so every NDYMAIL -> NDYHUB notification was silently rejected. This
+-- migration makes the database match the schema again.
+--
+-- Postgres has no "drop enum value", which is why the removal needed a full
+-- create-new-type/swap/drop-old-type rebuild. Adding one back is a plain
+-- ADD VALUE, and PG16 permits it inside a migration transaction as long as
+-- the new value isn't used in the same transaction.
+ALTER TYPE "NotificationCategory" ADD VALUE IF NOT EXISTS 'NDYMAIL';

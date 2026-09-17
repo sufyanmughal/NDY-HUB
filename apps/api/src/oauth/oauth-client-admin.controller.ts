@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { OAuthClientService } from './oauth-client.service';
 import { CreateClientDto } from './dto/create-client.dto';
+import { UpdateClientDto } from './dto/update-client.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../common/guards/permission.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
@@ -40,6 +41,14 @@ export class OAuthClientAdminController {
     // visible. The admin panel needs to show it once and tell the operator
     // to copy it now.
     return this.clients.create(dto);
+  }
+
+  // Editing name/redirectUris/allowedScopes on a live client — see
+  // OAuthClientService.update's doc comment for exactly what is and isn't
+  // editable here (never clientId/clientType/secret).
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateClientDto) {
+    return this.clients.update(id, dto);
   }
 
   @Patch(':id/activate')

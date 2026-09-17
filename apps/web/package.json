@@ -13,6 +13,7 @@
     "@simplewebauthn/browser": "^13.3.0",
     "framer-motion": "^12.43.0",
     "jspdf": "^4.2.1",
+    "jsqr": "^1.4.0",
     "lucide-react": "^1.26.0",
     "next": "16.2.11",
     "qrcode": "^1.5.4",

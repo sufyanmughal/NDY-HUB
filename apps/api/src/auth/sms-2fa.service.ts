@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IdentityService } from '../identity/identity.service';
 import { SmsService } from '../common/sms.service';
 import { SecurityEventService } from './security-event.service';
+import { TrustService } from '../trust/trust.service';
 import { Sms2faSetupDto } from './dto/sms-2fa-setup.dto';
 import { ConfirmSms2faDto } from './dto/confirm-sms-2fa.dto';
 import { DisableSms2faDto } from './dto/disable-sms-2fa.dto';
@@ -30,6 +31,7 @@ export class Sms2faService {
     private readonly identity: IdentityService,
     private readonly sms: SmsService,
     private readonly securityEvents: SecurityEventService,
+    private readonly trust: TrustService,
   ) {}
 
   /**
@@ -102,6 +104,11 @@ export class Sms2faService {
       },
     });
     void this.securityEvents.record(userId, 'SMS_2FA_ENABLED');
+    // Fire-and-forget, same reasoning as IdentityVerificationService's
+    // post-transaction recompute() call — a failure here leaves the tier
+    // stale, not wrong, and the next recompute (any future trust-relevant
+    // event) self-corrects it.
+    void this.trust.recompute(userId);
   }
 
   /**

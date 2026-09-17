@@ -20,7 +20,14 @@ import type { PassportCardData } from "./types";
  * - Bottom-left corner: a dotted particle-mesh sweep (SVG), purple/blue
  *   glow — kept from the closest earlier attempt, matches the reference. */
 export function VerticalPassportCard({ data }: { data: PassportCardData }) {
-  const title = [data.businessRole, data.businessName].filter(Boolean).join(" | ");
+  // A founding/leadership title (e.g. "Founder • CEO • Owner") takes
+  // priority over the generic business-role line when present — the two
+  // are mutually exclusive in practice (founding identities don't also set
+  // a business name/role), so this never has to combine them.
+  const title =
+    data.foundingIdentity?.title ??
+    [data.businessRole, data.businessName].filter(Boolean).join(" | ");
+  const subtitle = data.foundingIdentity?.subtitle;
   const photoSrc =
     data.profilePhotoUrl ??
     `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(data.displayName)}&backgroundType=gradientLinear`;
@@ -103,6 +110,11 @@ export function VerticalPassportCard({ data }: { data: PassportCardData }) {
             {data.displayName}
           </h2>
           {title && <p className="mt-1 text-[13px] font-medium text-slate-400">{title}</p>}
+          {subtitle && (
+            <p className="mt-0.5 max-w-[210px] text-[11.5px] leading-snug text-slate-500">
+              {subtitle}
+            </p>
+          )}
           {data.bio && (
             <p className="mt-2.5 max-w-[210px] text-[12.5px] leading-snug text-fuchsia-300/90">
               {data.bio}
@@ -129,7 +141,7 @@ export function VerticalPassportCard({ data }: { data: PassportCardData }) {
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-[10px] font-medium tracking-[0.12em] text-slate-400 uppercase">
-                Verified Member
+                {data.foundingIdentity ? "Genesis Identity" : "Verified Member"}
               </div>
               <div
                 className="mt-1 text-lg font-bold tracking-tight"
@@ -140,7 +152,9 @@ export function VerticalPassportCard({ data }: { data: PassportCardData }) {
                   color: "transparent",
                 }}
               >
-                {data.membershipTierLabel ?? "NDY HUB"}
+                {data.foundingIdentity
+                  ? `NDY-${data.foundingIdentity.class}`
+                  : (data.membershipTierLabel ?? "NDY HUB")}
               </div>
             </div>
             <ShieldCheck className="h-7 w-7 shrink-0 text-violet-300" strokeWidth={1.5} />

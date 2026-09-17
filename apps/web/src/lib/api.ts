@@ -197,6 +197,10 @@ export interface PublicPassport {
   phone: string | null;
   socials: PublicPassportSocials | null;
   business: PublicPassportBusiness | null;
+  // Founding/leadership NDY ID badge — only present for the small,
+  // manually-assigned set of ID classes (CEO/EXE/PRT/INV/DEV). null for
+  // every ordinary user. See identity.controller.ts's getPublicPassport.
+  foundingIdentity: { class: string; title: string | null; subtitle: string | null } | null;
 }
 
 export function getPublicPassport(ndyId: string): Promise<PublicPassport> {
@@ -1220,6 +1224,27 @@ export function setAdminOAuthClientActive(
   );
 }
 
+/** Editing a live client's name/redirectUris/allowedScopes — clientId,
+ * clientType, and the secret are never editable here (see the API's
+ * OAuthClientService.update doc comment for why: changing those would
+ * silently break every integration that already has this client's
+ * credentials baked into its config). Only send the fields actually
+ * changing — all params optional, same partial-update convention as the
+ * rest of this file. */
+export function updateAdminOAuthClient(
+  id: string,
+  params: {
+    name?: string;
+    redirectUris?: string[];
+    allowedScopes?: string[];
+  },
+): Promise<AdminOAuthClient> {
+  return authedFetch(`/admin/oauth-clients/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(params),
+  });
+}
+
 // --- OAuth / OIDC consent (SSO for third-party NDJOYIT sites) ---
 
 export interface OAuthClientPublicInfo {
@@ -1465,12 +1490,16 @@ export function listWorkspaceInvites(
   return authedFetch(`/business-workspaces/${workspaceId}/invites`);
 }
 
+/** The response also carries `acceptUrl` — the one and only time the raw
+ * invite token is visible (the API stores just its hash). Shown once to the
+ * inviter so they can pass the link on out-of-band if the invite email never
+ * arrives (MailService silently no-ops when no provider is configured). */
 export function inviteToWorkspace(
   workspaceId: string,
   invitedEmail: string,
   invitedRole: WorkspaceRole,
   invitedDepartment?: string,
-): Promise<WorkspaceInvite> {
+): Promise<WorkspaceInvite & { acceptUrl: string }> {
   return authedFetch(`/business-workspaces/${workspaceId}/invites`, {
     method: "POST",
     body: JSON.stringify({ invitedEmail, invitedRole, invitedDepartment }),
@@ -1494,6 +1523,27 @@ export function acceptWorkspaceInvite(
     method: "POST",
     body: JSON.stringify({ token }),
   });
+}
+
+/** Read-only preview for the accept page — what the invitee is joining,
+ * shown before they commit. Guarded the same way accept() is, so it's only
+ * callable by a signed-in session (which is also why it discloses the
+ * invited email: the page needs to tell a wrong-account invitee which
+ * address the invite was actually for). */
+export interface WorkspaceInvitePreview {
+  workspaceName: string;
+  invitedEmail: string;
+  invitedRole: WorkspaceRole;
+  invitedDepartment: string | null;
+  invitedByNdyId: string;
+  status: WorkspaceInvite["status"];
+  expiresAt: string;
+}
+
+export function getWorkspaceInvitePreview(
+  token: string,
+): Promise<WorkspaceInvitePreview> {
+  return authedFetch(`/workspace-invites/${encodeURIComponent(token)}`);
 }
 
 // --- Identity Verification (Phase 7): LEVEL_3 manual review request ---
@@ -1552,4 +1602,323 @@ export function rejectIdentityVerificationRequest(
     method: "POST",
     body: JSON.stringify({ reason }),
   });
+}
+
+// --- Notification Center (Phase 2's cross-cutting Notification backbone,
+// distinct from NdyspaceNotification/ndyspace-api.ts's NDYSPACE-only
+// notifications) — the general-purpose bell in the shared Topbar every
+// dashboard page renders. Backend has existed since Phase 2; this file
+// was the missing piece — nothing anywhere in the frontend called
+// GET /notifications until now. ---
+
+export type NotificationCategory =
+  | "SECURITY"
+  | "ECONOMY"
+  | "ACTION_APPROVAL"
+  | "NDYSPACE"
+  | "SYSTEM";
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  workspaceId: string | null;
+  category: NotificationCategory;
+  channel: "IN_APP" | "EMAIL" | "SMS";
+  title: string;
+  body: string;
+  linkUrl: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export function listNotifications(): Promise<AppNotification[]> {
+  return authedFetch("/notifications");
+}
+
+export function getNotificationUnreadCount(): Promise<{ count: number }> {
+  return authedFetch("/notifications/unread-count");
+}
+
+export function markNotificationRead(id: string): Promise<AppNotification> {
+  return authedFetch(`/notifications/${id}/read`, { method: "PATCH" });
+}
+
+export function markAllNotificationsRead(): Promise<{ updatedCount: number }> {
+  return authedFetch("/notifications/read-all", { method: "POST" });
+}
+
+// --- NDYQR™ — central dynamic QR codes ------------------------------------
+// A code's public short link (`${API_BASE_URL}/q/<slug>`) is permanent; only
+// its `destination` changes, which is what makes a printed QR dynamic. The
+// API stores/resolves/logs; the branded image is rendered in
+// lib/ndyqr-render.ts from the `slug`.
+
+export type NdyQrType =
+  | "LINK"
+  | "PASSPORT"
+  | "NDYSTAYS"
+  | "NDYCONNECT"
+  | "NDYQUIZ"
+  | "NDYVIXIT"
+  | "NDYXTRA"
+  | "NDYPAY"
+  | "LOGIN";
+
+export interface NdyQrCode {
+  id: string;
+  slug: string;
+  ownerId: string;
+  label: string;
+  type: NdyQrType;
+  destination: string;
+  campaign: string | null;
+  isActive: boolean;
+  expiresAt: string | null;
+  brandStyle: string;
+  colorFrom: string | null;
+  colorTo: string | null;
+  logoUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { scans: number };
+  owner?: { ndyId: string; fullName: string | null };
+}
+
+export interface CreateNdyQrInput {
+  label: string;
+  destination: string;
+  type?: NdyQrType;
+  campaign?: string;
+  expiresAt?: string;
+  brandStyle?: string;
+  colorFrom?: string;
+  colorTo?: string;
+  logoUrl?: string;
+}
+
+export interface UpdateNdyQrInput {
+  label?: string;
+  destination?: string;
+  type?: NdyQrType;
+  campaign?: string;
+  isActive?: boolean;
+  expiresAt?: string;
+  brandStyle?: string;
+  colorFrom?: string;
+  colorTo?: string;
+  logoUrl?: string;
+}
+
+export interface NdyQrAnalytics {
+  total: number;
+  windowDays: number;
+  byDay: { date: string; count: number }[];
+  devices: { key: string; count: number }[];
+  topLocations: { key: string; count: number }[];
+}
+
+/** The stable short link the QR image encodes — the same URL the renderer
+ * turns into pixels. Kept in one place so the API and the on-screen download
+ * can never disagree about what is encoded. */
+export function publicQrUrl(slug: string): string {
+  return `${API_BASE_URL}/q/${slug}`;
+}
+
+export function listQrCodes(): Promise<NdyQrCode[]> {
+  return authedFetch("/ndyqr");
+}
+
+export function createQrCode(input: CreateNdyQrInput): Promise<NdyQrCode> {
+  return authedFetch("/ndyqr", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateQrCode(
+  id: string,
+  input: UpdateNdyQrInput,
+): Promise<NdyQrCode> {
+  return authedFetch(`/ndyqr/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteQrCode(id: string): Promise<void> {
+  return authedFetch(`/ndyqr/${id}`, { method: "DELETE" });
+}
+
+export function getQrAnalytics(id: string): Promise<NdyQrAnalytics> {
+  return authedFetch(`/ndyqr/${id}/analytics`);
+}
+
+/** Platform-wide list — only succeeds for a caller with MANAGE_QR_CODES. */
+export function listAllQrCodes(): Promise<NdyQrCode[]> {
+  return authedFetch("/ndyqr/admin/all");
+}
+
+// --- NDY Signature (Phase 8, second half) ---------------------------------
+// A signature is a durable, independently-verifiable artifact. Signing is
+// authenticated (a signature is always attributable to a real NDY identity);
+// the emailed /sign/[token] link authorizes a specific signer slot.
+
+export type SignatureRequestStatus =
+  | "PENDING"
+  | "SIGNED"
+  | "DECLINED"
+  | "EXPIRED"
+  | "REVOKED";
+
+export interface SignatureRequestSummary {
+  id: string;
+  title: string;
+  contentHash: string;
+  contentRef: string | null;
+  createdByUserId: string;
+  createdByNdyId: string;
+  status: SignatureRequestStatus;
+  expiresAt: string | null;
+  createdAt: string;
+  _count?: { signers: number; signatures: number };
+}
+
+export interface SignatureSignerSlot {
+  id: string;
+  userId: string | null;
+  invitedEmail: string | null;
+  signedAt: string | null;
+  declinedAt: string | null;
+  expiresAt: string;
+  signatureRequest: SignatureRequestSummary;
+}
+
+export interface SignaturePreview {
+  title: string;
+  contentRef: string | null;
+  status: SignatureRequestStatus;
+  createdByNdyId: string;
+  invitedEmail: string | null;
+  expiresAt: string;
+  signedAt: string | null;
+  declinedAt: string | null;
+}
+
+export interface SignatureVerification {
+  signatureId: string;
+  signatureRequestId: string;
+  contentHash: string;
+  signerNdyId: string;
+  signedAt: string;
+}
+
+export interface CreateSignatureInput {
+  title: string;
+  contentHash: string;
+  contentRef?: string;
+  expiresAt?: string;
+  signers: { userId?: string; email?: string }[];
+}
+
+export function listMySignatures(): Promise<{
+  created: SignatureRequestSummary[];
+  toSign: SignatureSignerSlot[];
+}> {
+  return authedFetch("/signature/mine");
+}
+
+export function createSignatureRequest(
+  input: CreateSignatureInput,
+): Promise<{
+  request: SignatureRequestSummary;
+  signLinks: {
+    signerId: string;
+    userId: string | null;
+    email: string | null;
+    url: string;
+  }[];
+}> {
+  return authedFetch("/signature", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function getSignaturePreview(token: string): Promise<SignaturePreview> {
+  return authedFetch(`/signature/${encodeURIComponent(token)}/preview`);
+}
+
+export function signDocument(token: string): Promise<{
+  signature: { id: string };
+  requestStatus: SignatureRequestStatus;
+}> {
+  return authedFetch(`/signature/${encodeURIComponent(token)}/sign`, {
+    method: "POST",
+    body: JSON.stringify({ consent: true }),
+  });
+}
+
+export function declineSignature(token: string): Promise<{ declined: boolean }> {
+  return authedFetch(`/signature/${encodeURIComponent(token)}/decline`, {
+    method: "POST",
+  });
+}
+
+export function revokeSignatureRequest(id: string): Promise<SignatureRequestSummary> {
+  return authedFetch(`/signature/${encodeURIComponent(id)}/revoke`, {
+    method: "POST",
+  });
+}
+
+/** Public — no session required (this is the third-party-verifiable surface). */
+export function verifySignature(
+  signatureId: string,
+): Promise<SignatureVerification> {
+  return apiFetch(`/signature/verify/${encodeURIComponent(signatureId)}`);
+}
+
+// --- Context Broker — AI agent consent ------------------------------------
+// Which AI agents may act on your behalf, and within which scopes. The agent
+// is an ordinary OAuth client of type AI_AGENT; this is its per-user consent.
+
+export type AiAgentConsentScope =
+  | "CALENDAR"
+  | "CONTACTS"
+  | "TASKS"
+  | "NOTES"
+  | "ECONOMY_READ";
+
+export interface AiAgentGrant {
+  id: string;
+  userId: string;
+  oauthClientId: string;
+  clientName: string;
+  scopes: AiAgentConsentScope[];
+  grantedAt: string;
+  revokedAt: string | null;
+}
+
+export function listAgentScopes(): Promise<{ scopes: AiAgentConsentScope[] }> {
+  return authedFetch("/context-broker/scopes");
+}
+
+export function listAgentGrants(): Promise<AiAgentGrant[]> {
+  return authedFetch("/context-broker/grants");
+}
+
+export function grantAgentConsent(
+  oauthClientId: string,
+  scopes: AiAgentConsentScope[],
+): Promise<AiAgentGrant> {
+  return authedFetch("/context-broker/grants", {
+    method: "POST",
+    body: JSON.stringify({ oauthClientId, scopes }),
+  });
+}
+
+export function revokeAgentConsent(oauthClientId: string): Promise<AiAgentGrant> {
+  return authedFetch(
+    `/context-broker/grants/${encodeURIComponent(oauthClientId)}`,
+    { method: "DELETE" },
+  );
 }

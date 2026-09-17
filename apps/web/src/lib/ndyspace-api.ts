@@ -380,6 +380,14 @@ export function listContacts(): Promise<Contact[]> {
   return authedFetch("/ndyspace/contacts");
 }
 
+// Used by NDYMAIL's compose recipient autocomplete (ndy-mail-api.ts calls
+// this rather than duplicating a second contacts search) — see
+// NdyspaceContactsService.search's doc comment for why Contact is the
+// "shared, not a silo" address book NDYMAIL was designed to read from.
+export function searchContacts(query: string): Promise<Contact[]> {
+  return authedFetch(`/ndyspace/contacts/search?q=${encodeURIComponent(query)}`);
+}
+
 export function createContact(params: {
   fullName: string;
   email?: string;

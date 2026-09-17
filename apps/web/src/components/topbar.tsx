@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, Bell, Menu, ArrowLeft } from "lucide-react";
+import { Search, Menu, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { usePassport } from "@/lib/use-passport";
 import { useMobileNav } from "@/lib/mobile-nav-context";
 import { Avatar } from "@/components/avatar";
+import { NotificationBell } from "@/components/notification-bell";
 
 export function Topbar() {
   const { auth, logout } = useAuth();
@@ -59,13 +60,7 @@ export function Topbar() {
         <span className="hidden font-mono text-xs tracking-wide sm:inline">
           {auth.ndyId}
         </span>
-        <button
-          type="button"
-          title="Notifications — not built yet"
-          className="relative rounded-md p-1.5 hover:bg-surface-2 hover:text-foreground"
-        >
-          <Bell size={17} strokeWidth={2} />
-        </button>
+        <NotificationBell />
         <button
           onClick={logout}
           className="rounded-md px-2 py-1 text-xs hover:bg-surface-2 hover:text-foreground"

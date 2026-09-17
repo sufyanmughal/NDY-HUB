@@ -5,6 +5,7 @@ import { WorkspaceModule } from '../workspace/workspace.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { NdyspaceModule } from '../ndyspace/ndyspace.module';
 import { AuthModule } from '../auth/auth.module';
+import { ContextBrokerModule } from '../context-broker/context-broker.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { ACTION_REGISTRY } from './action-registry';
 
@@ -19,7 +20,15 @@ import { ACTION_REGISTRY } from './action-registry';
  * which only AuthModule's JwtModule import provides).
  */
 @Module({
-  imports: [WorkspaceModule, NotificationModule, NdyspaceModule, AuthModule],
+  imports: [
+    WorkspaceModule,
+    NotificationModule,
+    NdyspaceModule,
+    AuthModule,
+    // Provides ContextBrokerService for the Authorize-step AI-consent check
+    // (see ActionEngineService.submit).
+    ContextBrokerModule,
+  ],
   controllers: [ActionEngineController],
   providers: [ActionEngineService],
   exports: [ActionEngineService],

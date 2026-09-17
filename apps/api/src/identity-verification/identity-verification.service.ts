@@ -12,6 +12,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationService } from '../notifications/notification.service';
+import { TrustService } from '../trust/trust.service';
 
 export interface ReviewerActor {
   id: string;
@@ -41,6 +42,7 @@ export class IdentityVerificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationService,
+    private readonly trust: TrustService,
   ) {}
 
   async createRequest(userId: string, evidenceNote?: string) {
@@ -131,6 +133,14 @@ export class IdentityVerificationService {
         where: { id: request.id },
       }),
     ]);
+
+    // After the transaction, not inside it — recompute() does its own
+    // separate reads/writes (PassportClaim, TrustProfile) and doesn't need
+    // to be atomic with the approval itself: if this fails, the approval
+    // has already succeeded and the tier is simply stale until the next
+    // recompute, not incorrect in a way that matters (getTrustProfile()
+    // falls back to UNVERIFIED for a missing row, never to a wrong tier).
+    await this.trust.recompute(request.userId);
 
     await this.notifications.notify({
       userId: request.userId,

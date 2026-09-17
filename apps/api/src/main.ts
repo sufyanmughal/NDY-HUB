@@ -9,6 +9,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { mkdirSync } from 'fs';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import {
   UPLOADS_ROOT_DIR,
@@ -36,6 +37,20 @@ async function bootstrap() {
   // anything else has a chance to transform or swallow it.
   const { httpAdapter } = app.get(HttpAdapterHost);
   app.useGlobalFilters(new SentryGlobalFilter(httpAdapter));
+  // Standard hardening response headers (X-Content-Type-Options,
+  // X-Frame-Options, Strict-Transport-Security, etc.) — this is a pure
+  // JSON API plus a static-file mount (/uploads/*, profile photos), not a
+  // page-rendering server, so helmet's default Content-Security-Policy
+  // header is turned off: it's meant to constrain what a *browser
+  // rendering HTML from this origin* can load, which doesn't apply here,
+  // and its default policy would otherwise interfere with a photo under
+  // /uploads/* being embedded cross-origin (e.g. shown inside NDYMAIL).
+  // Every other helmet default stays on.
+  app.use(helmet({ contentSecurityPolicy: false }));
+  // Removes the "X-Powered-By: Express" response header — pure
+  // stack-fingerprinting information with no functional purpose, no
+  // reason to hand it to every caller by default.
+  app.disable('x-powered-by');
   // enableCors() has to come before useStaticAssets() — Express runs
   // middleware in registration order, and static-file serving ends the
   // response before anything registered after it ever runs. Registered in
