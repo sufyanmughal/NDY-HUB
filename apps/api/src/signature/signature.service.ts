@@ -37,6 +37,20 @@ function escapeHtml(str: string): string {
 }
 
 /**
+ * The exact statement a signer agrees to, stored verbatim on the Signature so
+ * it can be proved later even if the wording changes (client decision Q9).
+ *
+ * Deliberately SERVER-owned: the client displays this and cannot substitute its
+ * own text, so the stored record proves what was actually shown rather than
+ * what a caller claims was shown.
+ *
+ * v1 is an internal / verified NDY attestation (client decision Q8) — this text
+ * must NOT claim legal e-signature weight until the legal framework supports it.
+ */
+export const SIGNATURE_CONSENT_TEXT =
+  'I intend to sign this document as my NDY identity. I understand this records a verified NDY digital attestation, and is not presented as a legally-binding electronic signature.';
+
+/**
  * NDY Signature (Phase 8, second half) — the signing lifecycle.
  *
  * Separated from the Action Engine on purpose (docs/phase8-signature-trust-
@@ -200,6 +214,8 @@ export class SignatureService {
         contentHash: signer.signatureRequest.contentHash,
         ip: ip ?? null,
         userAgent: userAgent ?? null,
+        // Verbatim record of what the signer agreed to.
+        consentText: SIGNATURE_CONSENT_TEXT,
       },
     });
 
@@ -294,6 +310,9 @@ export class SignatureService {
       expiresAt: signer.expiresAt,
       signedAt: signer.signedAt,
       declinedAt: signer.declinedAt,
+      // The exact statement the signer is agreeing to — the UI shows this
+      // rather than hardcoding its own wording.
+      consentText: SIGNATURE_CONSENT_TEXT,
     };
   }
 

@@ -188,9 +188,9 @@ export default function SignDocumentPage() {
                     onChange={(e) => setConsent(e.target.checked)}
                     className="mt-0.5"
                   />
-                  <span>
-                    I intend to sign this document as my NDY identity.
-                  </span>
+                  {/* The exact wording comes from the server, so what the signer
+                      saw is provably what gets recorded — never client-authored. */}
+                  <span>{state.preview.consentText}</span>
                 </label>
 
                 <div className="mt-4 flex gap-2">
@@ -211,11 +211,6 @@ export default function SignDocumentPage() {
                 </div>
               </>
             )}
-
-            <p className="mt-3 text-center text-[11px] text-foreground-muted">
-              This records an internal attestation by your NDY identity. It is
-              not presented as a legally-binding e-signature.
-            </p>
           </div>
         )}
 

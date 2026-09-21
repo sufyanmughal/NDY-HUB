@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SignatureRequestStatus } from '@prisma/client';
-import { SignatureService } from './signature.service';
+import { SignatureService, SIGNATURE_CONSENT_TEXT } from './signature.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../common/mail.service';
 import { NotificationService } from '../notifications/notification.service';
@@ -191,6 +191,9 @@ describe('SignatureService', () => {
           signerNdyId: 'NDY-USER-1',
           contentHash: 'd'.repeat(64),
           ip: '1.2.3.4',
+          // The exact wording shown is stored verbatim — server-owned, so the
+          // record proves what was displayed rather than what a caller claims.
+          consentText: SIGNATURE_CONSENT_TEXT,
         }),
       });
       expect(result.requestStatus).toBe(SignatureRequestStatus.SIGNED);
