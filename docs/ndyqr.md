@@ -207,16 +207,34 @@ edge-to-edge and only the corners rounded. The web renderer was corrected to
 match. This is exactly the failure mode the "automatic readability validation"
 requirement exists to catch.
 
-## 7b. Service credentials — blocked on a small modelling decision
+## 7b. Service credentials (built)
 
-The intent is a `ndyqr:create` scope (same server-to-server shape as
-`ndybits:report-event`) so another product's backend can create codes without a
-user session. One thing has to be decided first: **`NdyQrCode.ownerId` is a
-required FK to `User`**, so a code created by a *service* has no owner to point
-at. Options: make `ownerId` nullable and add an optional `oauthClientId` owner
-(exactly one of the two set), or keep service-created codes out of scope and
-require a user context. Not guessed here — it's a schema decision on a live
-table.
+`POST /ndyqr/service` lets another NDY product's backend create codes **on its
+own behalf, with no logged-in user**, authenticated as a registered `OAuthClient`
+holding the new **`ndyqr:create`** scope (Basic auth, same shape as the NDY
+Economy event-intake guard). The consuming product then just fetches the public
+image endpoint — it needs no QR implementation of its own.
+
+The ownership question this raised is resolved: **a code belongs to either a
+member or a product, never both and never neither**, and that invariant is
+enforced by a **database CHECK constraint**, not only by application code.
+
+## 7c. Onboarding the first consuming product (NDYSTAYS)
+
+Per the client's decision (Q22 — NDYSTAYS first), onboarding a product is an
+admin action, not a code change:
+
+1. Register the product as an `OAuthClient` in NDYHUB (Admin → Connected
+   Websites) with `allowedScopes` including **`ndyqr:create`**. The
+   `client_secret` is shown once.
+2. The product's backend calls `POST /ndyqr/service` with Basic auth
+   (`clientId:clientSecret`) and a body of `{ label, destination, type }`.
+3. It receives the code (including its `slug`) and can immediately fetch
+   `GET /q/:slug/image.png` or `.svg` — unauthenticated, already validated.
+4. To retarget later, `PATCH /ndyqr/:id` as the owning client.
+
+No product-specific QR code is written at any point, which is the whole intent of
+"One NDYQR Core → many NDY products".
 
 ---
 

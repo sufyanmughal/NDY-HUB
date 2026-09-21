@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import sharp from 'sharp';
+import { NDY_LOGO_PNG_BASE64 } from './ndy-logo-asset';
 
 /**
  * Server-side NDYQR™ brand renderer — the Node port of
@@ -106,7 +107,7 @@ export class NdyQrRenderService {
 
     const parts: string[] = [];
     parts.push(
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}" width="${sizePx}" height="${sizePx}" shape-rendering="geometricPrecision">`,
+      `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${total} ${total}" width="${sizePx}" height="${sizePx}" shape-rendering="geometricPrecision">`,
     );
     parts.push(
       `<defs><linearGradient id="ndyqr-grad" x1="0" y1="0" x2="1" y2="1">` +
@@ -153,14 +154,29 @@ export class NdyQrRenderService {
       );
     }
 
-    // Reserved centre + the drawn ND mark. (The web renderer draws the same
-    // mark for SVG; embedding the raster logo asset server-side is a follow-up.)
+    // Reserved centre + the OFFICIAL ND logo (client decision Q21: one
+    // consistent identity across browser- and server-rendered codes). The logo
+    // is a small base64 constant rather than a runtime file read, so it can't
+    // depend on an asset being bundled into the deployment. The drawn "ND"
+    // monogram remains as the fallback when the constant is empty.
     const cx = margin + reserve.start;
     const span = reserve.span;
     parts.push(
       `<rect x="${cx - span * 0.12}" y="${cx - span * 0.12}" width="${span * 1.24}" height="${span * 1.24}" rx="${span * 0.28}" fill="${NDY_QR_BRAND.background}"/>`,
-      `<text x="${cx + span / 2}" y="${cx + span / 2}" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="${span * 0.62}" fill="url(#ndyqr-grad)">ND</text>`,
     );
+    if (NDY_LOGO_PNG_BASE64) {
+      const logoW = span * 0.92;
+      const logoH = logoW * (457 / 547); // preserve the source aspect ratio
+      const logoX = cx + span / 2 - logoW / 2;
+      const logoY = cx + span / 2 - logoH / 2;
+      parts.push(
+        `<image x="${logoX}" y="${logoY}" width="${logoW}" height="${logoH}" preserveAspectRatio="xMidYMid meet" href="data:image/png;base64,${NDY_LOGO_PNG_BASE64}" xlink:href="data:image/png;base64,${NDY_LOGO_PNG_BASE64}"/>`,
+      );
+    } else {
+      parts.push(
+        `<text x="${cx + span / 2}" y="${cx + span / 2}" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="${span * 0.62}" fill="url(#ndyqr-grad)">ND</text>`,
+      );
+    }
 
     parts.push('</svg>');
     return parts.join('');

@@ -18,8 +18,9 @@ describe('NdyQrRenderService', () => {
       expect(svg).toContain(NDY_QR_BRAND.colorFrom);
       expect(svg).toContain(NDY_QR_BRAND.colorMid);
       expect(svg).toContain(NDY_QR_BRAND.colorTo);
-      // The reserved centre mark, not a pasted-over logo.
-      expect(svg).toContain('>ND</text>');
+      // The official logo, embedded in the reserved centre (client Q21).
+      expect(svg).toContain('<image');
+      expect(svg).toContain('data:image/png;base64,');
     });
 
     it('honours a per-code tint override', () => {
