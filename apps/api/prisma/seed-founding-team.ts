@@ -100,7 +100,16 @@ async function main() {
       continue;
     }
 
-    const user = await prisma.user.findUnique({ where: { email: entry.email.toLowerCase() } });
+    // Case-insensitive on purpose: email is stored EXACTLY as the account was
+    // created with (AuthService.register passes dto.email straight through —
+    // there is no normalization/lowercasing anywhere in the signup path), so an
+    // exact-match lookup would silently MISS an account whose email contains any
+    // uppercase letter. findUnique can't be used here because uniqueness is
+    // case-sensitive at the DB level, so findFirst + insensitive mode is the
+    // correct lookup rather than a convenience.
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: entry.email.trim(), mode: 'insensitive' } },
+    });
     if (!user) {
       console.log(`MISS  ${entry.fullName} <${entry.email}>: no matching account found — create the account first, then re-run.`);
       continue;

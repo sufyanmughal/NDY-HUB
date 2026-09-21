@@ -181,6 +181,12 @@ export class AuthService {
     }
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
+      // Failed-login capture (client decision Q6) — the risk signal the Trust
+      // Score needs alongside positive verification. Only recorded when the
+      // account actually exists (SecurityEvent needs a userId, and an unknown
+      // email has none). Row-flooding is bounded by the login endpoint's own
+      // brute-force throttle, and record() never throws.
+      void this.securityEvents.record(user.id, 'LOGIN_FAILED', meta);
       throw new UnauthorizedException('Incorrect email or password.');
     }
     if (user.suspended) {
