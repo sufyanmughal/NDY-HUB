@@ -152,6 +152,29 @@ on a short domain than on the API host. Purely cosmetic, needs DNS.
 
 ---
 
+## Identity hygiene — found while preparing item 6
+
+**Q26. Email is matched case-sensitively everywhere — should we fix that?**
+While prepping the founding-ID script I found there is **no email normalization
+anywhere** in signup or login: the email is stored exactly as typed, and every
+lookup is an exact match. Two consequences:
+
+- Registering `Teun@ndyhub.com` and later `teun@ndyhub.com` would create **two
+  separate accounts** for one person — a real identity-integrity problem for a
+  system whose whole premise is *One Identity*.
+- A member who registered with any capital letter must type it **exactly** that
+  way to sign in, which will confuse people and generate avoidable support.
+
+→ *My recommendation: normalize email to lowercase on signup and login, and make
+the uniqueness check case-insensitive. It's small and contained, but it touches
+the signup/login path — so I'm flagging it rather than changing it quietly. Worth
+doing before the founding accounts go in, since those IDs are permanent.*
+
+*(The founding-ID script itself is already case-insensitive, so the assignment
+will work regardless of how an account was registered.)*
+
+---
+
 ## Two things that affect me day to day
 
 **Q24. Can I get a staging or scoped database?** Five migrations are finished and
