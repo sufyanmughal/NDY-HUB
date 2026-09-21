@@ -32,14 +32,14 @@ describe('ContextBrokerService', () => {
   describe('assertConsent', () => {
     it('refuses when the request does not identify its client', async () => {
       const { service } = makeService();
-      const result = await service.assertConsent('u1', undefined, ['calendar']);
+      const result = await service.assertConsent('u1', undefined, ['email:summarize']);
       expect(result.allowed).toBe(false);
     });
 
     it('refuses an unknown client', async () => {
       const { service, prisma } = makeService();
       prisma.oAuthClient.findUnique.mockResolvedValue(null);
-      const result = await service.assertConsent('u1', 'cl_nope', ['calendar']);
+      const result = await service.assertConsent('u1', 'cl_nope', ['email:summarize']);
       expect(result.allowed).toBe(false);
     });
 
@@ -49,14 +49,14 @@ describe('ContextBrokerService', () => {
         ...AGENT,
         clientType: OAuthClientType.CONFIDENTIAL,
       });
-      const result = await service.assertConsent('u1', 'cl_agent', ['calendar']);
+      const result = await service.assertConsent('u1', 'cl_agent', ['email:summarize']);
       expect(result.allowed).toBe(false);
     });
 
     it('refuses an inactive agent', async () => {
       const { service, prisma } = makeService();
       prisma.oAuthClient.findUnique.mockResolvedValue({ ...AGENT, isActive: false });
-      const result = await service.assertConsent('u1', 'cl_agent', ['calendar']);
+      const result = await service.assertConsent('u1', 'cl_agent', ['email:summarize']);
       expect(result.allowed).toBe(false);
     });
 
@@ -64,7 +64,7 @@ describe('ContextBrokerService', () => {
       const { service, prisma } = makeService();
       prisma.oAuthClient.findUnique.mockResolvedValue(AGENT);
       prisma.aiAgentConsent.findUnique.mockResolvedValue(null);
-      const result = await service.assertConsent('u1', 'cl_agent', ['calendar']);
+      const result = await service.assertConsent('u1', 'cl_agent', ['email:summarize']);
       expect(result.allowed).toBe(false);
     });
 
@@ -72,10 +72,10 @@ describe('ContextBrokerService', () => {
       const { service, prisma } = makeService();
       prisma.oAuthClient.findUnique.mockResolvedValue(AGENT);
       prisma.aiAgentConsent.findUnique.mockResolvedValue({
-        scopes: [AiAgentConsentScope.CALENDAR],
+        scopes: [AiAgentConsentScope.EMAIL_SUMMARIZE],
         revokedAt: new Date(),
       });
-      const result = await service.assertConsent('u1', 'cl_agent', ['calendar']);
+      const result = await service.assertConsent('u1', 'cl_agent', ['email:summarize']);
       expect(result.allowed).toBe(false);
     });
 
@@ -83,24 +83,24 @@ describe('ContextBrokerService', () => {
       const { service, prisma } = makeService();
       prisma.oAuthClient.findUnique.mockResolvedValue(AGENT);
       prisma.aiAgentConsent.findUnique.mockResolvedValue({
-        scopes: [AiAgentConsentScope.CALENDAR],
+        scopes: [AiAgentConsentScope.EMAIL_SUMMARIZE],
         revokedAt: null,
       });
-      const result = await service.assertConsent('u1', 'cl_agent', ['tasks']);
+      const result = await service.assertConsent('u1', 'cl_agent', ['email:draft-reply']);
       expect(result.allowed).toBe(false);
-      if (!result.allowed) expect(result.reason).toContain('TASKS');
+      if (!result.allowed) expect(result.reason).toContain('EMAIL_DRAFT_REPLY');
     });
 
     it('allows when the grant covers every required scope', async () => {
       const { service, prisma } = makeService();
       prisma.oAuthClient.findUnique.mockResolvedValue(AGENT);
       prisma.aiAgentConsent.findUnique.mockResolvedValue({
-        scopes: [AiAgentConsentScope.CALENDAR, AiAgentConsentScope.TASKS],
+        scopes: [AiAgentConsentScope.EMAIL_SUMMARIZE, AiAgentConsentScope.EMAIL_DRAFT_REPLY],
         revokedAt: null,
       });
       const result = await service.assertConsent('u1', 'cl_agent', [
-        'calendar',
-        'tasks',
+        'email:summarize',
+        'email:draft-reply',
       ]);
       expect(result.allowed).toBe(true);
     });
@@ -109,10 +109,13 @@ describe('ContextBrokerService', () => {
       const { service, prisma } = makeService();
       prisma.oAuthClient.findUnique.mockResolvedValue(AGENT);
       prisma.aiAgentConsent.findUnique.mockResolvedValue({
-        scopes: [AiAgentConsentScope.CALENDAR],
+        scopes: [AiAgentConsentScope.EMAIL_SUMMARIZE],
         revokedAt: null,
       });
-      const result = await service.assertConsent('u1', 'cl_agent', ['files']);
+      // 'ndyspace' (and calendar/contacts/tasks) are deliberately UNMAPPED now
+      // that the catalog is scoped to the real first consumer — an agent cannot
+      // reach them until a consent scope is agreed for them.
+      const result = await service.assertConsent('u1', 'cl_agent', ['ndyspace']);
       expect(result.allowed).toBe(false);
     });
 
@@ -132,7 +135,7 @@ describe('ContextBrokerService', () => {
         clientType: OAuthClientType.PUBLIC,
       });
       await expect(
-        service.grant('u1', 'cl_agent', [AiAgentConsentScope.CALENDAR]),
+        service.grant('u1', 'cl_agent', [AiAgentConsentScope.EMAIL_SUMMARIZE]),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -140,7 +143,7 @@ describe('ContextBrokerService', () => {
       const { service, prisma } = makeService();
       prisma.oAuthClient.findUnique.mockResolvedValue(null);
       await expect(
-        service.grant('u1', 'cl_nope', [AiAgentConsentScope.CALENDAR]),
+        service.grant('u1', 'cl_nope', [AiAgentConsentScope.EMAIL_SUMMARIZE]),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -148,13 +151,13 @@ describe('ContextBrokerService', () => {
       const { service, prisma } = makeService();
       prisma.oAuthClient.findUnique.mockResolvedValue(AGENT);
       await service.grant('u1', 'cl_agent', [
-        AiAgentConsentScope.CALENDAR,
-        AiAgentConsentScope.CALENDAR,
+        AiAgentConsentScope.EMAIL_SUMMARIZE,
+        AiAgentConsentScope.EMAIL_SUMMARIZE,
       ]);
       expect(prisma.aiAgentConsent.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           create: expect.objectContaining({
-            scopes: [AiAgentConsentScope.CALENDAR],
+            scopes: [AiAgentConsentScope.EMAIL_SUMMARIZE],
           }),
         }),
       );

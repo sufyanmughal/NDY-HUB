@@ -23,23 +23,29 @@ import { PrismaService } from '../prisma/prisma.service';
  * to agents before someone decides what consent it needs.
  */
 export const ACTION_SCOPE_TO_CONSENT: Record<string, AiAgentConsentScope> = {
-  calendar: AiAgentConsentScope.CALENDAR,
-  contacts: AiAgentConsentScope.CONTACTS,
-  tasks: AiAgentConsentScope.TASKS,
-  // note.create declares the broader 'ndyspace' scope in the registry; the
-  // (placeholder) consent vocabulary names the tighter NOTES.
-  ndyspace: AiAgentConsentScope.NOTES,
-  // Reserved — no economy action is registered yet (see ECONOMY_READ).
-  economy: AiAgentConsentScope.ECONOMY_READ,
+  // Scoped to the FIRST REAL CONSUMER (client Q13: NDYCORE / NDYMAIL AI —
+  // Summarise → Draft Reply → Rewrite/Translate). These are the scope strings
+  // those actions declare.
+  'email:summarize': AiAgentConsentScope.EMAIL_SUMMARIZE,
+  'email:draft-reply': AiAgentConsentScope.EMAIL_DRAFT_REPLY,
+  'email:modify-text': AiAgentConsentScope.EMAIL_MODIFY_TEXT,
+  // Declared by any action that would send mail content off NDY infrastructure.
+  // Note this gates the member's CONSENT; the provider allow-list that decides
+  // *which* providers may receive it is a governance decision (Q14), enforced
+  // separately.
+  'email:egress': AiAgentConsentScope.EMAIL_CONTENT_EGRESS,
+  // Anything else is intentionally absent, so it FAILS CLOSED — including the
+  // existing calendar/contacts/tasks/notes actions, which have no agreed AI
+  // consent scope. An agent cannot reach them until a scope is deliberately
+  // agreed for them, which is the whole point of this layer.
 };
 
-/** Every scope a user can grant, for the consent UI. */
+/** Every scope a member can grant, for the consent UI. */
 export const AI_AGENT_SCOPES: AiAgentConsentScope[] = [
-  AiAgentConsentScope.CALENDAR,
-  AiAgentConsentScope.CONTACTS,
-  AiAgentConsentScope.TASKS,
-  AiAgentConsentScope.NOTES,
-  AiAgentConsentScope.ECONOMY_READ,
+  AiAgentConsentScope.EMAIL_SUMMARIZE,
+  AiAgentConsentScope.EMAIL_DRAFT_REPLY,
+  AiAgentConsentScope.EMAIL_MODIFY_TEXT,
+  AiAgentConsentScope.EMAIL_CONTENT_EGRESS,
 ];
 
 export type ConsentCheck =

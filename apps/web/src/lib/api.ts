@@ -1802,6 +1802,9 @@ export interface SignaturePreview {
   expiresAt: string;
   signedAt: string | null;
   declinedAt: string | null;
+  /** The exact statement the signer agrees to — server-owned, so the UI shows
+   * this rather than hardcoding its own wording. */
+  consentText: string;
 }
 
 export interface SignatureVerification {
@@ -1882,11 +1885,10 @@ export function verifySignature(
 // is an ordinary OAuth client of type AI_AGENT; this is its per-user consent.
 
 export type AiAgentConsentScope =
-  | "CALENDAR"
-  | "CONTACTS"
-  | "TASKS"
-  | "NOTES"
-  | "ECONOMY_READ";
+  | "EMAIL_SUMMARIZE"
+  | "EMAIL_DRAFT_REPLY"
+  | "EMAIL_MODIFY_TEXT"
+  | "EMAIL_CONTENT_EGRESS";
 
 export interface AiAgentGrant {
   id: string;

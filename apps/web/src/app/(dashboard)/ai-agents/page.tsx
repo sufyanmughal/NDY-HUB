@@ -16,13 +16,14 @@ const INPUT_CLASS =
   "w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus:border-accent";
 
 /** Plain-language labels — a consent screen should read as "what the agent may
- * do", not as scope enum values. */
+ * do", not as scope enum values. Scoped to the first real consumer (NDYMAIL AI),
+ * and split so the "may leave NDY" permission is explicit rather than implied. */
 const SCOPE_LABEL: Record<AiAgentConsentScope, string> = {
-  CALENDAR: "Your calendar",
-  CONTACTS: "Your contacts",
-  TASKS: "Your tasks",
-  NOTES: "Your notes",
-  ECONOMY_READ: "Your economy balances (read-only)",
+  EMAIL_SUMMARIZE: "Summarise your email",
+  EMAIL_DRAFT_REPLY: "Draft replies to your email",
+  EMAIL_MODIFY_TEXT: "Rewrite or translate your email text",
+  EMAIL_CONTENT_EGRESS:
+    "Process your email content outside NDY (with a permitted provider)",
 };
 
 export default function AiAgentsPage() {
