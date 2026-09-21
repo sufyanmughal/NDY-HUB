@@ -8,7 +8,10 @@
 ALTER TYPE "OAuthClientType" ADD VALUE 'AI_AGENT';
 
 -- CreateEnum
-CREATE TYPE "AiAgentConsentScope" AS ENUM ('CALENDAR', 'CONTACTS', 'TASKS', 'NOTES', 'ECONOMY_READ');
+-- Scoped to the confirmed first consumer (NDYMAIL AI), covering both halves of
+-- the Context Broker: action ingress (what the agent may do) and data egress
+-- (what may leave NDY). See the schema comment.
+CREATE TYPE "AiAgentConsentScope" AS ENUM ('EMAIL_SUMMARIZE', 'EMAIL_DRAFT_REPLY', 'EMAIL_MODIFY_TEXT', 'EMAIL_CONTENT_EGRESS');
 
 -- CreateTable
 CREATE TABLE "AiAgentConsent" (

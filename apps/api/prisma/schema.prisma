@@ -945,6 +945,12 @@ model Session {
 
 enum SecurityEventType {
   LOGIN_SUCCESS
+  // A failed password attempt against a REAL account (client decision Q6).
+  // Captured so the Trust Score can eventually understand genuine risk signals,
+  // not just positive verification — deliberately NOT weighted yet, because the
+  // locked v1 penalty table doesn't include it and adding an unapproved weight
+  // would break "lock the formula together".
+  LOGIN_FAILED
   NEW_DEVICE
   PASSWORD_CHANGED
   PASSKEY_ADDED
@@ -1735,11 +1741,10 @@ model PassportClaim {
 // Phase 8 (docs/phase8-signature-trust-design.md §3) — NDY Trust.
 //
 // `tier` derives cleanly from VerificationLevel + PassportClaim (both already
-// real). `score` is a finer-grained 0–100 signal whose formula was confirmed
-// with the client before building it (the design doc's §5.4 left it open
-// specifically so a wrong formula wouldn't ship silently). The weights live in
-// TrustService.SCORE_WEIGHTS — one place — so adjusting them is a code change
-// with no schema impact.
+// real). `score` is the finer-grained 0–100 signal, implemented from the model
+// the client LOCKED on 2026-09-17 (six categories, neutral baseline of 50,
+// decaying risk penalties). All weights live in TrustService.SCORE — one place —
+// so tuning them is a code change with no schema impact.
 //
 // Derived/cached, not the source of truth — User.verificationLevel and
 // PassportClaim rows remain authoritative; this is a materialized view,
@@ -2017,6 +2022,11 @@ model Signature {
   contentHash        String
   ip                 String?
   userAgent          String?
+  // The exact statement the signer was shown and agreed to, stored verbatim so
+  // it can be proved later even if the wording changes. Owned by the SERVER
+  // (SignatureService.SIGNATURE_CONSENT_TEXT) rather than accepted from the
+  // client — otherwise a caller could claim it displayed anything.
+  consentText        String?
   signedAt           DateTime         @default(now())
 
   @@index([signatureRequestId])
@@ -2041,12 +2051,27 @@ model Signature {
 // agent-callable actions are registered, not guessed broadly up front — the
 // same "don't build ahead of a real caller" discipline as oauth/scopes.ts.
 
+// The consent vocabulary, scoped to the FIRST REAL CONSUMER (client decision
+// Q13: NDYCORE / NDYMAIL AI, whose first proof case is Summarise → Draft Reply
+// → Rewrite/Translate). Deliberately narrow — the previous placeholder catalog
+// (calendar/contacts/tasks/notes/economy) was guessing ahead of a caller, which
+// is exactly what this project's own discipline says not to do.
+//
+// Both sides of the Context Broker are represented (client's explicit Q14
+// instruction to keep them intact):
+//   ACTION INGRESS — what the agent may DO on the member's behalf.
+//   DATA EGRESS    — what may LEAVE NDY infrastructure. Gating egress still
+//                    requires a provider allow-list, which is a governance
+//                    decision (Q14), not something engineering invents.
 enum AiAgentConsentScope {
-  CALENDAR
-  CONTACTS
-  TASKS
-  NOTES
-  ECONOMY_READ
+  // --- ACTION INGRESS ---
+  EMAIL_SUMMARIZE
+  EMAIL_DRAFT_REPLY
+  /** Rewrite / translate — the same scope, since both are "modify the text". */
+  EMAIL_MODIFY_TEXT
+  // --- DATA EGRESS ---
+  /** Email content may be processed by the agent (and its permitted provider). */
+  EMAIL_CONTENT_EGRESS
 }
 
 model AiAgentConsent {
