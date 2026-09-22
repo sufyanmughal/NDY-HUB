@@ -58,7 +58,10 @@ describe('NdyQrRenderService', () => {
 
     it('still scans with a custom tint', async () => {
       expect(
-        await renderer.validate(TEXT, { colorFrom: '#0f0f0f', colorTo: '#3b3b3b' }),
+        await renderer.validate(TEXT, {
+          colorFrom: '#0f0f0f',
+          colorTo: '#3b3b3b',
+        }),
       ).toBe(true);
     });
 

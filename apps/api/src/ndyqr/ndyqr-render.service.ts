@@ -88,7 +88,9 @@ function inCenter(
   reserve: { start: number; span: number },
 ): boolean {
   const end = reserve.start + reserve.span - 1;
-  return row >= reserve.start && row <= end && col >= reserve.start && col <= end;
+  return (
+    row >= reserve.start && row <= end && col >= reserve.start && col <= end
+  );
 }
 
 @Injectable()
@@ -201,7 +203,10 @@ export class NdyQrRenderService {
    * Rasterises the PNG to raw RGBA and decodes it with a real QR reader;
    * returns false if it doesn't decode back to exactly `text`.
    */
-  async validate(text: string, options: NdyQrRenderOptions = {}): Promise<boolean> {
+  async validate(
+    text: string,
+    options: NdyQrRenderOptions = {},
+  ): Promise<boolean> {
     const png = await this.renderPng(text, options);
     return (await this.decodePng(png)) === text;
   }
@@ -215,7 +220,11 @@ export class NdyQrRenderService {
         .ensureAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
-      const decoded = jsQR(new Uint8ClampedArray(data), info.width, info.height);
+      const decoded = jsQR(
+        new Uint8ClampedArray(data),
+        info.width,
+        info.height,
+      );
       return decoded?.data ?? null;
     } catch {
       return null;

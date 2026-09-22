@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment -- jest.fn() test doubles are untyped; assertions on them are intentional. */
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { AiAgentConsentScope, OAuthClientType } from '@prisma/client';
 import { ContextBrokerService } from './context-broker.service';
@@ -5,7 +6,10 @@ import { PrismaService } from '../prisma/prisma.service';
 
 function makePrisma() {
   return {
-    oAuthClient: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+    oAuthClient: {
+      findUnique: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     aiAgentConsent: {
       findUnique: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
@@ -32,14 +36,18 @@ describe('ContextBrokerService', () => {
   describe('assertConsent', () => {
     it('refuses when the request does not identify its client', async () => {
       const { service } = makeService();
-      const result = await service.assertConsent('u1', undefined, ['email:summarize']);
+      const result = await service.assertConsent('u1', undefined, [
+        'email:summarize',
+      ]);
       expect(result.allowed).toBe(false);
     });
 
     it('refuses an unknown client', async () => {
       const { service, prisma } = makeService();
       prisma.oAuthClient.findUnique.mockResolvedValue(null);
-      const result = await service.assertConsent('u1', 'cl_nope', ['email:summarize']);
+      const result = await service.assertConsent('u1', 'cl_nope', [
+        'email:summarize',
+      ]);
       expect(result.allowed).toBe(false);
     });
 
@@ -49,14 +57,21 @@ describe('ContextBrokerService', () => {
         ...AGENT,
         clientType: OAuthClientType.CONFIDENTIAL,
       });
-      const result = await service.assertConsent('u1', 'cl_agent', ['email:summarize']);
+      const result = await service.assertConsent('u1', 'cl_agent', [
+        'email:summarize',
+      ]);
       expect(result.allowed).toBe(false);
     });
 
     it('refuses an inactive agent', async () => {
       const { service, prisma } = makeService();
-      prisma.oAuthClient.findUnique.mockResolvedValue({ ...AGENT, isActive: false });
-      const result = await service.assertConsent('u1', 'cl_agent', ['email:summarize']);
+      prisma.oAuthClient.findUnique.mockResolvedValue({
+        ...AGENT,
+        isActive: false,
+      });
+      const result = await service.assertConsent('u1', 'cl_agent', [
+        'email:summarize',
+      ]);
       expect(result.allowed).toBe(false);
     });
 
@@ -64,7 +79,9 @@ describe('ContextBrokerService', () => {
       const { service, prisma } = makeService();
       prisma.oAuthClient.findUnique.mockResolvedValue(AGENT);
       prisma.aiAgentConsent.findUnique.mockResolvedValue(null);
-      const result = await service.assertConsent('u1', 'cl_agent', ['email:summarize']);
+      const result = await service.assertConsent('u1', 'cl_agent', [
+        'email:summarize',
+      ]);
       expect(result.allowed).toBe(false);
     });
 
@@ -75,7 +92,9 @@ describe('ContextBrokerService', () => {
         scopes: [AiAgentConsentScope.EMAIL_SUMMARIZE],
         revokedAt: new Date(),
       });
-      const result = await service.assertConsent('u1', 'cl_agent', ['email:summarize']);
+      const result = await service.assertConsent('u1', 'cl_agent', [
+        'email:summarize',
+      ]);
       expect(result.allowed).toBe(false);
     });
 
@@ -86,7 +105,9 @@ describe('ContextBrokerService', () => {
         scopes: [AiAgentConsentScope.EMAIL_SUMMARIZE],
         revokedAt: null,
       });
-      const result = await service.assertConsent('u1', 'cl_agent', ['email:draft-reply']);
+      const result = await service.assertConsent('u1', 'cl_agent', [
+        'email:draft-reply',
+      ]);
       expect(result.allowed).toBe(false);
       if (!result.allowed) expect(result.reason).toContain('EMAIL_DRAFT_REPLY');
     });
@@ -95,7 +116,10 @@ describe('ContextBrokerService', () => {
       const { service, prisma } = makeService();
       prisma.oAuthClient.findUnique.mockResolvedValue(AGENT);
       prisma.aiAgentConsent.findUnique.mockResolvedValue({
-        scopes: [AiAgentConsentScope.EMAIL_SUMMARIZE, AiAgentConsentScope.EMAIL_DRAFT_REPLY],
+        scopes: [
+          AiAgentConsentScope.EMAIL_SUMMARIZE,
+          AiAgentConsentScope.EMAIL_DRAFT_REPLY,
+        ],
         revokedAt: null,
       });
       const result = await service.assertConsent('u1', 'cl_agent', [
@@ -115,7 +139,9 @@ describe('ContextBrokerService', () => {
       // 'ndyspace' (and calendar/contacts/tasks) are deliberately UNMAPPED now
       // that the catalog is scoped to the real first consumer — an agent cannot
       // reach them until a consent scope is agreed for them.
-      const result = await service.assertConsent('u1', 'cl_agent', ['ndyspace']);
+      const result = await service.assertConsent('u1', 'cl_agent', [
+        'ndyspace',
+      ]);
       expect(result.allowed).toBe(false);
     });
 

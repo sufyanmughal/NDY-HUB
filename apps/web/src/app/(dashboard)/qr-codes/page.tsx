@@ -72,10 +72,13 @@ export default function QrCodesPage() {
   const [analyticsFor, setAnalyticsFor] = useState<NdyQrCode | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    // No synchronous setState before the await — React's set-state-in-effect
+    // rule (and this codebase's existing data hooks) require updates to happen
+    // after the async work, not synchronously inside the effect that triggers it.
     try {
-      setCodes(await listQrCodes());
+      const result = await listQrCodes();
+      setCodes(result);
+      setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't load your QR codes.");
     } finally {
@@ -84,6 +87,7 @@ export default function QrCodesPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; `load` updates state only AFTER its await (never synchronously), and is reused as the refresh handler rather than duplicated.
     void load();
   }, [load]);
 
@@ -107,7 +111,12 @@ export default function QrCodesPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => void load()}
+            onClick={() => {
+              // Event handlers may set state directly; only effects can't.
+              setError(null);
+              setLoading(true);
+              void load();
+            }}
             className="rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-2"
             title="Refresh"
           >

@@ -34,8 +34,7 @@ export default function AiAgentsPage() {
   const [showGrant, setShowGrant] = useState(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    // No synchronous setState before the await (see qr-codes/page.tsx's note).
     try {
       const [grantsResult, scopesResult] = await Promise.all([
         listAgentGrants(),
@@ -43,6 +42,7 @@ export default function AiAgentsPage() {
       ]);
       setGrants(grantsResult);
       setAvailable(scopesResult.scopes);
+      setError(null);
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Couldn't load your AI agent access.",
@@ -53,6 +53,7 @@ export default function AiAgentsPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; `load` updates state only AFTER its await (never synchronously).
     void load();
   }, [load]);
 

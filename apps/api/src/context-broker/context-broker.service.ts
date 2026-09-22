@@ -49,8 +49,7 @@ export const AI_AGENT_SCOPES: AiAgentConsentScope[] = [
 ];
 
 export type ConsentCheck =
-  | { allowed: true }
-  | { allowed: false; reason: string };
+  { allowed: true } | { allowed: false; reason: string };
 
 /** Registry scope string -> the consent scope it needs, or null if unmapped. */
 export function consentScopeFor(
@@ -98,7 +97,10 @@ export class ContextBrokerService {
       select: { clientType: true, isActive: true, name: true },
     });
     if (!client) {
-      return { allowed: false, reason: `Unknown OAuth client "${oauthClientId}".` };
+      return {
+        allowed: false,
+        reason: `Unknown OAuth client "${oauthClientId}".`,
+      };
     }
     if (client.clientType !== OAuthClientType.AI_AGENT) {
       return {
@@ -107,7 +109,10 @@ export class ContextBrokerService {
       };
     }
     if (!client.isActive) {
-      return { allowed: false, reason: `AI agent "${client.name}" is not active.` };
+      return {
+        allowed: false,
+        reason: `AI agent "${client.name}" is not active.`,
+      };
     }
 
     // Nothing declared to gate — same as any action with no required scopes.

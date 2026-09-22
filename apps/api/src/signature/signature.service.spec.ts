@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- jest.fn() test doubles are untyped; assertions on them are intentional. */
 import {
   BadRequestException,
   ConflictException,
@@ -40,7 +41,9 @@ function makeService() {
   const prisma = makePrisma();
   const mail = { send: jest.fn().mockResolvedValue(undefined) };
   const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
-  const config = { getOrThrow: jest.fn().mockReturnValue('http://localhost:3001') };
+  const config = {
+    getOrThrow: jest.fn().mockReturnValue('http://localhost:3001'),
+  };
   const service = new SignatureService(
     prisma as unknown as PrismaService,
     mail as unknown as MailService,
@@ -228,7 +231,9 @@ describe('SignatureService', () => {
 
       await expect(service.sign(actor, 'tok')).resolves.toBeDefined();
       expect(prisma.signatureRequestSigner.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ userId: 'user-1' }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ userId: 'user-1' }),
+        }),
       );
     });
   });

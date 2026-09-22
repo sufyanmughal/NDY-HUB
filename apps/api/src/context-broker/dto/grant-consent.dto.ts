@@ -1,4 +1,10 @@
-import { ArrayNotEmpty, IsArray, IsEnum, IsString, MinLength } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsEnum,
+  IsString,
+  MinLength,
+} from 'class-validator';
 import { AiAgentConsentScope } from '@prisma/client';
 
 export class GrantAiAgentConsentDto {

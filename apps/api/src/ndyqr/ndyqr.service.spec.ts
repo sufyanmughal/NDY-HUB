@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment -- jest.fn() test doubles are untyped; assertions on them are intentional. */
 import { NdyqrService } from './ndyqr.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeoIpService } from '../common/geo-ip.service';
@@ -24,7 +25,7 @@ const DTO = { label: 'Menu', destination: 'https://ndystays.com/room/42' };
 describe('NdyqrService — ownership', () => {
   it('attributes a member-created code to the member', async () => {
     const { prisma, service } = makeService();
-    await service.create('user-1', DTO as never);
+    await service.create('user-1', DTO);
     expect(prisma.ndyQrCode.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ ownerId: 'user-1' }),
@@ -37,7 +38,7 @@ describe('NdyqrService — ownership', () => {
 
   it('attributes a service-created code to the OAuth client, with no user owner', async () => {
     const { prisma, service } = makeService();
-    await service.createForClient('cl_quiz', DTO as never);
+    await service.createForClient('cl_quiz', DTO);
     expect(prisma.ndyQrCode.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ oauthClientId: 'cl_quiz' }),

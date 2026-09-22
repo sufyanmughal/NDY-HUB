@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { customAlphabet } from 'nanoid';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
@@ -149,7 +145,8 @@ export class NdyqrService {
    * encode different things. */
   publicUrlFor(slug: string): string {
     const base = (
-      this.config.get<string>('API_URL') ?? `http://localhost:${this.config.get('PORT') ?? 3000}`
+      this.config.get<string>('API_URL') ??
+      `http://localhost:${this.config.get('PORT') ?? 3000}`
     ).replace(/\/$/, '');
     return `${base}/q/${slug}`;
   }
@@ -167,10 +164,7 @@ export class NdyqrService {
    * to, or null when the slug is unknown, deactivated, or expired — the
    * controller turns null into a friendly 404. Records the scan
    * fire-and-forget so a slow analytics/geo write never delays the redirect. */
-  async resolveDestination(
-    slug: string,
-    req: Request,
-  ): Promise<string | null> {
+  async resolveDestination(slug: string, req: Request): Promise<string | null> {
     const code = await this.prisma.ndyQrCode.findUnique({ where: { slug } });
     if (!code || !code.isActive) return null;
     if (code.expiresAt && code.expiresAt.getTime() <= Date.now()) return null;
@@ -184,12 +178,21 @@ export class NdyqrService {
    * side-effect record in this codebase). */
   private async recordScan(qrCodeId: string, req: Request): Promise<void> {
     try {
-      const userAgentHeader = req.headers['user-agent'];
+      // Header values are typed `any` on this Request type — cast to the
+      // concrete shape so they stay string | string[] | undefined rather than
+      // flowing through as unsafe any values.
+      const headers = req.headers as Record<
+        string,
+        string | string[] | undefined
+      >;
+      const userAgentHeader = headers['user-agent'];
       const userAgent = Array.isArray(userAgentHeader)
         ? userAgentHeader[0]
         : userAgentHeader;
-      const refererHeader = req.headers['referer'] ?? req.headers['referrer'];
-      const referer = Array.isArray(refererHeader) ? refererHeader[0] : refererHeader;
+      const refererHeader = headers['referer'] ?? headers['referrer'];
+      const referer = Array.isArray(refererHeader)
+        ? refererHeader[0]
+        : refererHeader;
       const location = await this.geoIp.lookupLocation(req.ip);
 
       await this.prisma.ndyQrScan.create({
@@ -240,7 +243,10 @@ export class NdyqrService {
       const device = scan.deviceType ?? 'unknown';
       deviceMap.set(device, (deviceMap.get(device) ?? 0) + 1);
       if (scan.location) {
-        locationMap.set(scan.location, (locationMap.get(scan.location) ?? 0) + 1);
+        locationMap.set(
+          scan.location,
+          (locationMap.get(scan.location) ?? 0) + 1,
+        );
       }
     }
 
@@ -289,7 +295,9 @@ function deviceTypeFromUserAgent(userAgent: string | undefined): string {
   if (!userAgent) return 'unknown';
   const ua = userAgent.toLowerCase();
   if (/ipad|tablet|playbook|silk/.test(ua)) return 'tablet';
-  if (/mobi|iphone|ipod|android.*mobile|windows phone/.test(ua)) return 'mobile';
-  if (/bot|crawler|spider|curl|wget|python|axios|node-fetch/.test(ua)) return 'bot';
+  if (/mobi|iphone|ipod|android.*mobile|windows phone/.test(ua))
+    return 'mobile';
+  if (/bot|crawler|spider|curl|wget|python|axios|node-fetch/.test(ua))
+    return 'bot';
   return 'desktop';
 }

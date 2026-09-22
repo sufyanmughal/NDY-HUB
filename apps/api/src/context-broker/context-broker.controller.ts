@@ -10,7 +10,10 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedRequestUser } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { AI_AGENT_SCOPES, ContextBrokerService } from './context-broker.service';
+import {
+  AI_AGENT_SCOPES,
+  ContextBrokerService,
+} from './context-broker.service';
 import { GrantAiAgentConsentDto } from './dto/grant-consent.dto';
 
 /**

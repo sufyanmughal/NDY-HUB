@@ -38,7 +38,8 @@ function makePrisma() {
               createdAt ? security.reuseInWindow : security.reuseEver,
             );
           }
-          if (type === 'DEVICE_REVOKED') return Promise.resolve(security.deviceRevokedInWindow);
+          if (type === 'DEVICE_REVOKED')
+            return Promise.resolve(security.deviceRevokedInWindow);
           if (type === 'LOGIN_SUCCESS') return Promise.resolve(security.logins);
           return Promise.resolve(0);
         },
@@ -103,7 +104,9 @@ describe('TrustService — locked v1 model', () => {
     it('email only = baseline + 6', async () => {
       const { prisma, service } = makeService();
       stubUser(prisma, { verificationLevel: VerificationLevel.LEVEL_1 });
-      expect((await service.recompute('user-1')).score).toBe(SCORE.baseline + 6);
+      expect((await service.recompute('user-1')).score).toBe(
+        SCORE.baseline + 6,
+      );
     });
 
     it('email + phone = baseline + 12, tier BASIC', async () => {
@@ -129,24 +132,32 @@ describe('TrustService — locked v1 model', () => {
       stubUser(prisma, { totpEnabledAt: new Date() });
       prisma.passkey.count.mockResolvedValue(1);
       prisma.totpBackupCode.count.mockResolvedValue(5);
-      expect((await service.recompute('user-1')).score).toBe(SCORE.baseline + 12);
+      expect((await service.recompute('user-1')).score).toBe(
+        SCORE.baseline + 12,
+      );
     });
 
     it('treats SMS 2FA as 2FA too', async () => {
       const { prisma, service } = makeService();
       stubUser(prisma, { smsPhoneE164: '+15551234567' });
-      expect((await service.recompute('user-1')).score).toBe(SCORE.baseline + 6);
+      expect((await service.recompute('user-1')).score).toBe(
+        SCORE.baseline + 6,
+      );
     });
 
     it('adds device trust (+6) only when no device approval is unresolved', async () => {
       const { prisma, service } = makeService();
       stubUser(prisma);
       prisma.device.count.mockResolvedValue(1);
-      expect((await service.recompute('user-1')).score).toBe(SCORE.baseline + 6);
+      expect((await service.recompute('user-1')).score).toBe(
+        SCORE.baseline + 6,
+      );
 
       // A pending approval withholds the "all resolved" half.
       prisma.deviceApprovalRequest.count.mockResolvedValue(1);
-      expect((await service.recompute('user-1')).score).toBe(SCORE.baseline + 3);
+      expect((await service.recompute('user-1')).score).toBe(
+        SCORE.baseline + 3,
+      );
     });
 
     it('adds verified claims (+8) for a business claim and a third-party credential', async () => {
@@ -163,7 +174,9 @@ describe('TrustService — locked v1 model', () => {
       // Claim alone, without LEVEL_3 identity verification, is not TRUSTED.
       stubUser(prisma);
       prisma.passportClaim.findFirst.mockResolvedValue({ id: 'claim' });
-      expect((await service.recompute('user-1')).tier).toBe(TrustTier.UNVERIFIED);
+      expect((await service.recompute('user-1')).tier).toBe(
+        TrustTier.UNVERIFIED,
+      );
 
       stubUser(prisma, { verificationLevel: VerificationLevel.LEVEL_3 });
       expect((await service.recompute('user-1')).tier).toBe(TrustTier.TRUSTED);
@@ -172,7 +185,9 @@ describe('TrustService — locked v1 model', () => {
     it('adds account age (+3) for an account older than 90 days', async () => {
       const { prisma, service } = makeService();
       stubUser(prisma, { createdAt: OLD_ACCOUNT });
-      expect((await service.recompute('user-1')).score).toBe(SCORE.baseline + 3);
+      expect((await service.recompute('user-1')).score).toBe(
+        SCORE.baseline + 3,
+      );
     });
 
     it('adds sustained-activity (+3) only with enough sign-ins spread over the span', async () => {
@@ -187,7 +202,9 @@ describe('TrustService — locked v1 model', () => {
 
       // Enough sign-ins but not spread over the span → no bonus.
       security.loginOldEnough = false;
-      expect((await service.recompute('user-1')).score).toBe(SCORE.baseline + 3);
+      expect((await service.recompute('user-1')).score).toBe(
+        SCORE.baseline + 3,
+      );
     });
   });
 
@@ -197,17 +214,23 @@ describe('TrustService — locked v1 model', () => {
       stubUser(prisma);
       security.reuseInWindow = 1;
       security.reuseEver = 1;
-      expect((await service.recompute('user-1')).score).toBe(SCORE.baseline - 30);
+      expect((await service.recompute('user-1')).score).toBe(
+        SCORE.baseline - 30,
+      );
     });
 
     it('caps the device-revocation penalty at −9', async () => {
       const { prisma, security, service } = makeService();
       stubUser(prisma);
       security.deviceRevokedInWindow = 1;
-      expect((await service.recompute('user-1')).score).toBe(SCORE.baseline - 3);
+      expect((await service.recompute('user-1')).score).toBe(
+        SCORE.baseline - 3,
+      );
 
       security.deviceRevokedInWindow = 4;
-      expect((await service.recompute('user-1')).score).toBe(SCORE.baseline - 9);
+      expect((await service.recompute('user-1')).score).toBe(
+        SCORE.baseline - 9,
+      );
     });
 
     it('decays a penalty once the triggering event is outside the window', async () => {

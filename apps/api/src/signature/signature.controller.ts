@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -48,10 +56,7 @@ export class SignatureController {
    * mutate the slot. */
   @UseGuards(JwtAuthGuard)
   @Get(':token/preview')
-  preview(
-    @Param('token') token: string,
-    @CurrentUser() _user: AuthenticatedRequestUser,
-  ) {
+  preview(@Param('token') token: string) {
     return this.signatures.preview(token);
   }
 
@@ -71,7 +76,13 @@ export class SignatureController {
     @CurrentUser() user: AuthenticatedRequestUser,
     @Req() req: Request,
   ) {
-    const userAgent = req.headers['user-agent'];
+    // Cast: header values are typed `any` here, so narrow to the concrete shape
+    // rather than passing an unsafe value through.
+    const headers = req.headers as Record<
+      string,
+      string | string[] | undefined
+    >;
+    const userAgent = headers['user-agent'];
     return this.signatures.sign(
       user,
       token,

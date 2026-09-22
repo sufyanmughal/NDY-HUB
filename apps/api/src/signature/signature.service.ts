@@ -84,7 +84,10 @@ export class SignatureService {
    * same "shown once" contract as an OAuth client secret / workspace invite
    * link) so the creator can share them out-of-band when email isn't
    * configured. */
-  async create(actor: AuthenticatedRequestUser, dto: CreateSignatureRequestDto) {
+  async create(
+    actor: AuthenticatedRequestUser,
+    dto: CreateSignatureRequestDto,
+  ) {
     const signerDefaults: SignatureSignerDto[] = dto.signers.map((s, index) => {
       if (!s.userId && !s.email) {
         throw new BadRequestException(
@@ -236,7 +239,9 @@ export class SignatureService {
         sourceEventId: `signature-signed:${signature.id}`,
       })
       .catch((err) =>
-        this.logger.warn(`Failed to notify creator of signature ${signature.id}: ${err}`),
+        this.logger.warn(
+          `Failed to notify creator of signature ${signature.id}: ${err}`,
+        ),
       );
 
     return { signature, requestStatus: status };
@@ -266,7 +271,9 @@ export class SignatureService {
         sourceEventId: `signature-declined:${signer.id}`,
       })
       .catch((err) =>
-        this.logger.warn(`Failed to notify creator of decline ${signer.id}: ${err}`),
+        this.logger.warn(
+          `Failed to notify creator of decline ${signer.id}: ${err}`,
+        ),
       );
 
     return { declined: true };
@@ -277,7 +284,8 @@ export class SignatureService {
     const request = await this.prisma.signatureRequest.findUnique({
       where: { id: requestId },
     });
-    if (!request) throw new NotFoundException('No signature request with that id.');
+    if (!request)
+      throw new NotFoundException('No signature request with that id.');
     if (request.createdByUserId !== actor.sub) {
       throw new ForbiddenException('Only the creator can revoke this request.');
     }
@@ -366,9 +374,12 @@ export class SignatureService {
       include: { signatureRequest: true },
     });
     if (!signer) throw new NotFoundException('Invalid signing link.');
-    if (signer.signedAt) throw new ConflictException('This document is already signed.');
+    if (signer.signedAt)
+      throw new ConflictException('This document is already signed.');
     if (signer.declinedAt) {
-      throw new ConflictException('You already declined to sign this document.');
+      throw new ConflictException(
+        'You already declined to sign this document.',
+      );
     }
     if (signer.expiresAt.getTime() <= Date.now()) {
       throw new ConflictException('This signing link has expired.');
