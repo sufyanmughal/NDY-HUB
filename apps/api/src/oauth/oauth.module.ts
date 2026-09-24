@@ -50,6 +50,6 @@ import { NotificationModule } from '../notifications/notification.module';
   // registry — an ecosystem app reporting a verified economy event
   // authenticates the same way it would for any other server-to-server
   // NDY HUB call.
-  exports: [GrantService, OAuthClientService],
+  exports: [GrantService, OAuthClientService, OidcKeysService],
 })
 export class OAuthModule {}

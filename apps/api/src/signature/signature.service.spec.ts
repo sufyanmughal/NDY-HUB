@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { SignatureRequestStatus } from '@prisma/client';
 import { SignatureService, SIGNATURE_CONSENT_TEXT } from './signature.service';
+import { OidcKeysService } from '../oauth/oidc-keys.service';
+import { importJWK, jwtVerify, type JWK } from 'jose';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../common/mail.service';
 import { NotificationService } from '../notifications/notification.service';
@@ -42,15 +44,21 @@ function makeService() {
   const mail = { send: jest.fn().mockResolvedValue(undefined) };
   const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
   const config = {
+    get: jest.fn().mockReturnValue(undefined),
     getOrThrow: jest.fn().mockReturnValue('http://localhost:3001'),
   };
+  // With no OIDC_RSA_PRIVATE_KEY configured, OidcKeysService generates an
+  // ephemeral keypair — which is exactly what lets these tests verify the
+  // attestation for real against its published public JWK.
+  const keys = new OidcKeysService(config as unknown as ConfigService);
   const service = new SignatureService(
     prisma as unknown as PrismaService,
     mail as unknown as MailService,
     notifications as unknown as NotificationService,
     config as unknown as ConfigService,
+    keys,
   );
-  return { prisma, mail, notifications, config, service };
+  return { prisma, mail, notifications, config, keys, service };
 }
 
 describe('SignatureService', () => {
@@ -203,6 +211,52 @@ describe('SignatureService', () => {
       expect(notifications.notify).toHaveBeenCalledTimes(1);
     });
 
+    it('attests the signature with a JWS that verifies against the published key', async () => {
+      const { prisma, keys, service } = makeService();
+      prisma.signatureRequestSigner.findUnique.mockResolvedValue({
+        id: 'slot-1',
+        signatureRequestId: 'req-1',
+        userId: 'user-1',
+        invitedEmail: null,
+        signedAt: null,
+        declinedAt: null,
+        expiresAt: new Date(Date.now() + 1000),
+        signatureRequest: {
+          id: 'req-1',
+          status: SignatureRequestStatus.PENDING,
+          contentHash: 'd'.repeat(64),
+          title: 'Doc',
+          createdByUserId: 'creator-1',
+          expiresAt: null,
+        },
+      });
+      prisma.signature.create.mockResolvedValue({ id: 'sig-1' });
+      prisma.signatureRequestSigner.findMany.mockResolvedValue([
+        { signedAt: new Date(), declinedAt: null },
+      ]);
+      prisma.signatureRequest.update.mockResolvedValue({});
+
+      await service.sign(actor, 'tok');
+
+      const data = prisma.signature.create.mock.calls[0][0].data as {
+        id: string;
+        attestation: string;
+        attestationKeyId: string;
+      };
+      expect(data.attestationKeyId).toBe(keys.keyId);
+
+      // The real assertion: the token verifies against the SAME public JWK the
+      // server publishes, and carries the claims a third party would check.
+      const publicKey = await importJWK(keys.publicJwk as JWK, 'RS256');
+      const { payload } = await jwtVerify(data.attestation, publicKey);
+      expect(payload.sub).toBe('NDY-USER-1');
+      expect(payload.iss).toBe('http://localhost:3001');
+      expect(payload.aud).toBe('ndy-signature');
+      expect(payload.jti).toBe(data.id);
+      expect(payload.contentHash).toBe('d'.repeat(64));
+      expect(payload.consentText).toBe(SIGNATURE_CONSENT_TEXT);
+    });
+
     it('binds an email-invited slot to the caller when the emails match', async () => {
       const { service, prisma } = makeService();
       prisma.signatureRequestSigner.findUnique.mockResolvedValue({
@@ -306,6 +360,8 @@ describe('SignatureService', () => {
         contentHash: 'a'.repeat(64),
         signerNdyId: 'NDY-USER-1',
         signedAt,
+        attestation: 'header.payload.signature',
+        attestationKeyId: 'dev-ephemeral',
         // Fields that must NOT leak:
         signerUserId: 'user-1',
         ip: '1.2.3.4',
@@ -320,6 +376,9 @@ describe('SignatureService', () => {
         contentHash: 'a'.repeat(64),
         signerNdyId: 'NDY-USER-1',
         signedAt,
+        attestation: 'header.payload.signature',
+        attestationKeyId: 'dev-ephemeral',
+        jwksUri: expect.stringContaining('/.well-known/jwks.json') as unknown,
       });
       expect(result).not.toHaveProperty('ip');
       expect(result).not.toHaveProperty('userAgent');

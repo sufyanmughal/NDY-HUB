@@ -8,6 +8,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SignJWT } from 'jose';
 import {
   NotificationCategory,
   NotificationChannel,
@@ -16,6 +17,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../common/mail.service';
 import { NotificationService } from '../notifications/notification.service';
+import { OidcKeysService } from '../oauth/oidc-keys.service';
 import type { AuthenticatedRequestUser } from '../auth/guards/jwt-auth.guard';
 import {
   CreateSignatureRequestDto,
@@ -77,6 +79,7 @@ export class SignatureService {
     private readonly mail: MailService,
     private readonly notifications: NotificationService,
     private readonly config: ConfigService,
+    private readonly keys: OidcKeysService,
   ) {}
 
   /** Creates a request and one signer slot per signer, minting a single-use
@@ -207,18 +210,35 @@ export class SignatureService {
     const signer = await this.loadSignerForSigning(rawToken);
     await this.assertSignerIdentity(signer, actor);
 
+    // Generated up front so the attestation can bind to it as its `jti` — that
+    // is what ties the cryptographic proof to this exact signature row.
+    const signatureId = crypto.randomUUID();
+    const contentHash = signer.signatureRequest.contentHash;
+    const attestation = await this.attest({
+      signatureId,
+      signerNdyId: actor.ndyId,
+      contentHash,
+      requestId: signer.signatureRequestId,
+      issuedAt: new Date(),
+    });
+
     const signature = await this.prisma.signature.create({
       data: {
+        id: signatureId,
         signatureRequestId: signer.signatureRequestId,
         signerUserId: actor.sub,
         signerNdyId: actor.ndyId,
         // Copy the hash at sign time — proves what was actually signed even if
         // the request row is later altered.
-        contentHash: signer.signatureRequest.contentHash,
+        contentHash,
         ip: ip ?? null,
         userAgent: userAgent ?? null,
         // Verbatim record of what the signer agreed to.
         consentText: SIGNATURE_CONSENT_TEXT,
+        // Cryptographic attestation over the claims above, verifiable against
+        // NDY HUB's published JWKS. Null if signing failed — see attest().
+        attestation: attestation.jws,
+        attestationKeyId: attestation.keyId,
       },
     });
 
@@ -324,6 +344,49 @@ export class SignatureService {
     };
   }
 
+  /**
+   * Signs this signature's claims with NDY HUB's OIDC keypair, producing a
+   * compact JWS a third party can verify against the published JWKS — the
+   * "cryptographic proof + independent verification" half of the client's v1
+   * definition, with no new key material to distribute or rotate.
+   *
+   * Scoped claim: this proves **NDY HUB attested this record**. It does NOT
+   * prove the signer personally held a private key — that needs a per-user
+   * signing key and is a later assurance level, not something to imply now.
+   *
+   * Deliberately fail-soft: if signing throws (misconfigured key material), the
+   * signature is still recorded with a null attestation. The signature already
+   * happened; losing it because of a key problem would be the worse failure.
+   */
+  private async attest(params: {
+    signatureId: string;
+    signerNdyId: string;
+    contentHash: string;
+    requestId: string;
+    issuedAt: Date;
+  }): Promise<{ jws: string | null; keyId: string | null }> {
+    try {
+      const jws = await new SignJWT({
+        contentHash: params.contentHash,
+        consentText: SIGNATURE_CONSENT_TEXT,
+        signatureRequestId: params.requestId,
+      })
+        .setProtectedHeader({ alg: 'RS256', kid: this.keys.keyId, typ: 'JWT' })
+        .setIssuer(this.config.getOrThrow<string>('WEB_APP_URL'))
+        .setAudience('ndy-signature')
+        .setSubject(params.signerNdyId)
+        .setJti(params.signatureId)
+        .setIssuedAt(Math.floor(params.issuedAt.getTime() / 1000))
+        .sign(this.keys.privateKey);
+      return { jws, keyId: this.keys.keyId };
+    } catch (err) {
+      this.logger.warn(
+        `Failed to attest signature ${params.signatureId}: ${(err as Error).message}`,
+      );
+      return { jws: null, keyId: null };
+    }
+  }
+
   /** Public, unauthenticated verification — the actual "independently
    * verifiable artifact" surface. Returns only what a third party needs and
    * nothing more (no emails, no PII beyond the public ndyId). */
@@ -332,12 +395,21 @@ export class SignatureService {
       where: { id: signatureId },
     });
     if (!signature) throw new NotFoundException('No signature with that id.');
+    const apiUrl =
+      this.config.get<string>('API_URL') ??
+      `http://localhost:${this.config.get('PORT') ?? 3000}`;
     return {
       signatureId: signature.id,
       signatureRequestId: signature.signatureRequestId,
       contentHash: signature.contentHash,
       signerNdyId: signature.signerNdyId,
       signedAt: signature.signedAt,
+      // The cryptographic proof. A third party verifies the JWS against the
+      // published JWKS below, then checks that its `contentHash` claim matches
+      // the document they hold — without trusting this database at all.
+      attestation: signature.attestation,
+      attestationKeyId: signature.attestationKeyId,
+      jwksUri: `${apiUrl}/.well-known/jwks.json`,
     };
   }
 

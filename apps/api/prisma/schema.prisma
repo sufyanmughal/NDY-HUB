@@ -2027,6 +2027,18 @@ model Signature {
   // (SignatureService.SIGNATURE_CONSENT_TEXT) rather than accepted from the
   // client — otherwise a caller could claim it displayed anything.
   consentText        String?
+  // A compact JWS (RS256) attesting this signature, signed with NDY HUB's
+  // published OIDC keypair so a third party can verify it against the existing
+  // /.well-known/jwks.json with no new key to distribute. This is the
+  // "cryptographic proof + independent verification" half of the client's v1
+  // definition. It proves NDY HUB ATTESTED this record; it deliberately does
+  // NOT claim the signer held a private key — a stronger claim needs a real
+  // signing key per user, which is a later assurance level.
+  //
+  // Nullable: rows created before this existed, and attestation signing must
+  // never block recording a signature that already happened.
+  attestation        String?
+  attestationKeyId   String?
   signedAt           DateTime         @default(now())
 
   @@index([signatureRequestId])

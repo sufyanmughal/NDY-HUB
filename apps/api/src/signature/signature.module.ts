@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationModule } from '../notifications/notification.module';
+import { OAuthModule } from '../oauth/oauth.module';
 import { SignatureController } from './signature.controller';
 import { SignatureService } from './signature.service';
 
@@ -15,7 +16,9 @@ import { SignatureService } from './signature.service';
  * lifecycle.
  */
 @Module({
-  imports: [AuthModule, NotificationModule],
+  // OAuthModule provides OidcKeysService so a signature can be cryptographically
+  // attested with NDY HUB's existing published signing keypair.
+  imports: [AuthModule, NotificationModule, OAuthModule],
   controllers: [SignatureController],
   providers: [SignatureService],
   exports: [SignatureService],
