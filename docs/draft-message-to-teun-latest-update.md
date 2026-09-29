@@ -5,7 +5,7 @@ verified.
 
 **Verification:** API builds clean; **126 automated tests pass** across 14
 suites; lint is clean on every file I have touched; the web app builds for
-production. Fourteen feature commits are in place, one per change.
+production.
 
 ---
 
