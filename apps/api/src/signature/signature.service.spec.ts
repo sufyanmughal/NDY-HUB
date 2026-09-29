@@ -5,7 +5,10 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { SignatureRequestStatus } from '@prisma/client';
+import {
+  SignatureAttestationStatus,
+  SignatureRequestStatus,
+} from '@prisma/client';
 import { SignatureService, SIGNATURE_CONSENT_TEXT } from './signature.service';
 import { OidcKeysService } from '../oauth/oidc-keys.service';
 import { importJWK, jwtVerify, type JWK } from 'jose';
@@ -34,7 +37,7 @@ function makePrisma() {
       findMany: jest.fn(),
       update: jest.fn(),
     },
-    signature: { create: jest.fn(), findUnique: jest.fn() },
+    signature: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     user: { findUnique: jest.fn() },
   };
 }
@@ -242,8 +245,11 @@ describe('SignatureService', () => {
         id: string;
         attestation: string;
         attestationKeyId: string;
+        attestationStatus: SignatureAttestationStatus;
       };
       expect(data.attestationKeyId).toBe(keys.keyId);
+      // VERIFIED is set only because the produced token validated below.
+      expect(data.attestationStatus).toBe(SignatureAttestationStatus.VERIFIED);
 
       // The real assertion: the token verifies against the SAME public JWK the
       // server publishes, and carries the claims a third party would check.
@@ -255,6 +261,100 @@ describe('SignatureService', () => {
       expect(payload.jti).toBe(data.id);
       expect(payload.contentHash).toBe('d'.repeat(64));
       expect(payload.consentText).toBe(SIGNATURE_CONSENT_TEXT);
+    });
+
+    it('records FAILED — never a verified proof — when signing cannot complete', async () => {
+      const { prisma, config, service } = makeService();
+      // Misconfigured issuer material: attestation cannot complete.
+      config.getOrThrow.mockImplementation(() => {
+        throw new Error('WEB_APP_URL is not set');
+      });
+      prisma.signatureRequestSigner.findUnique.mockResolvedValue({
+        id: 'slot-1',
+        signatureRequestId: 'req-1',
+        userId: 'user-1',
+        invitedEmail: null,
+        signedAt: null,
+        declinedAt: null,
+        expiresAt: new Date(Date.now() + 1000),
+        signatureRequest: {
+          id: 'req-1',
+          status: SignatureRequestStatus.PENDING,
+          contentHash: 'd'.repeat(64),
+          title: 'Doc',
+          createdByUserId: 'creator-1',
+          expiresAt: null,
+        },
+      });
+      prisma.signature.create.mockResolvedValue({ id: 'sig-1' });
+      prisma.signatureRequestSigner.findMany.mockResolvedValue([
+        { signedAt: new Date(), declinedAt: null },
+      ]);
+      prisma.signatureRequest.update.mockResolvedValue({});
+
+      // The member's action is still recorded (fail-soft)…
+      await service.sign(actor, 'tok');
+
+      const data = prisma.signature.create.mock.calls[0][0].data as {
+        attestation: string | null;
+        attestationStatus: SignatureAttestationStatus;
+        attestationAttempts: number;
+        attestationLastError: string | null;
+      };
+      // …but it is not presented as cryptographically verified, and the failure
+      // is recorded so a retry is possible and explicable.
+      expect(data.attestationStatus).toBe(SignatureAttestationStatus.FAILED);
+      expect(data.attestation).toBeNull();
+      expect(data.attestationAttempts).toBe(1);
+      expect(data.attestationLastError).toContain('WEB_APP_URL');
+    });
+
+    it('reattest() recovers a failed proof and records the attempt', async () => {
+      const { prisma, service } = makeService();
+      prisma.signature.findUnique.mockResolvedValue({
+        id: 'sig-1',
+        signatureRequestId: 'req-1',
+        signerNdyId: 'NDY-USER-1',
+        contentHash: 'd'.repeat(64),
+        signedAt: new Date(),
+        attestationStatus: SignatureAttestationStatus.FAILED,
+        attestationAttempts: 1,
+        attestedAt: null,
+      });
+      prisma.signature.update.mockImplementation((args: { data: unknown }) =>
+        Promise.resolve(args.data),
+      );
+
+      const result = await service.reattest('sig-1');
+
+      expect(result.status).toBe(SignatureAttestationStatus.VERIFIED);
+      expect(result.attempts).toBe(2);
+      const updated = prisma.signature.update.mock.calls[0][0].data as {
+        attestation: string | null;
+        attestationStatus: SignatureAttestationStatus;
+      };
+      expect(updated.attestationStatus).toBe(
+        SignatureAttestationStatus.VERIFIED,
+      );
+      expect(updated.attestation).toEqual(expect.any(String));
+    });
+
+    it('reattest() leaves an already-verified signature untouched', async () => {
+      const { prisma, service } = makeService();
+      prisma.signature.findUnique.mockResolvedValue({
+        id: 'sig-1',
+        signatureRequestId: 'req-1',
+        signerNdyId: 'NDY-USER-1',
+        contentHash: 'd'.repeat(64),
+        signedAt: new Date(),
+        attestationStatus: SignatureAttestationStatus.VERIFIED,
+        attestationAttempts: 1,
+      });
+
+      const result = await service.reattest('sig-1');
+
+      expect(result.attempts).toBe(1);
+      expect(prisma.signature.update).not.toHaveBeenCalled();
     });
 
     it('binds an email-invited slot to the caller when the emails match', async () => {
@@ -362,6 +462,7 @@ describe('SignatureService', () => {
         signedAt,
         attestation: 'header.payload.signature',
         attestationKeyId: 'dev-ephemeral',
+        attestationStatus: SignatureAttestationStatus.VERIFIED,
         // Fields that must NOT leak:
         signerUserId: 'user-1',
         ip: '1.2.3.4',
@@ -376,12 +477,33 @@ describe('SignatureService', () => {
         contentHash: 'a'.repeat(64),
         signerNdyId: 'NDY-USER-1',
         signedAt,
+        attestationStatus: SignatureAttestationStatus.VERIFIED,
         attestation: 'header.payload.signature',
         attestationKeyId: 'dev-ephemeral',
         jwksUri: expect.stringContaining('/.well-known/jwks.json') as unknown,
       });
       expect(result).not.toHaveProperty('ip');
       expect(result).not.toHaveProperty('userAgent');
+    });
+
+    it('does NOT expose a proof unless it was validated', async () => {
+      const { service, prisma } = makeService();
+      prisma.signature.findUnique.mockResolvedValue({
+        id: 'sig-2',
+        signatureRequestId: 'req-1',
+        contentHash: 'a'.repeat(64),
+        signerNdyId: 'NDY-USER-1',
+        signedAt: new Date(),
+        attestation: 'an-unvalidated-token',
+        attestationKeyId: 'dev-ephemeral',
+        attestationStatus: SignatureAttestationStatus.FAILED,
+      });
+
+      const result = await service.verify('sig-2');
+
+      expect(result.attestationStatus).toBe(SignatureAttestationStatus.FAILED);
+      expect(result.attestation).toBeNull();
+      expect(result.attestationKeyId).toBeNull();
     });
 
     it('404s for an unknown signature', async () => {

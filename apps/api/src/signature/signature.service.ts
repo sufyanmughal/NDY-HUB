@@ -8,10 +8,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SignJWT } from 'jose';
+import { SignJWT, importJWK, jwtVerify, type JWK } from 'jose';
 import {
   NotificationCategory,
   NotificationChannel,
+  SignatureAttestationStatus,
   SignatureRequestStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -236,9 +237,17 @@ export class SignatureService {
         // Verbatim record of what the signer agreed to.
         consentText: SIGNATURE_CONSENT_TEXT,
         // Cryptographic attestation over the claims above, verifiable against
-        // NDY HUB's published JWKS. Null if signing failed — see attest().
+        // NDY HUB's published JWKS. Only a VALIDATED proof counts as verified —
+        // see attest().
         attestation: attestation.jws,
         attestationKeyId: attestation.keyId,
+        attestationStatus: attestation.status,
+        attestationAttempts: 1,
+        attestationLastError: attestation.error,
+        attestedAt:
+          attestation.status === SignatureAttestationStatus.VERIFIED
+            ? new Date()
+            : null,
       },
     });
 
@@ -364,7 +373,12 @@ export class SignatureService {
     contentHash: string;
     requestId: string;
     issuedAt: Date;
-  }): Promise<{ jws: string | null; keyId: string | null }> {
+  }): Promise<{
+    jws: string | null;
+    keyId: string | null;
+    status: SignatureAttestationStatus;
+    error: string | null;
+  }> {
     try {
       const jws = await new SignJWT({
         contentHash: params.contentHash,
@@ -378,13 +392,90 @@ export class SignatureService {
         .setJti(params.signatureId)
         .setIssuedAt(Math.floor(params.issuedAt.getTime() / 1000))
         .sign(this.keys.privateKey);
-      return { jws, keyId: this.keys.keyId };
+
+      // Validate before claiming anything. The client's bar is that the proof
+      // "exists AND has been validated", so VERIFIED is set only after the token
+      // we just produced verifies against our own published key with the required
+      // issuer and audience — not merely because signing returned a string.
+      const key = await importJWK(this.keys.publicJwk as JWK, 'RS256');
+      await jwtVerify(jws, key, {
+        issuer: this.config.getOrThrow<string>('WEB_APP_URL'),
+        audience: 'ndy-signature',
+      });
+
+      return {
+        jws,
+        keyId: this.keys.keyId,
+        status: SignatureAttestationStatus.VERIFIED,
+        error: null,
+      };
     } catch (err) {
+      // Fail-soft by design: the signature already happened, so a proof problem
+      // must not discard the user's action. It is recorded as FAILED instead,
+      // which is exactly the state the retry path below recovers from.
+      const message = (err as Error).message;
       this.logger.warn(
-        `Failed to attest signature ${params.signatureId}: ${(err as Error).message}`,
+        `Failed to attest signature ${params.signatureId}: ${message}`,
       );
-      return { jws: null, keyId: null };
+      return {
+        jws: null,
+        keyId: null,
+        status: SignatureAttestationStatus.FAILED,
+        error: message,
+      };
     }
+  }
+
+  /**
+   * Retries attestation for a signature whose proof failed or was never
+   * produced — the audited recovery path. Idempotent: an already-verified
+   * signature is returned untouched. Every attempt increments the stored attempt
+   * count and records the outcome, so both the failure and the recovery are
+   * provable after the fact.
+   */
+  async reattest(signatureId: string) {
+    const signature = await this.prisma.signature.findUnique({
+      where: { id: signatureId },
+    });
+    if (!signature) throw new NotFoundException('No signature with that id.');
+
+    if (signature.attestationStatus === SignatureAttestationStatus.VERIFIED) {
+      return {
+        status: signature.attestationStatus,
+        attempts: signature.attestationAttempts,
+      };
+    }
+
+    const result = await this.attest({
+      signatureId: signature.id,
+      signerNdyId: signature.signerNdyId,
+      contentHash: signature.contentHash,
+      requestId: signature.signatureRequestId,
+      issuedAt: signature.signedAt,
+    });
+
+    const updated = await this.prisma.signature.update({
+      where: { id: signature.id },
+      data: {
+        attestation: result.jws,
+        attestationKeyId: result.keyId,
+        attestationStatus: result.status,
+        attestationAttempts: signature.attestationAttempts + 1,
+        attestationLastError: result.error,
+        attestedAt:
+          result.status === SignatureAttestationStatus.VERIFIED
+            ? new Date()
+            : signature.attestedAt,
+      },
+    });
+
+    this.logger.log(
+      `Re-attestation for signature ${signature.id}: ${result.status} (attempt ${updated.attestationAttempts}).`,
+    );
+    return {
+      status: updated.attestationStatus,
+      attempts: updated.attestationAttempts,
+    };
   }
 
   /** Public, unauthenticated verification — the actual "independently
@@ -398,17 +489,21 @@ export class SignatureService {
     const apiUrl =
       this.config.get<string>('API_URL') ??
       `http://localhost:${this.config.get('PORT') ?? 3000}`;
+    const verified =
+      signature.attestationStatus === SignatureAttestationStatus.VERIFIED;
     return {
       signatureId: signature.id,
       signatureRequestId: signature.signatureRequestId,
       contentHash: signature.contentHash,
       signerNdyId: signature.signerNdyId,
       signedAt: signature.signedAt,
-      // The cryptographic proof. A third party verifies the JWS against the
-      // published JWKS below, then checks that its `contentHash` claim matches
-      // the document they hold — without trusting this database at all.
-      attestation: signature.attestation,
-      attestationKeyId: signature.attestationKeyId,
+      // The authoritative answer to "is this cryptographically verified?".
+      attestationStatus: signature.attestationStatus,
+      // The proof is returned ONLY when it exists AND has been validated. A
+      // pending or failed attestation is reported as its status — never handed
+      // out as though it were a cryptographic attestation.
+      attestation: verified ? signature.attestation : null,
+      attestationKeyId: verified ? signature.attestationKeyId : null,
       jwksUri: `${apiUrl}/.well-known/jwks.json`,
     };
   }

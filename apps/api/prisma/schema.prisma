@@ -1963,6 +1963,22 @@ enum SignatureRequestStatus {
   REVOKED
 }
 
+/**
+ * The state of a signature's cryptographic attestation (client instruction,
+ * 2026-09-24): a record must never be PRESENTED as cryptographically verified
+ * until the proof exists AND has been validated. Freezing that as an explicit
+ * status — rather than inferring it from whether a token string happens to be
+ * present — is what makes the honest answer the default one.
+ */
+enum SignatureAttestationStatus {
+  /** No validated proof yet: not attempted, or awaiting a retry. */
+  PENDING
+  /** A proof exists and was verified against our own published key. */
+  VERIFIED
+  /** Every attempt so far failed. Retriable — see SignatureService.reattest. */
+  FAILED
+}
+
 // A document/statement awaiting one or more signatures. contentHash lets the
 // signed artifact be verified byte-for-byte later without NDY HUB storing the
 // document itself (mirrors IdentityVerificationRequest's "store a
@@ -2039,6 +2055,16 @@ model Signature {
   // never block recording a signature that already happened.
   attestation        String?
   attestationKeyId   String?
+  // Status is the authoritative answer to "is this cryptographically verified?".
+  // Defaults to PENDING deliberately: a row that never got a proof must not read
+  // as verified.
+  attestationStatus  SignatureAttestationStatus @default(PENDING)
+  /** Audited retry trail: how many attestation attempts have been made, when the
+   * last success was, and why the last failure happened. Kept on the record so a
+   * failed proof is explainable and recovery is provable. */
+  attestationAttempts Int   @default(0)
+  attestationLastError String?
+  attestedAt         DateTime?
   signedAt           DateTime         @default(now())
 
   @@index([signatureRequestId])
