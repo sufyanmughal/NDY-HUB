@@ -114,6 +114,42 @@ login for the ecosystem" part), NDY HUB redirects back into your app, and
 sending the PKCE verifier itself. You never touch the authorization code
 or construct the token request by hand.
 
+**If a brand-new user registers here**, NDY HUB's own hosted page handles
+email verification *before* redirecting back to your app — by the time
+`flutter_appauth` hands you tokens, the account is already verified. You
+never see a separate "check your email" screen in your own app, and there
+is nothing to build for it.
+
+### If you're calling `/auth/register` and `/auth/verify-email/confirm` directly instead
+
+Some integrations skip the flow above and call NDY HUB's raw
+`POST /auth/register` / `POST /auth/verify-email/confirm` endpoints
+directly from the app (own in-app "check your email" screen, own
+polling/resend UI). **This is a different, valid pattern — but two things
+about it are easy to miss and have caused real confusion:**
+
+1. **The verification email always links to the NDYHUB website**, not
+   back into your app — there is currently no deep-link/app-redirect step
+   on that link. A user who taps it lands on `ndyhub.com`, gets logged in
+   there, and your app has no way to detect that unless you separately
+   poll `GET /auth/me` (with the token you already hold) to notice
+   `verificationLevel` has moved past `LEVEL_0`. If you need the user
+   redirected back into your app instead, talk to us first — it's a small
+   addition (reusing the same custom-scheme/App-Link redirect URI you
+   already registered in §0), but it does not exist yet.
+2. **The verification link expires in under 5 minutes**
+   (`expiresInSeconds: 299` on both the register and resend-by-email
+   responses). Build your "check your email" screen around that real
+   number with a live countdown and an obvious resend action, rather than
+   assuming the link stays valid indefinitely.
+
+If you didn't already know which of these two patterns you're using: if
+your app opens a system browser/Custom Tab and comes back automatically
+with tokens, you're on the flow above and none of this applies. If your
+app shows its own email/password fields and its own "check your email"
+screen, you're on the direct-endpoint pattern and both points above
+apply to you.
+
 ### Android — register the redirect scheme
 
 In `android/app/build.gradle`, inside `defaultConfig`:
@@ -281,6 +317,22 @@ This keeps the separation intentional: the OAuth client from §0 identifies
 *a user*, on *their own device*; this second client identifies *your
 backend*, reporting on their behalf. A client secret must never ship
 inside the app binary — that's the whole reason Public clients exist.
+
+---
+
+## 6a. Account deletion (App Store / Play Store requirement)
+
+Both Apple and Google require an in-app path to delete the account, not
+just log out. NDY HUB has this: `POST /gdpr/delete-account` (bearer-token
+authenticated, full reference in `docs/API.md`). **One current
+limitation**: it requires the account's current password to confirm the
+deletion. If your users signed up entirely through the OAuth flow above
+(§2) with no password ever set (or via a future Google/Apple sign-in),
+this endpoint will reject them with a clear `400` rather than deleting
+the account. Tell us if this applies to your users — a password-less
+deletion path (re-authentication/OTP-based instead of a password) is a
+known, straightforward addition we haven't built yet because nothing
+needed it until now.
 
 ---
 

@@ -539,6 +539,7 @@ footer.doc-footer {
 
       <div class="toc-group-label">Strong auth</div>
       <a href="#totp">Two-factor (TOTP)</a>
+      <a href="#sms-2fa">SMS-based 2FA</a>
       <a href="#passkeys">Passkeys (WebAuthn)</a>
       <a href="#social">Social login</a>
 
@@ -550,6 +551,7 @@ footer.doc-footer {
       <div class="toc-group-label">Platform integration</div>
       <a href="#oidc">OAuth2 / OIDC provider</a>
       <a href="#qr">QR / cross-device login</a>
+      <a href="#gdpr">Account data & deletion</a>
 
       <div class="toc-group-label">Reference</div>
       <a href="#rate-limits">Rate limits</a>
@@ -655,6 +657,7 @@ footer.doc-footer {
     <section id="email-verification">
       <h2>Email verification</h2>
       <p class="section-intro">Verification is <strong>link-based</strong>, not a code — the email contains a button linking to <code>{WEB_APP_URL}/verify-email?token=...</code>. The link expires in <strong>4 minutes 59 seconds</strong>; after that it must be resent.</p>
+      <div class="callout">For app/mobile integrations: this link currently always opens the NDYHUB website, logs the user in there, and lands them on the NDYHUB dashboard — there is no automatic redirect back into a native app yet. If your app needs the user to land back in-app after verifying, that needs an app-specific deep link wired into this flow (the same custom-scheme/App-Link mechanism already used for OAuth login can be extended here) — ask before assuming it exists. Because the link expires in under 5 minutes, a delay between the email arriving and the user tapping it (spam filtering, a slow push notification) is the most common reason a "verify" tap ends up on an error/login screen instead of succeeding.</div>
 
       <div class="endpoint">
         <div class="route">
@@ -800,7 +803,7 @@ footer.doc-footer {
 
     <section id="totp">
       <h2>Two-factor authentication (TOTP)</h2>
-      <p class="section-intro">Authenticator-app based (RFC 6238, ±30s clock-drift tolerance), plus 8 single-use backup/recovery codes. <strong>SMS and email-OTP are not implemented as 2FA methods yet</strong> — this is TOTP-only today.</p>
+      <p class="section-intro">Authenticator-app based (RFC 6238, ±30s clock-drift tolerance), plus 8 single-use backup/recovery codes. SMS is also supported as a second 2FA method (see <a href="#sms-2fa">SMS-based 2FA</a> below); email-OTP is not implemented.</p>
 
       <div class="endpoint">
         <div class="route">
@@ -843,6 +846,54 @@ footer.doc-footer {
         <p>Step 2 of a 2FA login, called after <code>login()</code> returned <code>requires2fa</code>.</p>
         <pre class="code">{ <span class="k">"challengeToken"</span>: <span class="s">"from-the-login-response"</span>, <span class="k">"code"</span>: <span class="s">"123456-or-backup-code"</span> }</pre>
         <p>Returns a full session. Challenge tokens expire after 5 minutes and are single-use. Using a backup code logs a distinct <code>RECOVERY_CODE_USED</code> security event (see <a href="#sessions">Sessions &amp; security</a>).</p>
+      </div>
+    </section>
+
+    <section id="sms-2fa">
+      <h2>SMS-based 2FA</h2>
+      <p class="section-intro">A second, independent 2FA method (via Sinch) — a user can have TOTP, SMS, both, or neither enabled. At login, if both are enabled the frontend lets the user pick a method; SMS is never sent proactively.</p>
+
+      <div class="endpoint">
+        <div class="route">
+          <span class="method post">POST</span>
+          <span class="path">/auth/sms-2fa/setup</span>
+          <span class="lock-badge">🔒 AUTH</span>
+        </div>
+        <p>Sends a verification code to the number via SMS.</p>
+        <pre class="code">{ <span class="k">"phoneE164"</span>: <span class="s">"+15551234567"</span> }</pre>
+        <p><code>phoneE164</code> must be E.164 format (leading <code>+</code>, 1–15 digits, no spaces/dashes).</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="route">
+          <span class="method post">POST</span>
+          <span class="path">/auth/sms-2fa/enable</span>
+          <span class="lock-badge">🔒 AUTH</span>
+        </div>
+        <p>Same phone number as the setup call, plus the code just received.</p>
+        <pre class="code">{ <span class="k">"phoneE164"</span>: <span class="s">"+15551234567"</span>, <span class="k">"code"</span>: <span class="s">"123456"</span> }</pre>
+      </div>
+
+      <div class="endpoint">
+        <div class="route">
+          <span class="method post">POST</span>
+          <span class="path">/auth/sms-2fa/disable</span>
+          <span class="lock-badge">🔒 AUTH</span>
+        </div>
+        <pre class="code">{ <span class="k">"currentPassword"</span>: <span class="s">"..."</span> }</pre>
+        <p>Password required — same high-friction-on-purpose pattern as TOTP disable.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="route">
+          <span class="method post">POST</span>
+          <span class="path">/auth/2fa/send-sms</span>
+          <span class="public-badge">PUBLIC</span>
+          <span class="rate-badge">5 req/min/IP</span>
+        </div>
+        <p>Called by the login-time method picker when the user chooses "text me a code" instead of entering a TOTP code.</p>
+        <pre class="code">{ <span class="k">"challengeToken"</span>: <span class="s">"from-the-login-response"</span> }</pre>
+        <p>Triggers the SMS send for that in-progress login challenge; the code is then submitted the same way as a TOTP code, via <code>POST /auth/2fa/verify</code>.</p>
       </div>
     </section>
 
@@ -924,8 +975,9 @@ footer.doc-footer {
           <span class="path">/auth/oauth/providers</span>
           <span class="public-badge">PUBLIC</span>
         </div>
-        <pre class="code">{ <span class="k">"google"</span>: <span class="b">true</span>, <span class="k">"apple"</span>: <span class="b">false</span> }</pre>
+        <pre class="code">{ <span class="k">"google"</span>: <span class="b">boolean</span>, <span class="k">"apple"</span>: <span class="b">boolean</span> }</pre>
         <p>Lets the frontend decide whether to render each button at all, based on whether credentials are actually configured server-side.</p>
+        <div class="callout">Both are <code>false</code> until real Google Cloud OAuth / Apple Developer credentials are set as environment variables on the server — this is a deployment/config step, not something a client integration can turn on.</div>
       </div>
 
       <div class="endpoint">
@@ -1224,6 +1276,31 @@ footer.doc-footer {
           <tr><td><span class="method post" style="font-size:11px">POST</span></td><td><code>/auth/login-request/:token/exchange</code></td><td>Desktop, once it sees <code>APPROVED</code>, trades the token for a real session.</td></tr>
         </tbody>
       </table>
+      </div>
+    </section>
+
+    <section id="gdpr">
+      <h2>Account data &amp; deletion (GDPR)</h2>
+
+      <div class="endpoint">
+        <div class="route">
+          <span class="method get">GET</span>
+          <span class="path">/gdpr/export</span>
+          <span class="lock-badge">🔒 AUTH</span>
+        </div>
+        <p>Downloads a JSON file (<code>Content-Disposition: attachment</code>) of the account's profile, sessions, memberships, CRYNDY purchases, NDYBITS ledger, and connected OAuth grants. Internal-only fields (token hashes, etc.) are deliberately excluded.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="route">
+          <span class="method post">POST</span>
+          <span class="path">/gdpr/delete-account</span>
+          <span class="lock-badge">🔒 AUTH</span>
+        </div>
+        <pre class="code">{ <span class="k">"currentPassword"</span>: <span class="s">"..."</span>, <span class="k">"confirm"</span>: <span class="s">"DELETE"</span> }</pre>
+        <p>Self-service right-to-erasure: anonymizes the email/name/photo, clears the password hash, and revokes every active session, OAuth grant, and refresh token — the account is fully signed out everywhere and de-identified. Financial/loyalty records (memberships, CRYNDY purchases, NDYBITS ledger) are kept rather than hard-deleted, matching GDPR Article 17(3)(b)'s standard retention exception.</p>
+        <p><code>confirm</code> must be the literal string <code>"DELETE"</code> — the same "type DELETE to confirm" pattern used everywhere else in this API before a destructive account action.</p>
+        <div class="callout">Accounts with no password set (NDYAPPS-linked, or Google/Apple-only sign-in) cannot use this endpoint yet — it returns <code>400</code> directing the user to contact support instead. A password-less self-service deletion path (re-authentication/OTP-based) is a known, unbuilt gap for app-only/social-only accounts — confirm with the backend team before assuming it exists for your users.</div>
       </div>
     </section>
 

@@ -23,8 +23,9 @@ section's heading.
 11. [Connected accounts (social)](#connected-accounts-social)
 12. [OAuth2 / OIDC provider (for other NDY apps)](#oauth2--oidc-provider-for-other-ndy-apps)
 13. [QR / cross-device login](#qr--cross-device-login)
-14. [Rate limits](#rate-limits)
-15. [Error shape](#error-shape)
+14. [Account data & deletion (GDPR)](#account-data--deletion-gdpr)
+15. [Rate limits](#rate-limits)
+16. [Error shape](#error-shape)
 
 ---
 
@@ -131,6 +132,18 @@ Verification is **link-based**, not a code — the email contains a button
 linking to `{WEB_APP_URL}/verify-email?token=...`. The link expires in
 **4 minutes 59 seconds**; after that it must be resent.
 
+**For app/mobile integrations**: this link currently always opens the
+NDYHUB website, logs the user in there, and lands them on the NDYHUB
+dashboard — there is no automatic redirect back into a native app yet.
+If your app needs the user to land back in-app after verifying, that
+needs an app-specific deep link wired into this flow (the same
+custom-scheme/App-Link mechanism already used for OAuth login in
+`docs/MOBILE-INTEGRATION.md` §2 can be extended here) — ask before
+assuming it exists. Because the link expires in under 5 minutes, a delay
+between the email arriving and the user tapping it (spam filtering, a
+slow push notification) is the most common reason a "verify" tap ends up
+on an error/login screen instead of succeeding.
+
 ### `POST /auth/verify-email/confirm`
 
 Public (no auth) — the token itself is the credential.
@@ -210,8 +223,9 @@ Rate limit: 5 requests/minute/IP.
 ## Two-factor authentication (TOTP)
 
 Authenticator-app based (RFC 6238, ±30s clock-drift tolerance), plus 8
-single-use backup/recovery codes. SMS and email-OTP are **not**
-implemented as 2FA methods yet — this is TOTP-only today.
+single-use backup/recovery codes. SMS is also supported as a second 2FA
+method (see [SMS-based 2FA](#sms-based-2fa) below); email-OTP is **not**
+implemented.
 
 ### `POST /auth/2fa/setup` 🔒
 
@@ -262,6 +276,54 @@ Returns a full session on success. Using a backup code is logged as a
 distinct `RECOVERY_CODE_USED` security event (see
 [Sessions & security](#sessions--security)). Challenge tokens expire after
 5 minutes and are single-use.
+
+Rate limit: 5 requests/minute/IP.
+
+### SMS-based 2FA
+
+A second, independent 2FA method (via Sinch) — a user can have TOTP, SMS,
+both, or neither enabled. At login, if both are enabled the frontend lets
+the user pick a method; SMS is never sent proactively (only TOTP being
+enabled costs nothing extra to try first).
+
+### `POST /auth/sms-2fa/setup` 🔒
+
+```json
+{ "phoneE164": "+15551234567" }
+```
+
+Sends a verification code to the number via SMS. `phoneE164` must be
+E.164 format (leading `+`, 1–15 digits, no spaces/dashes).
+
+### `POST /auth/sms-2fa/enable` 🔒
+
+```json
+{ "phoneE164": "+15551234567", "code": "123456" }
+```
+
+Same phone number as the setup call, plus the code just received.
+Confirms and enables SMS 2FA on the account.
+
+### `POST /auth/sms-2fa/disable` 🔒
+
+```json
+{ "currentPassword": "..." }
+```
+
+Password required — same high-friction-on-purpose pattern as TOTP disable.
+
+### `POST /auth/2fa/send-sms`
+
+Public. Called by the login-time method picker when the user chooses
+"text me a code" instead of entering a TOTP code:
+
+```json
+{ "challengeToken": "from-the-login-response" }
+```
+
+Triggers the SMS send for that in-progress login challenge; the code is
+then submitted the same way as a TOTP code, via `POST /auth/2fa/verify`
+(see above).
 
 Rate limit: 5 requests/minute/IP.
 
@@ -333,9 +395,12 @@ Rate limit: 5 requests/minute/IP.
 
 ### `GET /auth/oauth/providers`
 
-Public. `{ "google": true, "apple": false }` — lets the frontend decide
-whether to render each button at all, based on whether credentials are
-actually configured server-side.
+Public. `{ "google": boolean, "apple": boolean }` — lets the frontend
+decide whether to render each button at all, based on whether credentials
+are actually configured server-side. **Both are `false` until real Google
+Cloud OAuth / Apple Developer credentials are set as environment
+variables on the server** — this is a deployment/config step, not
+something a client integration can turn on.
 
 ### `GET /auth/oauth/:provider/start?next=/dashboard`
 
@@ -680,6 +745,42 @@ phone (already logged in) approves it.
   `APPROVED`, trades the token for a real session.
 
 Requests expire after 90 seconds.
+
+---
+
+## Account data & deletion (GDPR)
+
+### `GET /gdpr/export` 🔒
+
+Downloads a JSON file (`Content-Disposition: attachment`) of the
+account's profile, sessions, memberships, CRYNDY purchases, NDYBITS
+ledger, and connected OAuth grants. Internal-only fields (token hashes,
+etc.) are deliberately excluded.
+
+### `POST /gdpr/delete-account` 🔒
+
+```json
+{ "currentPassword": "...", "confirm": "DELETE" }
+```
+
+Self-service right-to-erasure: anonymizes the email/name/photo, clears
+the password hash, and revokes every active session, OAuth grant, and
+refresh token — the account is fully signed out everywhere and
+de-identified. Financial/loyalty records (memberships, CRYNDY purchases,
+NDYBITS ledger) are kept rather than hard-deleted, matching GDPR Article
+17(3)(b)'s standard retention exception; this is the same choice already
+made for the audit log elsewhere in this system.
+
+`confirm` must be the literal string `"DELETE"` — the same "type DELETE
+to confirm" pattern used everywhere else in this API before a
+destructive account action.
+
+**Accounts with no password set (NDYAPPS-linked, or Google/Apple-only
+sign-in) cannot use this endpoint yet** — it returns `400` with a message
+directing the user to contact support instead. A password-less
+self-service deletion path (re-authentication/OTP-based instead of a
+password) is a known, unbuilt gap for app-only/social-only accounts —
+confirm with the backend team before assuming it exists for your users.
 
 ---
 
