@@ -101,4 +101,15 @@ export class RegisterDto {
   @IsOptional()
   @IsBoolean()
   phoneIsPublic?: boolean;
+
+  // Which app is registering, so the verification-email link can deep-link
+  // straight back into it instead of opening the NDY HUB website. Optional
+  // and unvalidated against any list here on purpose — an unrecognized or
+  // absent value just falls back to the website link
+  // (see verification-redirect.util.ts), never an error, since this field
+  // is cosmetic routing, not a security boundary.
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  clientId?: string;
 }

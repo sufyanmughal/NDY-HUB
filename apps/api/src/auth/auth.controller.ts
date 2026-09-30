@@ -279,7 +279,7 @@ export class AuthController {
   @Throttle(BRUTE_FORCE_GUARD)
   @Post('verify-email/resend-by-email')
   resendEmailVerificationByEmail(@Body() dto: ResendVerificationDto) {
-    return this.auth.requestEmailVerificationByEmail(dto.email);
+    return this.auth.requestEmailVerificationByEmail(dto.email, dto.clientId);
   }
 
   // Same brute-force tier as login/register — this is public and takes an

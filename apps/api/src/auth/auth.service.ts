@@ -24,6 +24,7 @@ import {
   passwordResetEmail,
 } from '../common/mail-templates';
 import { isPassportVerified } from '../common/passport-verification.util';
+import { resolveVerificationLink } from './verification-redirect.util';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
 import { SecurityEventService } from './security-event.service';
 import { TotpService } from './totp.service';
@@ -148,6 +149,7 @@ export class AuthService {
       user.id,
       user.email,
       user.fullName,
+      dto.clientId,
     );
     return {
       requiresEmailVerification: true,
@@ -511,6 +513,7 @@ export class AuthService {
    */
   async requestEmailVerificationByEmail(
     email: string,
+    clientId?: string,
   ): Promise<{ expiresInSeconds: number }> {
     const user = await this.identity.findByEmail(email);
     if (user && !user.emailVerifiedAt && !user.deletedAt) {
@@ -518,6 +521,7 @@ export class AuthService {
         user.id,
         user.email,
         user.fullName,
+        clientId,
       );
     }
     // Always the same constant regardless of whether a real send just
@@ -586,6 +590,7 @@ export class AuthService {
     userId: string,
     email: string,
     fullName: string | null,
+    clientId?: string,
   ): Promise<void> {
     const token = generateToken();
     await this.prisma.user.update({
@@ -597,16 +602,17 @@ export class AuthService {
         ),
       },
     });
-    this.sendVerificationEmail(email, fullName, token);
+    this.sendVerificationEmail(email, fullName, token, clientId);
   }
 
   private sendVerificationEmail(
     email: string,
     fullName: string | null,
     token: string,
+    clientId?: string,
   ): void {
     const webAppUrl = this.config.getOrThrow<string>('WEB_APP_URL');
-    const link = `${webAppUrl}/verify-email?token=${token}`;
+    const link = resolveVerificationLink(webAppUrl, token, clientId);
     const { subject, html } = verificationEmail({
       fullName,
       verifyUrl: link,

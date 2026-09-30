@@ -128,15 +128,21 @@ directly from the app (own in-app "check your email" screen, own
 polling/resend UI). **This is a different, valid pattern — but two things
 about it are easy to miss and have caused real confusion:**
 
-1. **The verification email always links to the NDYHUB website**, not
-   back into your app — there is currently no deep-link/app-redirect step
-   on that link. A user who taps it lands on `ndyhub.com`, gets logged in
-   there, and your app has no way to detect that unless you separately
-   poll `GET /auth/me` (with the token you already hold) to notice
-   `verificationLevel` has moved past `LEVEL_0`. If you need the user
-   redirected back into your app instead, talk to us first — it's a small
-   addition (reusing the same custom-scheme/App-Link redirect URI you
-   already registered in §0), but it does not exist yet.
+1. **By default the verification email links to the NDYHUB website**, not
+   back into your app. To get it deep-linked into your app instead, send
+   an extra `clientId` field on `POST /auth/register` (and on
+   `POST /auth/verify-email/resend-by-email`, for the resend case):
+   ```json
+   { "...": "the rest of the register body", "clientId": "ndjoyit" }
+   ```
+   `clientId` is matched against a small, explicit allow-list on the
+   server (not your redirect URI from §0 — verification links and OAuth
+   redirect URIs are deliberately separate mechanisms, since the
+   verification token is a one-time bearer credential and the server
+   should never send it to an arbitrary caller-supplied URI). Ask to get
+   your app's scheme added; `ndjoyit` → `ndjoyit://verify-email?token=...`
+   is already registered. Omitting `clientId`, or sending one that isn't
+   on the list, silently falls back to the website link — never an error.
 2. **The verification link expires in under 5 minutes**
    (`expiresInSeconds: 299` on both the register and resend-by-email
    responses). Build your "check your email" screen around that real

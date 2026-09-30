@@ -94,7 +94,8 @@ refresh token and clears both cookies.
   "websiteIsPublic": true,
   "socialsIsPublic": true,
   "businessIsPublic": true,
-  "phoneIsPublic": true
+  "phoneIsPublic": true,
+  "clientId": "optional, e.g. \"ndjoyit\" — see Email verification below"
 }
 ```
 
@@ -132,17 +133,29 @@ Verification is **link-based**, not a code — the email contains a button
 linking to `{WEB_APP_URL}/verify-email?token=...`. The link expires in
 **4 minutes 59 seconds**; after that it must be resent.
 
-**For app/mobile integrations**: this link currently always opens the
-NDYHUB website, logs the user in there, and lands them on the NDYHUB
-dashboard — there is no automatic redirect back into a native app yet.
-If your app needs the user to land back in-app after verifying, that
-needs an app-specific deep link wired into this flow (the same
-custom-scheme/App-Link mechanism already used for OAuth login in
-`docs/MOBILE-INTEGRATION.md` §2 can be extended here) — ask before
-assuming it exists. Because the link expires in under 5 minutes, a delay
-between the email arriving and the user tapping it (spam filtering, a
-slow push notification) is the most common reason a "verify" tap ends up
-on an error/login screen instead of succeeding.
+**For app/mobile integrations**: by default this link opens the NDYHUB
+website, logs the user in there, and lands them on the NDYHUB dashboard.
+An app that calls `POST /auth/register` or
+`POST /auth/verify-email/resend-by-email` directly (rather than the
+OAuth-redirect flow in `docs/MOBILE-INTEGRATION.md`) can get the link
+deep-linked straight back into itself instead by sending an extra field:
+
+```json
+{ "...": "the rest of the register/resend body", "clientId": "ndjoyit" }
+```
+
+`clientId` is matched against a small, explicit allow-list on the server
+(`apps/api/src/auth/verification-redirect.util.ts`) — only a value your
+app has actually been registered for will change the link; anything
+unrecognized (or omitted) silently falls back to the normal website link,
+so this can never be used to redirect a token somewhere unexpected. Ask
+to get your app's scheme added to that list before relying on it.
+Currently registered: `ndjoyit` → `ndjoyit://verify-email?token=...`.
+
+Because the link expires in under 5 minutes, a delay between the email
+arriving and the user tapping it (spam filtering, a slow push
+notification) is the most common reason a "verify" tap ends up on an
+error/login screen instead of succeeding.
 
 ### `POST /auth/verify-email/confirm`
 
