@@ -1924,3 +1924,48 @@ export function revokeAgentConsent(oauthClientId: string): Promise<AiAgentGrant>
     { method: "DELETE" },
   );
 }
+
+// --- NDYRA personal memory (Phase 1 control centre) ---
+// User-controlled preferences/goals, explicitly separate from verified
+// Passport facts. NDYCORE reads this the same way as any other relying
+// party once it exists — through this same API, never a direct DB read.
+
+export type UserMemoryType = "PREFERENCE" | "GOAL";
+
+export interface UserMemory {
+  id: string;
+  userId: string;
+  type: UserMemoryType;
+  content: string;
+  source: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateMemoryInput {
+  type: UserMemoryType;
+  content: string;
+  source?: string;
+}
+
+export function listMemories(): Promise<UserMemory[]> {
+  return authedFetch("/memory");
+}
+
+export function createMemory(input: CreateMemoryInput): Promise<UserMemory> {
+  return authedFetch("/memory", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateMemory(id: string, content: string): Promise<UserMemory> {
+  return authedFetch(`/memory/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ content }),
+  });
+}
+
+export function deleteMemory(id: string): Promise<void> {
+  return authedFetch(`/memory/${id}`, { method: "DELETE" });
+}

@@ -273,6 +273,7 @@ model User {
   ndyQrCodes              NdyQrCode[]
   aiAgentConsents         AiAgentConsent[]
   trustProfile            TrustProfile?
+  memories                UserMemory[]
 
   @@index([ndyId])
 }
@@ -2128,4 +2129,39 @@ model AiAgentConsent {
   @@unique([userId, oauthClientId])
   @@index([userId])
   @@index([oauthClientId])
+}
+
+// --- NDYRA personal memory (Phase 1 of the NDYRA/NDYCORE plan) ---
+// User-controlled, explicitly separate from PassportClaim (verified facts)
+// and from anything conversational/ephemeral — the client's own instruction:
+// "separate personal preferences from verified facts and temporary
+// conversation context." A memory row is never auto-promoted into a
+// PassportClaim or treated as a verified fact by anything that reads it.
+enum UserMemoryType {
+  /** A standing preference, e.g. "prefers window seats", "vegetarian". */
+  PREFERENCE
+  /** A goal/intent the member stated, e.g. "save for a trip to Málaga". */
+  GOAL
+}
+
+model UserMemory {
+  id        String         @id @default(uuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      UserMemoryType
+  // Short, human-readable — what the control centre shows and what a
+  // member edits directly. Not a free-form blob: NDYCORE reads this field,
+  // so keeping it a single plain-language line (vs. nested JSON) is what
+  // makes "the user can view/edit it directly" actually true rather than
+  // a developer-only JSON editor.
+  content   String
+  // Which product/context this memory came from, if any — e.g. "ndystays".
+  // Null for something stated directly to NDYRA with no product context.
+  // Purely informational (surfaced in the control centre), never used to
+  // restrict who can read it: a memory belongs to the member, not a product.
+  source    String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([userId, type])
 }

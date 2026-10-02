@@ -14,6 +14,7 @@ import {
   QrCode,
   FileSignature,
   Bot,
+  Brain,
   type LucideIcon,
 } from "lucide-react";
 import { useMe } from "./use-me";
@@ -81,6 +82,13 @@ const BASE_NAV_ITEMS: NavItem[] = [
     sublabel: "Sign & Verify",
     icon: FileSignature,
     iconColor: "#22c58b",
+  },
+  {
+    href: "/memory",
+    label: "NDYRA Memory",
+    sublabel: "What NDYRA remembers",
+    icon: Brain,
+    iconColor: "#fb7185",
   },
   {
     href: "/ai-agents",

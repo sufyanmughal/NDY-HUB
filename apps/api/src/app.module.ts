@@ -32,6 +32,7 @@ import { TrustModule } from './trust/trust.module';
 import { NdyqrModule } from './ndyqr/ndyqr.module';
 import { SignatureModule } from './signature/signature.module';
 import { ContextBrokerModule } from './context-broker/context-broker.module';
+import { MemoryModule } from './memory/memory.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { ContextBrokerModule } from './context-broker/context-broker.module';
     NdyqrModule,
     SignatureModule,
     ContextBrokerModule,
+    MemoryModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
