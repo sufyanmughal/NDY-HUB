@@ -140,9 +140,15 @@ about it are easy to miss and have caused real confusion:**
    redirect URIs are deliberately separate mechanisms, since the
    verification token is a one-time bearer credential and the server
    should never send it to an arbitrary caller-supplied URI). Ask to get
-   your app's scheme added; `ndjoyit` → `ndjoyit://verify-email?token=...`
-   is already registered. Omitting `clientId`, or sending one that isn't
-   on the list, silently falls back to the website link — never an error.
+   your app's scheme added; `ndjoyit` →
+   `https://ndjoyit.com/verify-email?token=...` is already registered —
+   an HTTPS App Link/Universal Link, not a custom URI scheme. (A custom
+   scheme was the first attempt and was confirmed broken: several email
+   clients, Gmail included, silently disable a button/link pointing at an
+   unrecognized custom scheme rather than leaving it clickable. Use the
+   same App Link host you registered in §0 for OAuth, not a second
+   domain.) Omitting `clientId`, or sending one that isn't on the list,
+   silently falls back to the website link — never an error.
 2. **The verification link expires in under 5 minutes**
    (`expiresInSeconds: 299` on both the register and resend-by-email
    responses). Build your "check your email" screen around that real

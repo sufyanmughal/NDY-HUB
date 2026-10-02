@@ -16,9 +16,9 @@ describe('resolveVerificationLink', () => {
     );
   });
 
-  it('deep-links into NDJOYIT for clientId "ndjoyit"', () => {
+  it('deep-links into NDJOYIT via an HTTPS App Link/Universal Link for clientId "ndjoyit" (a custom URI scheme is silently disabled as a clickable button by some email clients, e.g. Gmail)', () => {
     expect(resolveVerificationLink(webAppUrl, token, 'ndjoyit')).toBe(
-      'ndjoyit://verify-email?token=tok_abc123',
+      'https://ndjoyit.com/verify-email?token=tok_abc123',
     );
   });
 });

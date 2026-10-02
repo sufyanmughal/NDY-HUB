@@ -7,8 +7,17 @@
 // Add an entry here only once a real app has a registered, verified
 // scheme — same "add scopes as real clients need them" discipline as
 // apps/api/src/oauth/scopes.ts.
+//
+// HTTPS App Link / Universal Link, not a custom URI scheme
+// (ndjoyit://...): confirmed via real-world testing that most email
+// clients (Gmail included) silently disable a button/link pointing at an
+// unrecognized custom scheme, while an https:// link always renders
+// clickable — the OS, not the email client, resolves an App Link/
+// Universal Link into the app. Reuses the same ndjoyit.com domain already
+// registered as the App Link host for the OAuth flow
+// (docs/MOBILE-INTEGRATION.md §0) rather than a second domain.
 const VERIFICATION_REDIRECT_SCHEMES: Record<string, string> = {
-  ndjoyit: 'ndjoyit://verify-email',
+  ndjoyit: 'https://ndjoyit.com/verify-email',
 };
 
 export function resolveVerificationLink(

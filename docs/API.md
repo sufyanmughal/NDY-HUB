@@ -150,7 +150,13 @@ app has actually been registered for will change the link; anything
 unrecognized (or omitted) silently falls back to the normal website link,
 so this can never be used to redirect a token somewhere unexpected. Ask
 to get your app's scheme added to that list before relying on it.
-Currently registered: `ndjoyit` → `ndjoyit://verify-email?token=...`.
+Currently registered: `ndjoyit` → `https://ndjoyit.com/verify-email?token=...`
+— an HTTPS App Link / Universal Link, not a custom URI scheme. A custom
+scheme (`ndjoyit://...`) was tried first and confirmed broken: several
+email clients (Gmail included) silently disable a button/link pointing at
+an unrecognized custom scheme rather than leaving it clickable, while an
+`https://` link is always clickable and the OS resolves it into the app
+once the App Link/Universal Link is configured.
 
 Because the link expires in under 5 minutes, a delay between the email
 arriving and the user tapping it (spam filtering, a slow push
