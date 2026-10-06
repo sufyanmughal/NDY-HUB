@@ -6,6 +6,7 @@ import {
   loginWithPassword,
   registerWithPassword,
   resendEmailVerificationByEmail,
+  confirmEmailVerification,
   getOAuthProviders,
   buildOAuthStartUrl,
   type TwoFactorMethod,
@@ -62,6 +63,7 @@ export function PasswordAuthForm() {
   const { secondsLeft, expired } = useCountdown(verificationExpirySeed);
   const [resendBusy, setResendBusy] = useState(false);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [oauthProviders, setOauthProviders] = useState<{
     google: boolean;
@@ -155,11 +157,27 @@ export function PasswordAuthForm() {
         pendingVerificationEmail,
       );
       setVerificationExpirySeed(expiresInSeconds);
-      setResendMessage("Verification email sent — check your inbox.");
+      setResendMessage("Code sent — check your inbox.");
     } catch (err) {
       setResendMessage((err as Error).message);
     } finally {
       setResendBusy(false);
+    }
+  }
+
+  async function handleConfirmVerification(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pendingVerificationEmail) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await confirmEmailVerification(pendingVerificationEmail, verificationCode);
+      setPendingVerificationEmail(null);
+      await login();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -175,18 +193,21 @@ export function PasswordAuthForm() {
 
   if (pendingVerificationEmail) {
     return (
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 text-center">
-        <h2 className="text-lg font-semibold">Check your email</h2>
+      <form
+        onSubmit={handleConfirmVerification}
+        className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 text-center"
+      >
+        <h2 className="text-lg font-semibold">Enter your code</h2>
         <p className="mt-2 text-sm text-foreground-muted">
-          We sent a verification link to{" "}
+          We sent a 6-digit code to{" "}
           <span className="font-medium text-foreground">
             {pendingVerificationEmail}
           </span>
-          . Click it to activate your account, then sign in.
+          .
         </p>
         <p className="mt-3 text-sm font-medium tabular-nums">
           {expired ? (
-            <span className="text-critical">Link expired</span>
+            <span className="text-critical">Code expired</span>
           ) : (
             <>
               Expires in{" "}
@@ -196,16 +217,46 @@ export function PasswordAuthForm() {
             </>
           )}
         </p>
+
+        <div className="mt-4 text-left">
+          <label className="block text-xs uppercase tracking-wide text-foreground-muted">
+            Code
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="\d{6}"
+            maxLength={6}
+            value={verificationCode}
+            onChange={(e) =>
+              setVerificationCode(e.target.value.replace(/\D/g, ""))
+            }
+            required
+            autoFocus
+            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-center text-lg tracking-[0.5em] tabular-nums"
+            placeholder="000000"
+          />
+        </div>
+
+        {error && <p className="mt-3 text-sm text-critical">{error}</p>}
         {resendMessage && (
           <p className="mt-3 text-sm text-accent">{resendMessage}</p>
         )}
+
+        <button
+          type="submit"
+          disabled={busy || verificationCode.length !== 6}
+          className="mt-4 w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy ? "Verifying…" : "Verify"}
+        </button>
         <button
           type="button"
           onClick={handleResendVerification}
           disabled={resendBusy || !expired}
-          className="mt-4 w-full rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-2 w-full rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {resendBusy ? "Sending…" : "Resend verification email"}
+          {resendBusy ? "Sending…" : "Resend code"}
         </button>
         <button
           type="button"
@@ -217,7 +268,7 @@ export function PasswordAuthForm() {
         >
           Back to sign in
         </button>
-      </div>
+      </form>
     );
   }
 

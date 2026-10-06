@@ -120,7 +120,7 @@ account exists but is unusable until its email is confirmed:
 ```
 
 `expiresInSeconds` is always `299` (4 minutes 59 seconds) — the window the
-just-sent verification email is valid for. The frontend uses this to drive
+just-sent verification code is valid for. The frontend uses this to drive
 a live countdown.
 
 Rate limit: 5 requests/minute/IP.
@@ -129,46 +129,27 @@ Rate limit: 5 requests/minute/IP.
 
 ## Email verification
 
-Verification is **link-based**, not a code — the email contains a button
-linking to `{WEB_APP_URL}/verify-email?token=...`. The link expires in
-**4 minutes 59 seconds**; after that it must be resent.
+**As of 2026-10-06, verification is a typed-in 6-digit code, not a
+link.** The email contains a 6-digit numeric code, same shape and TTL as
+the password-reset code below. This replaced the earlier link-based flow:
+a clickable link either opens the NDYHUB website (requiring a hand-off
+back to the calling app) or needs an App Link/Universal Link, which
+depends on DNS and signing-certificate configuration on the caller's
+domain being correct before anything works. A typed-in code needs none
+of that — nothing to deep-link, nothing to register.
 
-**For app/mobile integrations**: by default this link opens the NDYHUB
-website, logs the user in there, and lands them on the NDYHUB dashboard.
-An app that calls `POST /auth/register` or
-`POST /auth/verify-email/resend-by-email` directly (rather than the
-OAuth-redirect flow in `docs/MOBILE-INTEGRATION.md`) can get the link
-deep-linked straight back into itself instead by sending an extra field:
-
-```json
-{ "...": "the rest of the register/resend body", "clientId": "ndjoyit" }
-```
-
-`clientId` is matched against a small, explicit allow-list on the server
-(`apps/api/src/auth/verification-redirect.util.ts`) — only a value your
-app has actually been registered for will change the link; anything
-unrecognized (or omitted) silently falls back to the normal website link,
-so this can never be used to redirect a token somewhere unexpected. Ask
-to get your app's scheme added to that list before relying on it.
-Currently registered: `ndjoyit` → `https://ndjoyit.com/verify-email?token=...`
-— an HTTPS App Link / Universal Link, not a custom URI scheme. A custom
-scheme (`ndjoyit://...`) was tried first and confirmed broken: several
-email clients (Gmail included) silently disable a button/link pointing at
-an unrecognized custom scheme rather than leaving it clickable, while an
-`https://` link is always clickable and the OS resolves it into the app
-once the App Link/Universal Link is configured.
-
-Because the link expires in under 5 minutes, a delay between the email
-arriving and the user tapping it (spam filtering, a slow push
-notification) is the most common reason a "verify" tap ends up on an
-error/login screen instead of succeeding.
+The code expires in **4 minutes 59 seconds**; after that it must be
+resent.
 
 ### `POST /auth/verify-email/confirm`
 
-Public (no auth) — the token itself is the credential.
+Public (no auth) — the code itself is the credential. A 6-digit code
+isn't globally unique enough to look up on its own (unlike the old
+32-char link token), so this takes `email` + `code` together, same shape
+as `POST /auth/reset-password`.
 
 ```json
-{ "token": "the-32-char-token-from-the-email-link" }
+{ "email": "person@example.com", "code": "123456" }
 ```
 
 **This is where a brand-new account's first real session is issued** —
@@ -176,12 +157,12 @@ Public (no auth) — the token itself is the credential.
 logs the user in for the first time. Response is a full session object
 (see [Authentication model](#authentication-model)).
 
-Errors: `400` if the token is invalid or expired, `409` if it was already
-used (double-click protection).
+Errors: `400` if the code is invalid or expired, `409` if it was already
+used (double-submit protection).
 
 ### `POST /auth/verify-email/resend-by-email`
 
-Public. Used on the "check your email" screen shown right after
+Public. Used on the "enter your code" screen shown right after
 registration (no session exists yet to authenticate a resend).
 
 ```json
@@ -191,7 +172,7 @@ registration (no session exists yet to authenticate a resend).
 Response: `{ "expiresInSeconds": 299 }` — always the same shape whether or
 not the email is actually registered/unverified (prevents using this
 endpoint to enumerate which emails have accounts). Issues a **fresh**
-token and a fresh 4:59 window every time it's called.
+code and a fresh 4:59 window every time it's called.
 
 Rate limit: 5 requests/minute/IP.
 
@@ -220,7 +201,7 @@ in yet:
 { "requiresEmailVerification": true, "email": "person@example.com" }
 ```
 (No `expiresInSeconds` here — this reports existing state, it doesn't send
-a new email. Call `verify-email/resend-by-email` to get a fresh link.)
+a new email. Call `verify-email/resend-by-email` to get a fresh code.)
 
 **2. 2FA enabled** — password was correct, a TOTP/backup code is still
 needed:

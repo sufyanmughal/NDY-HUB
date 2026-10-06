@@ -133,7 +133,7 @@ function emailLayout({
 
 export function verificationEmail(args: {
   fullName: string | null;
-  verifyUrl: string;
+  code: string;
   logoUrl?: string;
   productName?: string;
 }): { subject: string; html: string } {
@@ -145,10 +145,9 @@ export function verificationEmail(args: {
       productName,
       preheader: `Confirm your email to activate your NDY Identity.`,
       greeting,
-      intro: `Welcome to ${productName}. Confirm your email address below to activate your NDY Identity and finish setting up your account.`,
-      actionUrl: args.verifyUrl,
-      actionLabel: 'Verify Email Address',
-      expiryNote: 'This link expires in 4 minutes and 59 seconds.',
+      intro: `Welcome to ${productName}. Enter the code below to confirm your email address and activate your NDY Identity.`,
+      code: args.code,
+      expiryNote: 'This code expires in 4 minutes and 59 seconds.',
       logoUrl: args.logoUrl,
     }),
   };

@@ -826,11 +826,12 @@ export async function beginConnectOAuthProvider(
 // longer does), so this returns real tokens — the cookie gets set as a
 // side effect server-side, same as login/register.
 export function confirmEmailVerification(
-  token: string,
+  email: string,
+  code: string,
 ): Promise<IssuedSession> {
   return apiFetch<IssuedSession>("/auth/verify-email/confirm", {
     method: "POST",
-    body: JSON.stringify({ token }),
+    body: JSON.stringify({ email, code }),
   });
 }
 
@@ -1938,6 +1939,7 @@ export interface UserMemory {
   type: UserMemoryType;
   content: string;
   source: string | null;
+  enabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -1968,4 +1970,13 @@ export function updateMemory(id: string, content: string): Promise<UserMemory> {
 
 export function deleteMemory(id: string): Promise<void> {
   return authedFetch(`/memory/${id}`, { method: "DELETE" });
+}
+
+export function setMemoryEnabled(
+  id: string,
+  enabled: boolean,
+): Promise<UserMemory> {
+  return authedFetch(`/memory/${id}/${enabled ? "enable" : "disable"}`, {
+    method: "PATCH",
+  });
 }

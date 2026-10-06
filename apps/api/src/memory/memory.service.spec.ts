@@ -100,4 +100,37 @@ describe('MemoryService', () => {
       data: { content: 'updated' },
     });
   });
+
+  it('activeForUser excludes disabled memories, unlike listForUser', async () => {
+    prisma.userMemory.findMany.mockResolvedValue([]);
+    await service.activeForUser('user-1');
+    expect(prisma.userMemory.findMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', enabled: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  });
+
+  it('setEnabled(false) disables a memory the caller owns', async () => {
+    prisma.userMemory.findUnique.mockResolvedValue({
+      id: 'm1',
+      userId: 'user-1',
+    });
+    prisma.userMemory.update.mockResolvedValue({ id: 'm1', enabled: false });
+    await service.setEnabled('user-1', 'm1', false);
+    expect(prisma.userMemory.update).toHaveBeenCalledWith({
+      where: { id: 'm1' },
+      data: { enabled: false },
+    });
+  });
+
+  it('setEnabled rejects touching another user\'s memory', async () => {
+    prisma.userMemory.findUnique.mockResolvedValue({
+      id: 'm1',
+      userId: 'someone-else',
+    });
+    await expect(
+      service.setEnabled('user-1', 'm1', false),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.userMemory.update).not.toHaveBeenCalled();
+  });
 });

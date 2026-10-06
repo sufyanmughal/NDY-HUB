@@ -256,11 +256,11 @@ export class AuthController {
     return this.auth.changePassword(user.sub, dto);
   }
 
-  // Public: the token itself is the credential, same as a password-reset
-  // link — there's no session to require yet if this is opened in a fresh
-  // browser tab from the verification email. Now also where a brand-new
-  // account's first real session gets issued (register() no longer issues
-  // one directly), so this needs sessionMeta(req) same as login/register.
+  // Public: the code itself is the credential, same as password-reset —
+  // there's no session to require yet right after registering. Now also
+  // where a brand-new account's first real session gets issued
+  // (register() no longer issues one directly), so this needs
+  // sessionMeta(req) same as login/register.
   @Post('verify-email/confirm')
   confirmEmailVerification(@Body() dto: ConfirmEmailDto, @Req() req: Request) {
     return this.auth.confirmEmailVerification(dto, sessionMeta(req));
@@ -279,7 +279,7 @@ export class AuthController {
   @Throttle(BRUTE_FORCE_GUARD)
   @Post('verify-email/resend-by-email')
   resendEmailVerificationByEmail(@Body() dto: ResendVerificationDto) {
-    return this.auth.requestEmailVerificationByEmail(dto.email, dto.clientId);
+    return this.auth.requestEmailVerificationByEmail(dto.email);
   }
 
   // Same brute-force tier as login/register — this is public and takes an

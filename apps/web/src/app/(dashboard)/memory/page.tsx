@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Brain,
+  Eye,
+  EyeOff,
   Loader2,
   Pencil,
   Plus,
@@ -16,6 +18,7 @@ import {
   createMemory,
   deleteMemory,
   listMemories,
+  setMemoryEnabled,
   updateMemory,
   type UserMemory,
   type UserMemoryType,
@@ -62,8 +65,8 @@ export default function MemoryPage() {
           </div>
           <p className="mt-1 text-sm text-foreground-muted">
             What NDYRA remembers about you — your preferences and goals. View,
-            edit, or delete anything here; nothing is kept without your
-            control. Separate from your verified Passport facts.
+            edit, disable, or delete anything here; nothing is kept or used
+            without your control. Separate from your verified Passport facts.
           </p>
         </div>
         <button
@@ -165,8 +168,27 @@ function MemoryRow({
     }
   };
 
+  const toggleEnabled = async () => {
+    setBusy(true);
+    setRowError(null);
+    try {
+      const updated = await setMemoryEnabled(memory.id, !memory.enabled);
+      onUpdated(updated);
+    } catch (err) {
+      setRowError(
+        err instanceof ApiError ? err.message : "Couldn't update.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <div className="rounded-xl border border-border bg-surface px-4 py-3">
+    <div
+      className={`rounded-xl border border-border bg-surface px-4 py-3 ${
+        memory.enabled ? "" : "opacity-50"
+      }`}
+    >
       <div className="flex items-start gap-3">
         <Icon className="mt-0.5 h-4 w-4 shrink-0 text-foreground-muted" />
         <div className="min-w-0 flex-1">
@@ -177,6 +199,11 @@ function MemoryRow({
             {memory.source && (
               <span className="text-xs text-foreground-muted">
                 from {memory.source}
+              </span>
+            )}
+            {!memory.enabled && (
+              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
+                Disabled — not used by NDYRA
               </span>
             )}
           </div>
@@ -215,6 +242,18 @@ function MemoryRow({
         </div>
         {!editing && (
           <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() => void toggleEnabled()}
+              disabled={busy}
+              className="rounded-md p-2 text-foreground-muted hover:bg-surface-2 hover:text-foreground disabled:opacity-50"
+              title={memory.enabled ? "Disable" : "Enable"}
+            >
+              {memory.enabled ? (
+                <Eye className="h-4 w-4" />
+              ) : (
+                <EyeOff className="h-4 w-4" />
+              )}
+            </button>
             <button
               onClick={() => setEditing(true)}
               className="rounded-md p-2 text-foreground-muted hover:bg-surface-2 hover:text-foreground"

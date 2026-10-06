@@ -53,4 +53,20 @@ export class MemoryController {
   ) {
     return this.memory.remove(user.sub, id);
   }
+
+  @Patch(':id/disable')
+  disable(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.memory.setEnabled(user.sub, id, false);
+  }
+
+  @Patch(':id/enable')
+  enable(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.memory.setEnabled(user.sub, id, true);
+  }
 }

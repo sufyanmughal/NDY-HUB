@@ -125,35 +125,42 @@ is nothing to build for it.
 Some integrations skip the flow above and call NDY HUB's raw
 `POST /auth/register` / `POST /auth/verify-email/confirm` endpoints
 directly from the app (own in-app "check your email" screen, own
-polling/resend UI). **This is a different, valid pattern — but two things
-about it are easy to miss and have caused real confusion:**
+polling/resend UI). **This is a different, valid pattern.**
 
-1. **By default the verification email links to the NDYHUB website**, not
-   back into your app. To get it deep-linked into your app instead, send
-   an extra `clientId` field on `POST /auth/register` (and on
-   `POST /auth/verify-email/resend-by-email`, for the resend case):
+**As of 2026-10-06, email verification is a typed-in 6-digit code, not a
+link.** This replaced the earlier link-based flow specifically because a
+clickable link requires either the NDYHUB website (which then has to
+hand control back to your app — the exact "it opens a browser instead of
+staying in-app" problem that kept coming up) or an App Link/Universal
+Link, which depends on your domain's DNS and signing-certificate
+fingerprints being correctly configured before anything works at all. A
+typed-in code sidesteps both: there's nothing to deep-link, nothing to
+register, and no DNS to go wrong.
+
+The flow:
+1. `POST /auth/register` returns `{ "requiresEmailVerification": true, "email": "...", "expiresInSeconds": 299 }`.
+   NDY HUB emails a 6-digit numeric code to that address.
+2. Your app shows its own "Enter your code" screen and collects the
+   6-digit code from the user.
+3. `POST /auth/verify-email/confirm` with:
    ```json
-   { "...": "the rest of the register body", "clientId": "ndjoyit" }
+   { "email": "user@example.com", "code": "123456" }
    ```
-   `clientId` is matched against a small, explicit allow-list on the
-   server (not your redirect URI from §0 — verification links and OAuth
-   redirect URIs are deliberately separate mechanisms, since the
-   verification token is a one-time bearer credential and the server
-   should never send it to an arbitrary caller-supplied URI). Ask to get
-   your app's scheme added; `ndjoyit` →
-   `https://ndjoyit.com/verify-email?token=...` is already registered —
-   an HTTPS App Link/Universal Link, not a custom URI scheme. (A custom
-   scheme was the first attempt and was confirmed broken: several email
-   clients, Gmail included, silently disable a button/link pointing at an
-   unrecognized custom scheme rather than leaving it clickable. Use the
-   same App Link host you registered in §0 for OAuth, not a second
-   domain.) Omitting `clientId`, or sending one that isn't on the list,
-   silently falls back to the website link — never an error.
-2. **The verification link expires in under 5 minutes**
-   (`expiresInSeconds: 299` on both the register and resend-by-email
-   responses). Build your "check your email" screen around that real
-   number with a live countdown and an obvious resend action, rather than
-   assuming the link stays valid indefinitely.
+   returns the same session shape as `/auth/login` on success.
+4. To resend, `POST /auth/verify-email/resend-by-email` with
+   `{ "email": "user@example.com" }` — no `clientId` field anymore, since
+   there's no link/redirect to configure. It returns a fresh
+   `expiresInSeconds`.
+
+**The code expires in under 5 minutes** (`expiresInSeconds: 299` on both
+the register and resend-by-email responses) — build your "enter your
+code" screen around that real number with a live countdown and an
+obvious resend action, the same as before.
+
+There is no `clientId` field, no App Link, and no custom URI scheme to
+register for this flow anymore — none of that infrastructure is needed
+once the credential is a code the user types in rather than a link they
+tap.
 
 If you didn't already know which of these two patterns you're using: if
 your app opens a system browser/Custom Tab and comes back automatically

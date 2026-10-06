@@ -24,7 +24,6 @@ import {
   passwordResetEmail,
 } from '../common/mail-templates';
 import { isPassportVerified } from '../common/passport-verification.util';
-import { resolveVerificationLink } from './verification-redirect.util';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
 import { SecurityEventService } from './security-event.service';
 import { TotpService } from './totp.service';
@@ -149,7 +148,6 @@ export class AuthService {
       user.id,
       user.email,
       user.fullName,
-      dto.clientId,
     );
     return {
       requiresEmailVerification: true,
@@ -513,7 +511,6 @@ export class AuthService {
    */
   async requestEmailVerificationByEmail(
     email: string,
-    clientId?: string,
   ): Promise<{ expiresInSeconds: number }> {
     const user = await this.identity.findByEmail(email);
     if (user && !user.emailVerifiedAt && !user.deletedAt) {
@@ -521,7 +518,6 @@ export class AuthService {
         user.id,
         user.email,
         user.fullName,
-        clientId,
       );
     }
     // Always the same constant regardless of whether a real send just
@@ -533,37 +529,39 @@ export class AuthService {
   }
 
   /**
-   * The click-through from the verification link. Public (no auth) by
-   * design — the token itself, not a session, is the credential here, the
-   * same way a password-reset link works. Single-use, enforced the same
-   * atomic way as every other one-time token in this schema: the update's
-   * WHERE clause only matches while the hash is still present, so a
-   * double-click or a replayed request updates zero rows the second time.
-   * Now also the moment a brand-new account gets its first real session —
-   * register() no longer issues one, so this is where that finally
-   * happens, the same way TotpService.verifyChallenge is where a 2FA
-   * login's session finally gets issued.
+   * Redeems the typed-in verification code. Public (no auth) by design —
+   * the code itself, not a session, is the credential here, same as
+   * resetPassword(). A 6-digit code isn't globally unique enough to look
+   * up on its own (unlike the 32-char link token this replaced), so the
+   * lookup is scoped by email first, then the code's hash is checked
+   * against that one account — not a global findUnique. Single-use,
+   * enforced the same atomic way as every other one-time token in this
+   * schema: the update's WHERE clause only matches while the hash is
+   * still present, so a double-submit or a replayed request updates zero
+   * rows the second time. Also the moment a brand-new account gets its
+   * first real session — register() no longer issues one, so this is
+   * where that finally happens, the same way TotpService.verifyChallenge
+   * is where a 2FA login's session finally gets issued.
    */
   async confirmEmailVerification(
     dto: ConfirmEmailDto,
     meta: SessionMeta,
   ): Promise<IssuedSession> {
-    const tokenHash = hashToken(dto.token);
-    const user = await this.prisma.user.findUnique({
-      where: { emailVerificationTokenHash: tokenHash },
-    });
+    const user = await this.identity.findByEmail(dto.email);
+    const codeHash = hashToken(dto.code);
     if (
       !user ||
+      user.emailVerificationTokenHash !== codeHash ||
       !user.emailVerificationExpiresAt ||
       user.emailVerificationExpiresAt < new Date()
     ) {
       throw new BadRequestException(
-        'This verification link is invalid or has expired.',
+        'This code is invalid or has expired.',
       );
     }
 
     const result = await this.prisma.user.updateMany({
-      where: { id: user.id, emailVerificationTokenHash: tokenHash },
+      where: { id: user.id, emailVerificationTokenHash: codeHash },
       data: {
         emailVerifiedAt: new Date(),
         emailVerificationTokenHash: null,
@@ -578,7 +576,7 @@ export class AuthService {
       },
     });
     if (result.count === 0) {
-      throw new ConflictException('This verification link was already used.');
+      throw new ConflictException('This code was already used.');
     }
 
     const session = await this.sessions.issueSession(user.id, user.ndyId, meta);
@@ -590,32 +588,29 @@ export class AuthService {
     userId: string,
     email: string,
     fullName: string | null,
-    clientId?: string,
   ): Promise<void> {
-    const token = generateToken();
+    const code = generateResetCode();
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        emailVerificationTokenHash: hashToken(token),
+        emailVerificationTokenHash: hashToken(code),
         emailVerificationExpiresAt: new Date(
           Date.now() + EMAIL_VERIFICATION_TTL_MS,
         ),
       },
     });
-    this.sendVerificationEmail(email, fullName, token, clientId);
+    this.sendVerificationEmail(email, fullName, code);
   }
 
   private sendVerificationEmail(
     email: string,
     fullName: string | null,
-    token: string,
-    clientId?: string,
+    code: string,
   ): void {
     const webAppUrl = this.config.getOrThrow<string>('WEB_APP_URL');
-    const link = resolveVerificationLink(webAppUrl, token, clientId);
     const { subject, html } = verificationEmail({
       fullName,
-      verifyUrl: link,
+      code,
       logoUrl: `${webAppUrl}/email-logo.jpeg`,
     });
     // Fire-and-forget — see sendPasswordResetEmail's comment for why.
