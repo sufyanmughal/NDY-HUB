@@ -260,7 +260,10 @@ export class AuthController {
   // there's no session to require yet right after registering. Now also
   // where a brand-new account's first real session gets issued
   // (register() no longer issues one directly), so this needs
-  // sessionMeta(req) same as login/register.
+  // sessionMeta(req) same as login/register. Throttled same as
+  // reset-password: a 6-digit code is only 1,000,000 possibilities, so
+  // this must never be callable at unlimited rate.
+  @Throttle(BRUTE_FORCE_GUARD)
   @Post('verify-email/confirm')
   confirmEmailVerification(@Body() dto: ConfirmEmailDto, @Req() req: Request) {
     return this.auth.confirmEmailVerification(dto, sessionMeta(req));
