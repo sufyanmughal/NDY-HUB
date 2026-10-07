@@ -616,6 +616,17 @@ export class SocialAuthService {
     redirectPath: string,
     params: Record<string, string>,
   ): string {
+    // An allow-listed app return URL gets the code/error appended directly
+    // — there's no website page for a native app to run JS on, so the app
+    // itself is what calls POST /auth/oauth/exchange with this code, the
+    // same endpoint the website's /oauth/callback page already uses.
+    if (isAppReturnUrl(redirectPath)) {
+      const url = new URL(redirectPath);
+      for (const [key, value] of Object.entries(params)) {
+        url.searchParams.set(key, value);
+      }
+      return url.toString();
+    }
     const webAppUrl = this.config.getOrThrow<string>('WEB_APP_URL');
     const url = new URL(`${webAppUrl}/oauth/callback`);
     url.searchParams.set('next', redirectPath);
@@ -630,9 +641,27 @@ export class SocialAuthService {
   }
 }
 
+// A small, explicit allow-list of custom-scheme app return URLs —
+// deliberately NOT a free-form redirect target the caller supplies (same
+// open-redirect reasoning as the email-verification deep-link allow-list
+// this once mirrored): the OAuth login-exchange code is a one-time bearer
+// credential, so where it gets sent is not something an unauthenticated
+// /auth/oauth/:provider/start caller should control. Add an entry here
+// only once a real app has a registered, verified scheme.
+const REDIRECT_SCHEME_ALLOWLIST = new Set(['ndjoyit://oauth-callback']);
+
 function sanitizeRedirectPath(raw: string | undefined): string {
+  if (raw && REDIRECT_SCHEME_ALLOWLIST.has(raw)) return raw;
   if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/';
   return raw;
+}
+
+/** True for an allow-listed custom-scheme return URL — the one case
+ * callbackUrl() must redirect to directly instead of via the website's
+ * own /oauth/callback page, since a native app can't run that page's
+ * client-side exchange-and-bounce JS. */
+function isAppReturnUrl(redirectPath: string): boolean {
+  return REDIRECT_SCHEME_ALLOWLIST.has(redirectPath);
 }
 
 function parseAppleUserField(raw: string | undefined): string | undefined {
