@@ -21,6 +21,14 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # Must bind to the same Environment the secrets live in — without this,
+    # secrets.NEXT_PUBLIC_API_URL below silently resolves to an empty
+    # string (GitHub only exposes environment-scoped secrets to a job that
+    # itself declares that environment; secrets: inherit on the caller
+    # workflow does not propagate them into a job missing this). This was
+    # the actual root cause of NEXT_PUBLIC_API_URL baking in empty and
+    # breaking every /api/* rewrite on the website.
+    environment: ${{ inputs.environment }}
     permissions:
       contents: read
       packages: write
