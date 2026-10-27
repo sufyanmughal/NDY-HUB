@@ -194,20 +194,20 @@ export class SocialAuthService {
     state: string | undefined,
     error: string | undefined,
   ): Promise<{ redirectUrl: string }> {
-    const authState = await this.consumeState(state, 'GOOGLE');
-    if (!authState) {
-      return { redirectUrl: this.errorRedirect('/', 'invalid_request') };
-    }
-    if (error || !code) {
-      return {
-        redirectUrl: this.errorRedirect(
-          authState.redirectPath,
-          error ?? 'access_denied',
-        ),
-      };
-    }
-
     try {
+      const authState = await this.consumeState(state, 'GOOGLE');
+      if (!authState) {
+        return { redirectUrl: this.errorRedirect('/', 'invalid_request') };
+      }
+      if (error || !code) {
+        return {
+          redirectUrl: this.errorRedirect(
+            authState.redirectPath,
+            error ?? 'access_denied',
+          ),
+        };
+      }
+
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -257,32 +257,34 @@ export class SocialAuthService {
         ),
       };
     } catch {
-      return {
-        redirectUrl: this.errorRedirect(
-          authState.redirectPath,
-          'google_sign_in_failed',
-        ),
-      };
+      // Anything above — an expired/unknown state row, a malformed provider
+      // response, a DB hiccup mid-lookup — must still resolve to a redirect:
+      // there's no page on the other end of this request for a thrown
+      // exception to render into, so an uncaught error here strands the
+      // user on a raw JSON 500 instead of bouncing them back to the app.
+      // Falling back to the site root rather than authState.redirectPath
+      // since the state row itself may be exactly what failed to resolve.
+      return { redirectUrl: this.errorRedirect('/', 'google_sign_in_failed') };
     }
   }
 
   async handleAppleCallback(
     dto: AppleCallbackDto,
   ): Promise<{ redirectUrl: string }> {
-    const authState = await this.consumeState(dto.state, 'APPLE');
-    if (!authState) {
-      return { redirectUrl: this.errorRedirect('/', 'invalid_request') };
-    }
-    if (dto.error || !dto.code) {
-      return {
-        redirectUrl: this.errorRedirect(
-          authState.redirectPath,
-          dto.error ?? 'access_denied',
-        ),
-      };
-    }
-
     try {
+      const authState = await this.consumeState(dto.state, 'APPLE');
+      if (!authState) {
+        return { redirectUrl: this.errorRedirect('/', 'invalid_request') };
+      }
+      if (dto.error || !dto.code) {
+        return {
+          redirectUrl: this.errorRedirect(
+            authState.redirectPath,
+            dto.error ?? 'access_denied',
+          ),
+        };
+      }
+
       const clientSecret = await this.buildAppleClientSecret();
       const tokenRes = await fetch('https://appleid.apple.com/auth/token', {
         method: 'POST',
@@ -339,12 +341,15 @@ export class SocialAuthService {
         ),
       };
     } catch {
-      return {
-        redirectUrl: this.errorRedirect(
-          authState.redirectPath,
-          'apple_sign_in_failed',
-        ),
-      };
+      // Anything above — an expired/unknown state row, the Apple token
+      // endpoint erroring, a malformed/missing private key, a DB hiccup —
+      // must still resolve to a redirect: there's no page on the other end
+      // of this POST for a thrown exception to render into, so an uncaught
+      // error here previously stranded the user on a raw JSON 500 in Safari
+      // instead of bouncing them back to the app. Falling back to the site
+      // root rather than authState.redirectPath since the state row itself
+      // may be exactly what failed to resolve.
+      return { redirectUrl: this.errorRedirect('/', 'apple_sign_in_failed') };
     }
   }
 
@@ -637,7 +642,14 @@ export class SocialAuthService {
   }
 
   private errorRedirect(redirectPath: string, error: string): string {
-    return this.callbackUrl(redirectPath, { error });
+    try {
+      return this.callbackUrl(redirectPath, { error });
+    } catch {
+      // Last-resort fallback if even building the redirect URL fails (e.g. a
+      // missing WEB_APP_URL config value) — every caller above is already
+      // inside its own catch block, so this must never itself throw.
+      return `https://ndyhub.com/oauth/callback?error=${encodeURIComponent(error)}`;
+    }
   }
 }
 
