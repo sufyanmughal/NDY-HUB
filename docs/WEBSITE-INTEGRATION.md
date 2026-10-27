@@ -38,6 +38,24 @@ separate staging/preview domain, send that too.
 There is no server-side session on your end to manage. NDY HUB is the only
 place a password ever touches.
 
+### This is the whole ecosystem's identity, not a copy of it
+
+`POST /auth/register` doesn't create a "your-website" account that happens
+to live in NDY HUB's database — it creates **the** account. The moment
+someone registers through your site, they have a real NDY ID
+(`NDY-XXXXXX`), and that same email/password (or the same NDY ID, if they
+log in a different way) works unmodified on every other product that talks
+to this same API — the NDY HUB dashboard itself, NDJOYIT, any future NDY
+product, anything built from `docs/MOBILE-INTEGRATION.md` or this doc.
+There's no sync step, no export, no "connect your account" flow needed —
+one registration, used everywhere, by construction. The reverse is equally
+true: someone who already has an NDY ID from using a different NDY product
+logs into *your* site with the exact same credentials, no new signup.
+
+The only thing that's "yours" is the UI — the form, the branding, the
+screens. The identity behind it is shared, permanently, with everything
+else in the ecosystem. That's the entire point of NDY HUB existing.
+
 ---
 
 ## 2. Where to store the tokens
@@ -88,11 +106,13 @@ response is always:
 }
 ```
 
-The user gets an email with a verification link (expires in 4 minutes 59
-seconds). Your UI should show a "check your email" screen at this point —
-see step 5 for how the user actually gets logged in after clicking it.
+**As of 2026-10-06, verification is a typed-in 6-digit code, not a
+link.** NDY HUB emails a 6-digit numeric code to that address, valid for
+`expiresInSeconds` (always 299 — 4 minutes 59 seconds). Your UI should show
+your own "enter your code" screen at this point, with a live countdown —
+see step 5 for submitting it.
 
-If the email didn't arrive in time, resend it:
+If the code expires or didn't arrive in time, resend it:
 
 ```js
 await fetch("https://api.ndyhub.com/auth/verify-email/resend-by-email", {
@@ -122,8 +142,10 @@ don't assume success:
 ```js
 if ("requiresEmailVerification" in result) {
   // Correct password, but this account hasn't verified its email yet.
-  // Show the same "check your email" screen as step 3, and offer the
-  // resend-by-email call from step 3 again.
+  // Show the same "enter your code" screen as step 3 (no
+  // `expiresInSeconds` here — this reports existing state rather than
+  // sending a new code — so call resend-by-email from step 3 first to get
+  // a fresh one).
 } else if ("requires2fa" in result) {
   // Correct password, but this account has 2FA enabled (authenticator
   // app and/or SMS). See step 7 — you need a second screen to collect
@@ -141,28 +163,40 @@ which one was wrong.
 
 ---
 
-## 5. Confirming the email verification link
+## 5. Confirming the 6-digit code
 
-The verification email links to `https://ndyhub.com/verify-email?token=...`
-by default — **that's NDY HUB's own page, not yours**. If you want the
-user to land back on your site instead, you'll need to build your own
-`/verify-email` page that reads the `token` query param and calls:
+There's nothing to deep-link or register for this — the code is the
+credential, typed directly into a field on your own page. Build an "enter
+your code" screen (6-digit numeric input, a live countdown driven by
+`expiresInSeconds`, a resend button that re-enables once it hits zero),
+then:
 
 ```js
 const res = await fetch("https://api.ndyhub.com/auth/verify-email/confirm", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ token }),
+  body: JSON.stringify({ email, code: userEnteredCode }),
 });
 const session = await res.json();
 // -> { accessToken, refreshToken, expiresIn: "15m" }
 saveTokens(session.accessToken, session.refreshToken);
 ```
 
-This is the moment the account actually becomes usable — the response is a
-real session, log the user straight in. Tell us if you want the
-verification email itself to link to your domain instead of ndyhub.com and
-we'll set that up per-account.
+This is the moment the account actually becomes usable — `register()`
+itself never issues a session; confirming the code is what logs the user
+in for the first time. Errors: `400` if the code is wrong or expired, `409`
+if it was already used (e.g. a double form-submit).
+
+To resend (same call as step 3):
+
+```js
+await fetch("https://api.ndyhub.com/auth/verify-email/resend-by-email", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ email }),
+});
+// -> { "expiresInSeconds": 299 } — issues a fresh code and a fresh window
+```
 
 ---
 
@@ -313,10 +347,11 @@ minute" message into your UI rather than retrying silently in a loop.
 ## 12. Checklist before you consider this done
 
 - [ ] Told us your production (and staging) domain for the CORS allowlist
-- [ ] Registration form calls `/auth/register`, shows a "check your email"
+- [ ] Registration form calls `/auth/register`, shows an "enter your code"
       state on the `requiresEmailVerification` response
-- [ ] A `/verify-email` page on your own site (or you're OK using NDY
-      HUB's) that calls `/auth/verify-email/confirm` and logs the user in
+- [ ] That screen collects the 6-digit code and calls
+      `/auth/verify-email/confirm` with `{ email, code }`, with a live
+      countdown from `expiresInSeconds` and a working resend button
 - [ ] Login form handles all three response shapes (email verification, 2FA,
       success) — not just the success case
 - [ ] Tokens stored somewhere other than plain `localStorage`
