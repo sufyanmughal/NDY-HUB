@@ -1,7 +1,7 @@
 const sharp = require("sharp");
 const path = require("path");
 
-const outDir = "C:/Users/n8n/Desktop/Claude/ndy-hub/apps/web/public/economy-logos";
+const outDir = path.join(__dirname, "..", "public", "economy-logos");
 const fs = require("fs");
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
