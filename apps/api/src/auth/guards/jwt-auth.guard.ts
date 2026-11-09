@@ -40,6 +40,18 @@ export class JwtAuthGuard implements CanActivate {
     try {
       const payload =
         await this.jwt.verifyAsync<AuthenticatedRequestUser>(token);
+      // OAuthTokenService signs its scoped third-party access_token with
+      // this same app-wide secret (see its own doc comment for why), so
+      // signature verification alone doesn't distinguish it from a real
+      // dashboard session here — only the payload shape does. A real
+      // session token always has `sid` and never `token_use`; an OAuth
+      // token is the exact opposite. Without this check, a relying party
+      // holding nothing but an `openid profile email`-scoped token could
+      // present it here and reach every endpoint this guard protects,
+      // completely bypassing the OAuth scope system.
+      if (!payload.sid || (payload as { token_use?: string }).token_use) {
+        throw new UnauthorizedException('Invalid or expired access token.');
+      }
       (request as Request & { user: AuthenticatedRequestUser }).user = payload;
       return true;
     } catch {

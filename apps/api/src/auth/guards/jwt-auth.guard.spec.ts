@@ -83,6 +83,40 @@ describe('JwtAuthGuard', () => {
     );
   });
 
+  it('rejects an OAuth-scoped access_token even though it verifies with the same secret', async () => {
+    // OAuthTokenService.issueTokenSet signs { sub, ndy_id, client_id, scope,
+    // token_use: 'oauth_access' } with the same app-wide secret as a real
+    // session — no `sid`. This must not be accepted here.
+    const oauthPayload = {
+      sub: 'user-3',
+      ndy_id: 'NDY-3',
+      client_id: 'some-relying-party',
+      scope: 'openid profile email',
+      token_use: 'oauth_access',
+    };
+    jwt.verifyAsync.mockResolvedValue(oauthPayload);
+    const context = makeContext({
+      headers: { authorization: 'Bearer oauth-access-token' },
+      cookies: {},
+    });
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
+  it('rejects a well-signed payload missing sid (defense in depth, not just the token_use check)', async () => {
+    jwt.verifyAsync.mockResolvedValue({ sub: 'user-4', ndyId: 'NDY-4' });
+    const context = makeContext({
+      headers: { authorization: 'Bearer no-sid-token' },
+      cookies: {},
+    });
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
   it('rejects when jwt verification throws (expired/invalid/tampered token)', async () => {
     jwt.verifyAsync.mockRejectedValue(new Error('jwt expired'));
     const context = makeContext({
