@@ -67,7 +67,11 @@ export default function SettingsPage() {
         <EmailVerificationBanner />
       )}
 
-      {profile && <ProfileForm profile={profile} onSaved={setProfile} />}
+      {profile && (
+        <div id="personal-information">
+          <ProfileForm profile={profile} onSaved={setProfile} />
+        </div>
+      )}
       <PasswordForm />
       {profile && <TwoFactorSection profile={profile} onChanged={setProfile} />}
       {profile && (
@@ -76,7 +80,9 @@ export default function SettingsPage() {
       <PasskeysSection />
       <ConnectedAccountsSection />
       {profile && (
-        <DataPrivacySection ndyId={profile.ndyId} onAccountDeleted={logout} />
+        <div id="data-privacy">
+          <DataPrivacySection ndyId={profile.ndyId} onAccountDeleted={logout} />
+        </div>
       )}
     </div>
   );

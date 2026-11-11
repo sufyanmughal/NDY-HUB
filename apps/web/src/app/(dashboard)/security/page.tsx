@@ -340,7 +340,7 @@ export default function SecurityPage() {
         )}
       </div>
 
-      <div className="rounded-lg border border-border bg-surface p-5">
+      <div id="identity-verification" className="rounded-lg border border-border bg-surface p-5">
         <h2 className="text-sm font-medium text-foreground-muted">
           Identity Verification (LEVEL_3)
         </h2>

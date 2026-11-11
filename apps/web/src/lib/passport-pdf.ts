@@ -188,8 +188,8 @@ function buildPassportCardPdf(data: PassportPdfData): jsPDF {
   const headerTop = MARGIN;
   const logoHeight = 54;
   if (data.logoDataUrl) {
-    // public/logo-mark.png is 547x457 — preserve that aspect ratio.
-    const logoWidth = logoHeight * (547 / 457);
+    // public/logo-mark.png is a square 512x512 (2026-11 brand refresh) — 1:1.
+    const logoWidth = logoHeight;
     doc.addImage(data.logoDataUrl, "PNG", MARGIN, headerTop, logoWidth, logoHeight);
   } else {
     // Falls back to a plain text wordmark if the asset fetch failed —

@@ -29,6 +29,7 @@ import {
 } from "@/components/passport-cards";
 import { SharePanel } from "@/components/passport-cards/share-panel";
 import { NfcPanel } from "@/components/passport-cards/nfc-panel";
+import { ProfileOverview } from "@/components/passport-cards/profile-overview";
 
 // No selectable "tabs" anymore — every design renders on the one page,
 // stacked, each with its own download button. This constant only exists
@@ -181,26 +182,39 @@ export default function PassportPage() {
         </p>
       )}
 
-      {/* Every card design, one page, no tabs — each with its own download
-          button so any of the three can be saved as a PDF independently. */}
+      {/* Every card design, one page, no tabs. The Passport design keeps a
+          generic header + download button above it (unchanged); Business
+          and Minimal now own their own header/button layout internally per
+          the 2026-11 redesign (see their component doc comments), so they
+          render with no wrapper chrome here — just the download callback/
+          state passed through as props. */}
       <div className="mt-6 space-y-6" ref={qrSectionRef}>
         {PASSPORT_CARD_DESIGNS.map((d) => (
           <div key={d.id}>
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold">{d.label}</h2>
-                <p className="text-xs text-foreground-muted">{d.description}</p>
+            {d.id === "passport" && (
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold">{d.label}</h2>
+                  <p className="text-xs text-foreground-muted">{d.description}</p>
+                </div>
+                <button
+                  onClick={() => handleDownload(d.id)}
+                  disabled={!canDownload || downloadingDesign !== null}
+                  className="flex shrink-0 items-center gap-2 rounded-md bg-accent px-3.5 py-2 text-xs font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download size={14} strokeWidth={2} />
+                  {downloadingDesign === d.id ? "Preparing…" : "Download PDF"}
+                </button>
               </div>
-              <button
-                onClick={() => handleDownload(d.id)}
-                disabled={!canDownload || downloadingDesign !== null}
-                className="flex shrink-0 items-center gap-2 rounded-md bg-accent px-3.5 py-2 text-xs font-medium text-white hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Download size={14} strokeWidth={2} />
-                {downloadingDesign === d.id ? "Preparing…" : "Download PDF"}
-              </button>
-            </div>
-            <PassportCard design={d.id} data={cardData} />
+            )}
+            <PassportCard
+              design={d.id}
+              data={cardData}
+              onDownloadPdf={() => handleDownload(d.id)}
+              downloadLabel={downloadingDesign === d.id ? "Preparing…" : "Download PDF"}
+              downloadDisabled={!canDownload || downloadingDesign !== null}
+            />
+            {d.id === "passport" && <ProfileOverview />}
           </div>
         ))}
       </div>
