@@ -45,8 +45,17 @@ async function bootstrap() {
   // rendering HTML from this origin* can load, which doesn't apply here,
   // and its default policy would otherwise interfere with a photo under
   // /uploads/* being embedded cross-origin (e.g. shown inside NDYMAIL).
+  //
+  // crossOriginResourcePolicy is disabled for the same reason, separately
+  // from CSP: helmet sets `Cross-Origin-Resource-Policy: same-origin` by
+  // default, which browsers enforce on <img> tags independently of CORS/CSP
+  // — confirmed live, this silently blocked every profile photo embedded
+  // from ndyhub.com (a different origin than api.ndyhub.com) while working
+  // fine everywhere CORP isn't enforced (native app image loading, curl).
   // Every other helmet default stays on.
-  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use(
+    helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }),
+  );
   // Removes the "X-Powered-By: Express" response header — pure
   // stack-fingerprinting information with no functional purpose, no
   // reason to hand it to every caller by default.
