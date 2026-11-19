@@ -178,6 +178,11 @@ export interface PublicPassportBusiness {
 export interface PublicPassport {
   ndyId: string;
   fullName: string | null;
+  // Derived live from ndyId, safe to expose publicly (unlike email,
+  // which stays self-view-only) — see MeProfile.officialMailAddress's
+  // doc comment for the same "display-only, not a working inbox yet"
+  // caveat.
+  officialMailAddress: string;
   profilePhotoUrl: string | null;
   verificationLevel: string;
   // Founder/Super Admin accounts read as verified regardless of their own
@@ -517,6 +522,12 @@ export interface MeProfile {
   id: string;
   ndyId: string;
   email: string;
+  // Official NDYMAIL address, derived live from ndyId — see the
+  // backend's officialMailAddressForNdyId doc comment
+  // (apps/api/src/common/ndy-id.util.ts). Display-only for now: real
+  // send/receive still needs the ndyhub.com custom-domain DNS step
+  // (docs/ndymail-architecture-design.md §10.1), not done yet.
+  officialMailAddress: string;
   fullName: string | null;
   profilePhotoUrl: string | null;
   verificationLevel: string;

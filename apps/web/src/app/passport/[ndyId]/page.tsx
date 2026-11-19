@@ -27,11 +27,12 @@ import "@/styles/passport-public.css";
  * vertical-card.tsx) — a pixel-accurate clone of the user's passportcard.jpeg
  * reference mockup — so the public card is guaranteed to look identical to
  * the authenticated self-view, not a second hand-maintained copy of the
- * same design. No email (PublicPassport never exposes it — privacy by
- * design) and no membership tier (no public endpoint exposes a stranger's
- * paid tier); the card's badge falls back to "NDY HUB" and the "Not
- * Verified"/"Verified Member" label uses verificationLevel instead, which
- * IS public. */
+ * same design. The card's "email" slot shows officialMailAddress (derived
+ * live from ndyId, safe to expose publicly) — never the private personal
+ * signup email, which PublicPassport never returns at all. No membership
+ * tier (no public endpoint exposes a stranger's paid tier); the card's
+ * badge falls back to "NDY HUB" and the "Not Verified"/"Verified Member"
+ * label uses verificationLevel instead, which IS public. */
 export default function PublicPassportPage({
   params,
 }: {
@@ -102,7 +103,7 @@ export default function PublicPassportPage({
         xUrl: passport.socials?.x,
         businessName: passport.business?.name,
         businessRole: passport.business?.role,
-        email: null,
+        email: passport.officialMailAddress,
         phone: passport.phone,
         membershipTierLabel: null,
         qrDataUrl,

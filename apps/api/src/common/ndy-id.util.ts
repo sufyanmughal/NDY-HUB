@@ -125,3 +125,23 @@ export function parseNdyId(
   }
   return null;
 }
+
+/**
+ * The user's official NDYMAIL address, per
+ * docs/ndymail-architecture-design.md §9: deterministically derived from
+ * the permanent NDY ID (lowercased), never a separate stored value — a
+ * role/title change never orphans it, and there's nothing to migrate if
+ * the ID itself doesn't change. Zero stored state: this is a pure
+ * function of ndyId, computed fresh on every read (getMe()), the same
+ * "re-derive, don't cache" principle formatNdyId's own doc comment
+ * describes for the type segment.
+ *
+ * Real inbound/outbound delivery to this address is NOT yet live — it
+ * requires verifying ndyhub.com as a custom domain inside NDYHUB's own
+ * M365/Workspace tenant (§10.1), which is still blocked on DNS access
+ * from the client. This function only computes the address string; it
+ * does not provision a mailbox.
+ */
+export function officialMailAddressForNdyId(ndyId: string): string {
+  return `${ndyId.toLowerCase()}@ndyhub.com`;
+}

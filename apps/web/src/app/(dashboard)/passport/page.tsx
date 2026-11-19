@@ -49,14 +49,19 @@ export default function PassportPage() {
 
   const ndyId = auth.status === "authenticated" ? auth.ndyId : null;
 
-  // getMe() (not usePassport(), which only returns the public-safe shape)
-  // is the only place the account's real email is available — shown on
-  // this self-view only, never rendered from the public /passport/[ndyId]
-  // page.
+  // Shows the official NDYMAIL address (derived live from ndyId), not the
+  // personal signup email — a shareable identity/business card shouldn't
+  // leak a private inbox address, and the NDY-ID-derived address is the
+  // one meant to be public (docs/ndymail-architecture-design.md §9). Per
+  // client feedback on a real build. getMe() (not usePassport(), which
+  // only returns the public-safe shape) is used here only because this is
+  // the authenticated self-view — the public /passport/[ndyId] page reads
+  // officialMailAddress straight off its own public getPublicPassport
+  // call instead, no getMe() needed there.
   useEffect(() => {
     if (auth.status !== "authenticated") return;
     getMe()
-      .then((me) => setEmail(me.email))
+      .then((me) => setEmail(me.officialMailAddress))
       .catch(() => {
         /* email is a nice-to-have on the card — not worth surfacing an
          * error banner over */

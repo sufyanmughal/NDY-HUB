@@ -24,6 +24,7 @@ import {
   passwordResetEmail,
 } from '../common/mail-templates';
 import { isPassportVerified } from '../common/passport-verification.util';
+import { officialMailAddressForNdyId } from '../common/ndy-id.util';
 import { SessionService, SessionMeta, IssuedSession } from './session.service';
 import { SecurityEventService } from './security-event.service';
 import { TotpService } from './totp.service';
@@ -274,6 +275,11 @@ export class AuthService {
       id: user.id,
       ndyId: user.ndyId,
       email: user.email,
+      // Official NDYMAIL address — see officialMailAddressForNdyId's own
+      // doc comment. Display-only for now: real delivery is blocked on
+      // the ndyhub.com custom-domain DNS step (docs/ndymail-architecture-
+      // design.md §10.1), not yet done.
+      officialMailAddress: officialMailAddressForNdyId(user.ndyId),
       fullName: user.fullName,
       profilePhotoUrl: user.profilePhotoUrl,
       verificationLevel: user.verificationLevel,

@@ -1,7 +1,11 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { IdentityService } from './identity.service';
 import { isPassportVerified } from '../common/passport-verification.util';
-import { ndyIdTypeForUser, isOverrideOnlyNdyIdType } from '../common/ndy-id.util';
+import {
+  ndyIdTypeForUser,
+  isOverrideOnlyNdyIdType,
+  officialMailAddressForNdyId,
+} from '../common/ndy-id.util';
 import { PrismaService } from '../prisma/prisma.service';
 
 // Public-safe view of a Passport — never leaks email, password hash, or
@@ -46,6 +50,12 @@ export class IdentityController {
     return {
       ndyId: user.ndyId,
       fullName: user.fullName,
+      // Derived purely from the already-public ndyId — safe to expose on
+      // the public card unlike the private personal email below, which
+      // stays gated behind self-view at GET /auth/me. See
+      // officialMailAddressForNdyId's doc comment: display-only, real
+      // delivery still blocked on the ndyhub.com DNS step.
+      officialMailAddress: officialMailAddressForNdyId(user.ndyId),
       foundingIdentity,
       profilePhotoUrl: user.profilePhotoUrl,
       verificationLevel: user.verificationLevel,
