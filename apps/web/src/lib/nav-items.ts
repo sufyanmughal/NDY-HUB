@@ -15,6 +15,7 @@ import {
   FileSignature,
   Bot,
   Brain,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 import { useMe } from "./use-me";
@@ -68,6 +69,13 @@ const BASE_NAV_ITEMS: NavItem[] = [
     sublabel: "Digital Identity",
     icon: ShieldCheck,
     iconColor: "#4f7cff",
+  },
+  {
+    href: "/memberships/manage",
+    label: "Membership",
+    sublabel: "Plan & Billing",
+    icon: CreditCard,
+    iconColor: "#f6b503",
   },
   {
     href: "/qr-codes",
