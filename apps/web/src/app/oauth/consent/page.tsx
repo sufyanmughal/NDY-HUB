@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -14,7 +14,20 @@ type ConsentPhase =
   | { phase: "auto-approving" }
   | { phase: "ready"; status: OAuthAuthorizeStatus }
   | { phase: "submitting" }
+  | { phase: "redirecting"; redirectUrl: string }
   | { phase: "error"; message: string };
+
+// A custom-scheme redirect (mobile app clients, e.g. "ndypaymobile://auth?...")
+// can't be navigated to the same way as a normal https:// SSO redirect: by the
+// time submitOAuthConsent's fetch resolves, the user-activation context from
+// the original tap is gone, and WKWebView/ASWebAuthenticationSession (what
+// actually renders this page inside a mobile app's login flow) silently
+// refuses a script-triggered `location.href` navigation to a non-http(s)
+// scheme with no error — the page just sits here forever. http(s) targets
+// have no such restriction, so only non-http(s) targets need the fallback link.
+function isHttpUrl(url: string): boolean {
+  return url.startsWith("http://") || url.startsWith("https://");
+}
 
 function CenteredMessage({ children }: { children: React.ReactNode }) {
   return (
@@ -42,6 +55,17 @@ function ConsentPageInner() {
       : null;
 
   const [consent, setConsent] = useState<ConsentPhase>({ phase: "loading" });
+  const redirectLinkRef = useRef<HTMLAnchorElement>(null);
+
+  // Best-effort auto-continue the instant the fallback link exists — a real
+  // DOM click carries closer-to-genuine activation semantics than the bare
+  // `location.href` assignment that got stuck, so this succeeds in most
+  // cases. The link stays rendered and tappable either way, so even where
+  // this doesn't fire there's always a way forward instead of a dead end.
+  useEffect(() => {
+    if (consent.phase !== "redirecting") return;
+    redirectLinkRef.current?.click();
+  }, [consent]);
 
   // Bounces through /login and back — this route needs a logged-in browser
   // to answer "who's approving this," and only /login (via the QR/NDYAPPS
@@ -76,7 +100,12 @@ function ConsentPageInner() {
           codeChallenge,
           codeChallengeMethod,
         }).then((result) => {
-          if (!cancelled) window.location.href = result.redirectUrl;
+          if (cancelled) return;
+          if (isHttpUrl(result.redirectUrl)) {
+            window.location.href = result.redirectUrl;
+          } else {
+            setConsent({ phase: "redirecting", redirectUrl: result.redirectUrl });
+          }
         });
       })
       .catch((err: Error) => {
@@ -101,7 +130,11 @@ function ConsentPageInner() {
         codeChallenge,
         codeChallengeMethod,
       });
-      window.location.href = result.redirectUrl;
+      if (isHttpUrl(result.redirectUrl)) {
+        window.location.href = result.redirectUrl;
+      } else {
+        setConsent({ phase: "redirecting", redirectUrl: result.redirectUrl });
+      }
     } catch (err) {
       setConsent({ phase: "error", message: (err as Error).message });
     }
@@ -118,6 +151,22 @@ function ConsentPageInner() {
   }
   if (consent.phase === "auto-approving" || consent.phase === "submitting") {
     return <CenteredMessage>Signing you in…</CenteredMessage>;
+  }
+  if (consent.phase === "redirecting") {
+    return (
+      <CenteredMessage>
+        <div className="flex flex-col items-center gap-3">
+          <p>Signing you in…</p>
+          <a
+            ref={redirectLinkRef}
+            href={consent.redirectUrl}
+            className="text-xs text-accent hover:underline"
+          >
+            Continue to the app
+          </a>
+        </div>
+      </CenteredMessage>
+    );
   }
   if (consent.phase === "error") {
     return <CenteredMessage>{consent.message}</CenteredMessage>;
